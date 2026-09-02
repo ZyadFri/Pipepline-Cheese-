@@ -31,7 +31,7 @@ export default function TrajectoriesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Trajectories</h1>
+        <h1 className="type-h1 text-slate-900">Trajectories</h1>
         <div className="flex gap-2">
           <select className="border border-gray-300 rounded px-2 py-1 text-sm" value={processFilter} onChange={(e) => setProcessFilter(e.target.value)}>
             <option value="">All process classes</option>
@@ -60,7 +60,7 @@ export default function TrajectoriesPage() {
       ) : (
         <div className="space-y-2">
           {trajectories.map((t) => (
-            <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div key={t.id} className="surface p-4">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-900">{t.label ?? `Trajectory #${t.id}`}</span>
                 {t.process_class && (

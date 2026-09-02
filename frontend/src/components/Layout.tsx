@@ -14,18 +14,18 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--canvas)' }}>
       {/* Top nav */}
-      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-40">
+      <header className="sticky top-0 z-40 border-b" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px) saturate(120%)', borderColor: 'var(--border)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <NavLink to="/" className="flex items-center gap-3 group">
-            <div className="bg-white rounded-md p-1 shadow-sm border border-slate-100 group-hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-md p-1 shadow-xs border border-slate-100 group-hover:shadow-sm transition-shadow">
               <img src="/mcgill.png" alt="McGill" className="h-7 w-auto" />
             </div>
             <div className="hidden sm:block">
-              <span className="font-bold text-slate-900 text-sm">Meat & Cheese</span>
-              <span className="text-[#C8102E] font-bold text-sm"> Database</span>
+              <span className="font-display font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Meat & Cheese</span>
+              <span className="font-display font-semibold text-sm" style={{ color: 'var(--primary)' }}> Database</span>
             </div>
           </NavLink>
 
@@ -36,8 +36,8 @@ export default function Layout() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
             >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
-                style={{ background: 'linear-gradient(135deg, #C8102E, #8B0000)' }}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow-xs"
+                style={{ background: 'linear-gradient(135deg, #7A1B2E, #4E0F1C)' }}
               >
                 {user?.full_name?.charAt(0)?.toUpperCase() ?? 'U'}
               </div>

@@ -239,7 +239,7 @@ function PrimaryAction({ paper, pid }: { paper: PaperPipeline; pid: number }) {
 
   const cls = clsx(
     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap',
-    variant === 'primary'   ? 'bg-[#C8102E] text-white hover:bg-[#a60d26]' :
+    variant === 'primary'   ? 'bg-[#7A1B2E] text-white hover:bg-[#661523]' :
     variant === 'secondary' ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' :
                               'text-slate-500 hover:bg-slate-100',
   )
@@ -413,7 +413,7 @@ export default function ProjectView() {
   )
 
   return (
-    <div className="flex gap-6 p-6 min-h-full bg-[#f8f9fb]">
+    <div className="flex gap-6 p-6 min-h-full" style={{ background: 'var(--canvas)' }}>
 
       {/* ── Main column ─────────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 space-y-5">
@@ -428,7 +428,7 @@ export default function ProjectView() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
+                <h1 className="type-h1" style={{ color: 'var(--foreground)' }}>{project.name}</h1>
                 <span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200">Project</span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
@@ -490,7 +490,7 @@ export default function ProjectView() {
               warn: approvedRows === 0,
             },
           ].map((card) => (
-            <div key={card.label} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div key={card.label} className="surface p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className={clsx('w-9 h-9 rounded-xl flex items-center justify-center', card.color)}>
                   <card.icon size={16} className={card.iconCls} />
@@ -513,7 +513,7 @@ export default function ProjectView() {
         </div>
 
         {/* Papers table */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="surface overflow-hidden">
           {/* Table header */}
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100">
             <h2 className="text-sm font-bold text-slate-800">Papers ({total})</h2>
@@ -523,13 +523,13 @@ export default function ProjectView() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search papers…"
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 w-44 focus:outline-none focus:border-[#C8102E]/40 focus:ring-1 focus:ring-[#C8102E]/20"
+              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 w-44 focus:outline-none focus:border-[#7A1B2E]/40 focus:ring-1 focus:ring-[#7A1B2E]/20"
             />
             {/* Status filter */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#C8102E]/40 bg-white"
+              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#7A1B2E]/40 bg-white"
             >
               <option value="all">All Status</option>
               <option value="uploaded">Uploaded</option>
@@ -545,7 +545,7 @@ export default function ProjectView() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as typeof sort)}
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#C8102E]/40 bg-white"
+              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#7A1B2E]/40 bg-white"
             >
               <option value="newest">Sort: Newest</option>
               <option value="oldest">Sort: Oldest</option>
@@ -658,7 +658,7 @@ export default function ProjectView() {
                           <MoreHorizontal size={13} />
                         </button>
                         {openMenuId === paper.id && (
-                          <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-20 w-36">
+                          <div className="absolute right-0 top-full mt-1 surface shadow-lg py-1 z-20 w-36">
                             <Link
                               to={`/projects/${pid}/papers/${paper.id}/overview`}
                               className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
@@ -712,13 +712,13 @@ export default function ProjectView() {
       <div className="w-64 shrink-0 space-y-4">
 
         {/* Pipeline overview donut */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="surface p-4">
           <h3 className="text-xs font-bold text-slate-700 mb-4">Pipeline Overview</h3>
           <DonutChart total={total} segments={segments} />
         </div>
 
         {/* Quick actions */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="surface p-4">
           <h3 className="text-xs font-bold text-slate-700 mb-3">Quick Actions</h3>
           <div className="space-y-1">
             {[
@@ -744,7 +744,7 @@ export default function ProjectView() {
         </div>
 
         {/* Recent activity */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="surface p-4">
           <h3 className="text-xs font-bold text-slate-700 mb-3">Recent Activity</h3>
           {recent.length === 0 ? (
             <p className="text-[11px] text-slate-400 text-center py-4">No papers yet</p>

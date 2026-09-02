@@ -123,7 +123,7 @@ function PaperCard({ paper, pid }: { paper: PaperStatus; pid: number }) {
   const base = `/projects/${pid}/papers/${paper.id}`
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all p-4">
+    <div className="surface-interactive p-4">
       <div className="flex items-start gap-4">
         {/* Icon */}
         <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
@@ -161,7 +161,7 @@ function PaperCard({ paper, pid }: { paper: PaperStatus; pid: number }) {
               <div className="flex items-center gap-1.5">
                 <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#C8102E] rounded-full transition-all"
+                    className="h-full bg-[#7A1B2E] rounded-full transition-all"
                     style={{ width: `${paper.progress_pct}%` }}
                   />
                 </div>
@@ -218,7 +218,7 @@ function PaperCard({ paper, pid }: { paper: PaperStatus; pid: number }) {
                 className={clsx(
                   'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors',
                   action.variant === 'primary'
-                    ? 'bg-[#C8102E] text-white hover:bg-[#a60d26]'
+                    ? 'bg-[#7A1B2E] text-white hover:bg-[#661523]'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                 )}
               >
@@ -255,7 +255,7 @@ export default function PapersPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Papers</h1>
+          <h1 className="type-h1" style={{ color: 'var(--foreground)' }}>Papers</h1>
           <p className="text-xs text-slate-400 mt-0.5">Select a paper to open its extraction workflow</p>
         </div>
         <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function PapersPage() {
           </button>
           <Link
             to={`/projects/${pid}/upload`}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-[#C8102E] text-white px-3 py-1.5 rounded-lg hover:bg-[#a60d26] transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-[#7A1B2E] text-white px-3 py-1.5 rounded-lg hover:bg-[#661523] transition-colors"
           >
             <Upload size={12} /> Upload PDF
           </Link>
@@ -285,7 +285,7 @@ export default function PapersPage() {
           <p className="text-sm text-slate-400 mt-1 mb-4">Upload PDFs to start extracting data</p>
           <Link
             to={`/projects/${pid}/upload`}
-            className="inline-flex items-center gap-2 text-sm font-semibold bg-[#C8102E] text-white px-4 py-2 rounded-lg hover:bg-[#a60d26] transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-semibold bg-[#7A1B2E] text-white px-4 py-2 rounded-lg hover:bg-[#661523] transition-colors"
           >
             <Upload size={14} /> Upload Papers
           </Link>

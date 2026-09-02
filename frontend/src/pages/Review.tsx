@@ -302,7 +302,7 @@ export default function Review() {
             onClick={() => setFilter(s)}
             className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-all ${
               filter === s
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-[#7A1B2E] text-white shadow-sm'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >

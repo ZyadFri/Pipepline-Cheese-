@@ -201,7 +201,7 @@ export default function Analytics() {
       )}
 
       {/* Papers table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="surface shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="section-title">Papers Overview</h2>
         </div>

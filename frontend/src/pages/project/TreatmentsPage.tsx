@@ -26,7 +26,7 @@ export default function TreatmentsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Treatment Arms</h1>
+        <h1 className="type-h1 text-slate-900">Treatment Arms</h1>
       </div>
 
       {loading ? (

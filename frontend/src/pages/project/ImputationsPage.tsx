@@ -49,7 +49,7 @@ export default function ImputationsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Imputation Proposals</h1>
+        <h1 className="type-h1 text-slate-900">Imputation Proposals</h1>
         <div className="flex gap-2">
           <select className="border border-gray-300 rounded px-2 py-1 text-sm" value={decisionFilter}
             onChange={(e) => setDecisionFilter(e.target.value)}>
@@ -73,7 +73,7 @@ export default function ImputationsPage() {
       ) : (
         <div className="space-y-2">
           {proposals.map((p) => (
-            <div key={p.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-4">
+            <div key={p.id} className="surface p-4 flex items-start gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-gray-900">#{p.id}</span>

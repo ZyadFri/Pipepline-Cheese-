@@ -63,7 +63,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">My Projects</h1>
-          <p className="muted mt-1">Welcome back, <span className="font-medium text-slate-700">{user?.full_name}</span></p>
+          <p className="muted mt-1.5">Welcome back, <span className="font-medium" style={{ color: 'var(--foreground)' }}>{user?.full_name}</span></p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary">
           <Plus size={16} />
@@ -73,10 +73,10 @@ export default function Dashboard() {
 
       {/* Create Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17131A]/40 backdrop-blur-sm px-4">
+          <div className="surface w-full max-w-md !bg-white">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-base font-semibold text-slate-900">New Research Project</h2>
+              <h2 className="type-h3" style={{ color: 'var(--foreground)' }}>New Research Project</h2>
               <button onClick={() => setShowCreate(false)} className="btn-ghost p-1.5">
                 <X size={16} />
               </button>
@@ -102,7 +102,7 @@ export default function Dashboard() {
                   onChange={(e) => setDesc(e.target.value)}
                 />
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="type-caption text-slate-400">
                 A default food-preservation schema will be applied. You can customize it in Schema settings.
               </p>
               <div className="flex gap-3 pt-2">
@@ -121,16 +121,16 @@ export default function Dashboard() {
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
             <p className="text-sm text-slate-500">Loading projects…</p>
           </div>
         </div>
       ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-5">
-            <FlaskConical size={28} className="text-blue-400" />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'rgba(122,27,46,0.08)' }}>
+            <FlaskConical size={28} style={{ color: 'var(--primary)' }} />
           </div>
-          <h3 className="text-base font-semibold text-slate-900 mb-1">No projects yet</h3>
+          <h3 className="type-h3 mb-1" style={{ color: 'var(--foreground)' }}>No projects yet</h3>
           <p className="text-sm text-slate-500 mb-6 max-w-xs">Create your first project to start extracting structured data from scientific papers using AI.</p>
           <button onClick={() => setShowCreate(true)} className="btn-primary">
             <Plus size={16} /> Create First Project
@@ -139,14 +139,11 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {projects.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 group flex flex-col"
-            >
+            <div key={p.id} className="surface-interactive group flex flex-col">
               <div className="p-5 flex-1">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
-                    <FolderOpen size={16} className="text-blue-600" />
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(122,27,46,0.08)' }}>
+                    <FolderOpen size={16} style={{ color: 'var(--primary)' }} />
                   </div>
                   <button
                     onClick={() => handleDelete(p.id, p.name)}
@@ -158,7 +155,8 @@ export default function Dashboard() {
                 </div>
                 <Link
                   to={`/projects/${p.id}`}
-                  className="block font-semibold text-slate-900 hover:text-blue-600 transition-colors mt-2 mb-1 line-clamp-1"
+                  className="block type-title hover:text-[#7A1B2E] transition-colors mt-2 mb-1 line-clamp-1"
+                  style={{ color: 'var(--foreground)' }}
                 >
                   {p.name}
                 </Link>

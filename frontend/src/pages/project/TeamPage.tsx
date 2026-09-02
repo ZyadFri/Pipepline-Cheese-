@@ -63,9 +63,9 @@ export default function TeamPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Team</h1>
+        <h1 className="type-h1 text-slate-900">Team</h1>
         <div className="flex gap-2">
-          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">
+          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-sm bg-[#7A1B2E] text-white px-3 py-1.5 rounded hover:bg-[#661523]">
             <UserPlus size={14} /> Invite
           </button>
           <button onClick={load} className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 rounded px-2 py-1">
@@ -75,7 +75,7 @@ export default function TeamPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex gap-3 items-end">
+        <div className="surface p-4 mb-4 flex gap-3 items-end">
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">Email</label>
             <input className="border border-gray-300 rounded px-2 py-1 text-sm w-full" value={form.user_email}
@@ -88,7 +88,7 @@ export default function TeamPage() {
               {['reviewer', 'analyst', 'admin', 'viewer'].map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-          <button onClick={handleAdd} className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">Add</button>
+          <button onClick={handleAdd} className="bg-[#7A1B2E] text-white text-sm px-3 py-1 rounded hover:bg-[#661523]">Add</button>
           <button onClick={() => setShowForm(false)} className="text-sm text-gray-500">Cancel</button>
         </div>
       )}

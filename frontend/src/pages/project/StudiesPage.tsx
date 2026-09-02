@@ -122,7 +122,7 @@ export default function StudiesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Studies</h1>
+        <h1 className="type-h1 text-slate-900">Studies</h1>
         <div className="flex gap-2">
           <select
             className="border border-gray-300 rounded px-2 py-1 text-sm"
@@ -145,7 +145,7 @@ export default function StudiesPage() {
           </button>
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"
+            className="flex items-center gap-1 text-sm bg-[#7A1B2E] text-white px-3 py-1.5 rounded hover:bg-[#661523]"
           >
             <Plus size={14} /> New Study
           </button>
@@ -228,7 +228,7 @@ export default function StudiesPage() {
             <button
               onClick={handleCreate}
               disabled={saving}
-              className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
+              className="bg-[#7A1B2E] text-white text-sm px-4 py-1.5 rounded hover:bg-[#661523] disabled:opacity-50"
             >
               {saving ? 'Creating…' : 'Create Study'}
             </button>
@@ -263,7 +263,7 @@ export default function StudiesPage() {
       ) : (
         <div className="space-y-2">
           {studies.map((s) => (
-            <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-4 group">
+            <div key={s.id} className="surface p-4 flex items-start gap-4 group">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 truncate">{s.title ?? `Study #${s.id}`}</p>
                 <p className="text-sm text-gray-500 mt-0.5">

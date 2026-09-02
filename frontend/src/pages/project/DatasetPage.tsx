@@ -49,7 +49,7 @@ export default function DatasetPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Dataset ({observations.length} observations)</h1>
+        <h1 className="type-h1 text-slate-900">Dataset ({observations.length} observations)</h1>
         <div className="flex gap-2">
           <select className="border border-gray-300 rounded px-2 py-1 text-sm" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="">All types</option>

@@ -87,7 +87,7 @@ function PaperJobGroup({ group, onCancel, projectId }: { group: PaperGroup; onCa
   )
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+    <div className="surface overflow-hidden shadow-sm">
       {/* Paper header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
         <Layers size={13} className="text-slate-400 shrink-0" />
@@ -193,7 +193,7 @@ export default function ExtractionJobsPage() {
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Extraction Jobs</h1>
+          <h1 className="type-h1 text-slate-900">Extraction Jobs</h1>
           <p className="text-xs text-slate-400 mt-0.5">All pipeline runs, grouped by paper</p>
         </div>
         <button

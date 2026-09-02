@@ -77,7 +77,7 @@ export default function ExportPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Export Dataset</h1>
+        <h1 className="type-h1 text-slate-900">Export Dataset</h1>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -86,7 +86,7 @@ export default function ExportPage() {
             key={key}
             onClick={() => handleExport(key)}
             disabled={requesting}
-            className="bg-white border border-gray-200 rounded-lg p-4 text-left hover:border-blue-400 hover:shadow-sm transition-all disabled:opacity-50 flex items-start gap-3"
+            className="surface p-4 text-left hover:border-blue-400 hover:shadow-sm transition-all disabled:opacity-50 flex items-start gap-3"
           >
             <span className="text-blue-600 mt-0.5">{FORMAT_ICONS[key]}</span>
             <div>
@@ -102,7 +102,7 @@ export default function ExportPage() {
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Recent exports</h2>
           <div className="space-y-2">
             {runs.map((run) => (
-              <div key={run.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3">
+              <div key={run.id} className="surface p-3 flex items-center gap-3">
                 <span className="text-gray-500">{FORMAT_ICONS[run.format]}</span>
                 <div className="flex-1">
                   <span className={`text-sm font-medium ${STATUS_COLORS[run.status] ?? 'text-gray-700'}`}>

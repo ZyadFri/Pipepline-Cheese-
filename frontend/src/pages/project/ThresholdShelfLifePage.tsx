@@ -53,9 +53,9 @@ export default function ThresholdShelfLifePage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Thresholds & Shelf-Life</h1>
+        <h1 className="type-h1 text-slate-900">Thresholds & Shelf-Life</h1>
         <div className="flex gap-2">
-          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">
+          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-sm bg-[#7A1B2E] text-white px-3 py-1.5 rounded hover:bg-[#661523]">
             <Plus size={14} /> Add Threshold
           </button>
           <button onClick={load} className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 rounded px-2 py-1">
@@ -65,7 +65,7 @@ export default function ThresholdShelfLifePage() {
       </div>
 
       {showForm && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 space-y-3">
+        <div className="surface p-4 mb-4 space-y-3">
           <h2 className="text-sm font-semibold">New Threshold</h2>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -104,7 +104,7 @@ export default function ThresholdShelfLifePage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleCreate} className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">Save</button>
+            <button onClick={handleCreate} className="bg-[#7A1B2E] text-white text-sm px-3 py-1 rounded hover:bg-[#661523]">Save</button>
             <button onClick={() => setShowForm(false)} className="text-sm text-gray-500">Cancel</button>
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function ThresholdShelfLifePage() {
       ) : (
         <div className="space-y-3">
           {thresholds.map((t) => (
-            <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div key={t.id} className="surface p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-gray-900">{t.name}</p>
@@ -125,7 +125,7 @@ export default function ThresholdShelfLifePage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleAnalyze(t.id)} className="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
+                  <button onClick={() => handleAnalyze(t.id)} className="text-sm bg-[#7A1B2E] text-white px-3 py-1 rounded hover:bg-[#661523]">
                     Analyze
                   </button>
                   <button onClick={() => handleDelete(t.id)} className="text-red-400 hover:text-red-600 p-1">

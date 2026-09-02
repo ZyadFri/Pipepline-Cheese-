@@ -39,7 +39,7 @@ export default function AuditHistoryPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Audit History</h1>
+        <h1 className="type-h1 text-slate-900">Audit History</h1>
         <div className="flex gap-2">
           <select className="border border-gray-300 rounded px-2 py-1 text-sm" value={entityTypeFilter}
             onChange={(e) => setEntityTypeFilter(e.target.value)}>
@@ -66,7 +66,7 @@ export default function AuditHistoryPage() {
       ) : (
         <div className="space-y-1">
           {events.map((e) => (
-            <div key={e.id} className="bg-white border border-gray-200 rounded-lg">
+            <div key={e.id} className="surface">
               <button
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left"
                 onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}

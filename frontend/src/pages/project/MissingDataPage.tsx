@@ -42,7 +42,7 @@ export default function MissingDataPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Missing Data</h1>
+        <h1 className="type-h1 text-slate-900">Missing Data</h1>
         <span className="text-sm text-gray-500">{observations.length} observations with missing values</span>
       </div>
 
@@ -53,7 +53,7 @@ export default function MissingDataPage() {
       ) : (
         <div className="space-y-4">
           {Object.entries(byReason).sort((a, b) => b[1].length - a[1].length).map(([reason, obs]) => (
-            <div key={reason} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div key={reason} className="surface p-4">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-sm font-semibold text-gray-800">
                   {MISSING_REASON_LABELS[reason as MissingReason] ?? reason}

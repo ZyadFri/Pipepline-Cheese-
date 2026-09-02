@@ -113,7 +113,7 @@ export default function SchemaPage() {
       </div>
 
       {/* Schema table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="surface shadow-sm overflow-hidden">
         {/* Column headers */}
         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 grid grid-cols-12 gap-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
           <span className="col-span-3">Field Name</span>

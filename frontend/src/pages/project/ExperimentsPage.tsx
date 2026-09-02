@@ -74,11 +74,11 @@ export default function ExperimentsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Experiments</h1>
+        <h1 className="type-h1 text-slate-900">Experiments</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"
+            className="flex items-center gap-1 text-sm bg-[#7A1B2E] text-white px-3 py-1.5 rounded hover:bg-[#661523]"
           >
             <Plus size={14} /> New Experiment
           </button>
@@ -141,7 +141,7 @@ export default function ExperimentsPage() {
             </div>
           </div>
           <div className="flex gap-2 mt-4">
-            <button onClick={handleCreate} disabled={saving} className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={handleCreate} disabled={saving} className="bg-[#7A1B2E] text-white text-sm px-4 py-1.5 rounded hover:bg-[#661523] disabled:opacity-50">
               {saving ? 'Creating…' : 'Create Experiment'}
             </button>
             <button onClick={() => { setShowForm(false); setForm(EMPTY) }} className="text-sm text-gray-500 px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">

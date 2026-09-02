@@ -2,65 +2,338 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   Food Research Platform — design system
+
+   Ported from the sibling Shelf-Life Studio app's design language: a dense,
+   neutral product-software system (near-neutral cool greys, hairline
+   separation, shadows reserved for things that actually float) with one
+   chromatic accent — McGill burgundy — and a display serif reserved for
+   page-level headings so the product has a distinct editorial identity
+   instead of reading as "the UI font, but bigger."
+
+   Written for Tailwind v3 (this app's actual version, vs. the sibling app's
+   v4) as plain CSS custom properties + hand-written utility classes, not
+   v4's @theme syntax — same tokens, same visual result, no version migration.
+   ========================================================================== */
+
+:root {
+  /* --- surfaces / text --------------------------------------------------- */
+  --canvas: #FCFCFC;
+  --background: #FFFFFF;
+  --foreground: #17131A;
+
+  --card: #FFFFFF;
+  --popover: #FFFFFF;
+  --elevated: #FFFFFF;
+
+  --primary: #7A1B2E;
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #661523;
+  --primary-active: #4E0F1C;
+
+  --secondary: #F4F4F5;
+  --secondary-foreground: #26282C;
+
+  --muted: #F6F6F7;
+  --muted-foreground: #6B7079;
+  --subtle-foreground: #8F949C;
+
+  --accent: #F4F4F5;
+  --accent-foreground: #17131A;
+
+  --destructive: #C0362C;
+  --destructive-foreground: #FFFFFF;
+  --success: #157F52;
+  --success-foreground: #FFFFFF;
+  --warning: #9A6206;
+  --warning-foreground: #FFFFFF;
+  --info: #2E5FA3;
+  --info-foreground: #FFFFFF;
+
+  --border: #E9E9EC;
+  --border-strong: #D6D7DB;
+  --input: #E0E1E5;
+  --ring: #7A1B2E;
+
+  --sidebar: #FCFAFA;
+  --sidebar-foreground: #3F444C;
+  --sidebar-border: #EEE7E8;
+
+  /* --- type ---------------------------------------------------------------
+     Fonts are loaded directly via index.html's Google Fonts link (this is a
+     Vite app, not Next.js — no next/font CSS-variable indirection needed). */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: 'Source Serif 4', Georgia, "Times New Roman", serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* --- radius --------------------------------------------------------------
+     Soft, generous rounding — this scale reads as considered product design
+     rather than default-browser at card scale. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+
+  /* --- shadows ---------------------------------------------------------
+     Reserved for things that genuinely float (menus, modals, hover-lifted
+     cards). In-page surfaces use a hairline border instead. */
+  --shadow-xs: 0 1px 2px rgba(23, 19, 26, 0.05);
+  --shadow-sm: 0 1px 3px rgba(23, 19, 26, 0.06), 0 1px 2px rgba(23, 19, 26, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(23, 19, 26, 0.08), 0 2px 4px -2px rgba(23, 19, 26, 0.05);
+  --shadow-lg: 0 12px 32px -8px rgba(23, 19, 26, 0.14), 0 4px 8px -4px rgba(23, 19, 26, 0.06);
+  --shadow-focus: 0 0 0 3px rgba(122, 27, 46, 0.18);
+
+  /* --- motion --------------------------------------------------------- */
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 @layer base {
-  html, body, #root {
-    height: 100%;
-  }
+  html, body, #root { height: 100%; }
+
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    background-color: var(--canvas);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    letter-spacing: -0.006em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   }
+
   * { @apply border-slate-200; }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: rgba(122, 27, 46, 0.18);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(23, 19, 26, 0.16);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(23, 19, 26, 0.28);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
 }
 
 @layer components {
+  /* --- buttons ----------------------------------------------------------- */
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-[#C8102E] hover:bg-[#a60d26] active:bg-[#8B0000] text-white font-medium rounded-lg transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed text-sm;
+    @apply inline-flex items-center gap-2 px-4 py-2.5 text-white font-medium rounded-[--radius-md] transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm;
+    background: var(--primary);
+    box-shadow: var(--shadow-sm);
   }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .btn-primary:active:not(:disabled) { background: var(--primary-active); transform: translateY(0); }
+
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 font-medium rounded-lg transition-all border border-slate-200 shadow-sm disabled:opacity-40 text-sm;
+    @apply inline-flex items-center gap-2 px-4 py-2.5 bg-white font-medium rounded-[--radius-md] transition-all disabled:opacity-40 text-sm;
+    border: 1px solid var(--border-strong);
+    color: var(--foreground);
+    box-shadow: var(--shadow-xs);
   }
+  .btn-secondary:hover:not(:disabled) { background: var(--muted); border-color: var(--primary); }
+
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium rounded-lg transition-all text-sm;
+    @apply inline-flex items-center gap-2 px-3 py-2 font-medium rounded-[--radius-md] transition-all text-sm;
+    color: var(--muted-foreground);
   }
+  .btn-ghost:hover { color: var(--foreground); background: var(--muted); }
+
   .btn-danger {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all shadow-sm disabled:opacity-40 text-sm;
+    @apply inline-flex items-center gap-2 px-4 py-2.5 text-white font-medium rounded-[--radius-md] transition-all disabled:opacity-40 text-sm;
+    background: var(--destructive);
+    box-shadow: var(--shadow-sm);
   }
-  .card {
-    @apply bg-white border border-slate-200 rounded-xl p-5 shadow-sm;
+  .btn-danger:hover:not(:disabled) { filter: brightness(0.92); box-shadow: var(--shadow-md); }
+
+  /* --- surfaces -----------------------------------------------------------
+     Softly translucent card over a blur, with a hairline top-edge highlight
+     so it reads as a physical raised surface rather than a flat rectangle. */
+  .surface, .card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
   }
+  .card { @apply p-5; }
+  .surface::after, .card::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.9), transparent);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .surface-interactive {
+    position: relative;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: background-color 160ms var(--ease-standard),
+                border-color 160ms var(--ease-standard),
+                box-shadow 200ms var(--ease-out-quint),
+                transform 200ms var(--ease-out-quint);
+  }
+  .surface-interactive:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-3px);
+  }
+
   .input {
-    @apply w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition shadow-sm;
+    @apply w-full bg-white rounded-[--radius-md] px-3.5 py-2.5 text-sm placeholder-slate-400 focus:outline-none transition;
+    border: 1px solid var(--input);
+    color: var(--foreground);
   }
+  .input:focus { border-color: var(--primary); box-shadow: var(--shadow-focus); }
+
   .label {
-    @apply block text-xs font-semibold text-slate-600 mb-1.5 tracking-wide uppercase;
+    @apply block text-xs font-semibold mb-1.5 tracking-wide uppercase;
+    color: var(--muted-foreground);
   }
-  .badge-pending   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200; }
-  .badge-approved  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200; }
-  .badge-rejected  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200; }
-  .badge-edited    { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200; }
-  .badge-extracted { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200; }
-  .badge-error     { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200; }
-  .badge-uploading { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200; }
+
+  /* --- badges -------------------------------------------------------------
+     Softer fills, hairline borders in the same hue — quieter than solid
+     saturated chips, still instantly scannable by color. */
+  .badge-pending   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #FBF3E4; color: #9A6206; border: 1px solid #F0DFB8; }
+  .badge-approved  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #E7F3ED; color: #157F52; border: 1px solid #C7E4D6; }
+  .badge-rejected  { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #FBEAE8; color: #C0362C; border: 1px solid #F1CDC8; }
+  .badge-edited    { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #EAF0F8; color: #2E5FA3; border: 1px solid #CCDBEE; }
+  .badge-extracted { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #F1EBF8; color: #6B3FA0; border: 1px solid #DCCBEE; }
+  .badge-error     { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #FBEAE8; color: #C0362C; border: 1px solid #F1CDC8; }
+  .badge-uploading { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; background: #E7F0FA; color: #2E6FA3; border: 1px solid #C7DCF0; }
 
   .stat-card {
-    @apply bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4;
+    @apply flex items-center gap-4 p-5;
+    position: relative;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
   }
   .stat-icon {
-    @apply w-11 h-11 rounded-xl flex items-center justify-center shrink-0;
+    @apply w-11 h-11 rounded-[--radius-md] flex items-center justify-center shrink-0;
   }
-  .page-title {
-    @apply text-2xl font-bold text-slate-900 tracking-tight;
+
+  .page-title { font-family: var(--font-display); @apply text-3xl tracking-tight; font-weight: 560; letter-spacing: -0.02em; color: var(--foreground); }
+  .section-title { @apply text-base font-semibold; color: var(--foreground); }
+  .muted { @apply text-sm; color: var(--muted-foreground); }
+}
+
+@layer utilities {
+  .shadow-xs { box-shadow: var(--shadow-xs); }
+  .shadow-sm { box-shadow: var(--shadow-sm); }
+  .shadow-md { box-shadow: var(--shadow-md); }
+  .shadow-lg { box-shadow: var(--shadow-lg); }
+
+  /* --- typography roles -----------------------------------------------
+     Page-level headings run in Source Serif 4 — reserved for headings that
+     anchor a whole page or screen. h3-and-below stay on Inter: at
+     card-header density a serif reads busy, and these appear many-to-a-page. */
+  .type-display {
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 4vw, 3.25rem); line-height: 1.04;
+    letter-spacing: -0.022em; font-weight: 540;
+    font-variation-settings: "opsz" 60;
+    text-wrap: balance;
   }
-  .section-title {
-    @apply text-base font-semibold text-slate-900;
+  .type-h1 {
+    font-family: var(--font-display);
+    font-size: 2rem; line-height: 1.1;
+    letter-spacing: -0.018em; font-weight: 540;
+    font-variation-settings: "opsz" 48;
   }
-  .muted {
-    @apply text-sm text-slate-500;
+  .type-h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem; line-height: 1.18;
+    letter-spacing: -0.014em; font-weight: 540;
+    font-variation-settings: "opsz" 32;
+  }
+  .type-h3 { font-size: 1.1875rem; line-height: 1.3; letter-spacing: -0.012em; font-weight: 600; }
+  .type-body { font-size: 0.9375rem; line-height: 1.6; letter-spacing: -0.006em; }
+  .type-ui { font-size: 0.875rem; line-height: 1.5; letter-spacing: -0.003em; }
+  .type-label { font-size: 0.8125rem; line-height: 1.4; font-weight: 500; }
+  .type-caption { font-size: 0.75rem; line-height: 1.45; letter-spacing: 0.005em; }
+  .type-eyebrow { font-size: 0.75rem; line-height: 1.2; letter-spacing: 0.08em; font-weight: 600; text-transform: uppercase; }
+  .type-mono { font-family: var(--font-mono); font-size: 0.875rem; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border) 12%, var(--border) 88%, transparent);
+  }
+
+  .row-interactive { transition: background-color 120ms var(--ease-standard); }
+  .row-interactive:hover { background: var(--muted); }
+  .row-interactive[data-selected="true"] {
+    background: rgba(122, 27, 46, 0.06);
+    box-shadow: inset 2px 0 0 0 var(--primary);
+  }
+
+  /* --- marketing helpers (Login / Register hero) ------------------------ */
+  .hero-glow {
+    background:
+      radial-gradient(52% 46% at 50% -4%, rgba(122, 27, 46, 0.5), transparent 72%),
+      radial-gradient(34% 38% at 22% 4%, rgba(110, 91, 255, 0.2), transparent 72%),
+      radial-gradient(34% 38% at 78% 6%, rgba(194, 85, 122, 0.22), transparent 72%);
+    filter: blur(48px);
+  }
+  .text-gradient-fade {
+    background: linear-gradient(180deg, currentColor 30%, transparent 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
   }
 }
 
-/* ── Blob animations for Login page ────────────────────────────────────────── */
-
+/* ── Blob animations (Login / Register hero panels) ────────────────────────
+   Two layers composited on the same element on purpose: `animate-blobN`
+   drifts position/scale (transform), `blob-morph-*` independently reshapes
+   the silhouette (border-radius only) — never the same property from two
+   animations, so nothing in the cascade fights. */
 @keyframes blob1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
   33%       { transform: translate(-30px, 20px) scale(1.08); }
@@ -75,11 +348,31 @@
   0%, 100% { transform: translate(0, 0) scale(1); }
   50%       { transform: translate(15px, 15px) scale(1.12); }
 }
-
 .animate-blob1 { animation: blob1 12s ease-in-out infinite; }
 .animate-blob2 { animation: blob2 15s ease-in-out infinite; }
 .animate-blob3 { animation: blob3 10s ease-in-out infinite; }
 
-/* ── Sidebar scrollbar hide ─────────────────────────────────────────────────── */
+@keyframes blob-morph-a {
+  0%, 100% { border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; }
+  33%      { border-radius: 63% 37% 41% 59% / 55% 63% 37% 45%; }
+  66%      { border-radius: 37% 63% 55% 45% / 63% 40% 60% 37%; }
+}
+@keyframes blob-morph-b {
+  0%, 100% { border-radius: 55% 45% 38% 62% / 46% 60% 40% 54%; }
+  33%      { border-radius: 38% 62% 57% 43% / 60% 42% 58% 40%; }
+  66%      { border-radius: 60% 40% 46% 54% / 40% 58% 42% 60%; }
+}
+.animate-morph-a { animation: blob-morph-a 18s ease-in-out infinite; }
+.animate-morph-b { animation: blob-morph-b 22s ease-in-out infinite; }
+
+/* ── Sidebar scrollbar hide ────────────────────────────────────────────── */
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

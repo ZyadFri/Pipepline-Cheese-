@@ -30,7 +30,7 @@ const ADMIN_NAV = [
 
 function SectionLabel({ label }: { label: string }) {
   return (
-    <p className="px-3 pt-5 pb-1 text-[9.5px] font-bold uppercase tracking-widest text-slate-400 select-none">
+    <p className="type-eyebrow px-3 pt-5 pb-1.5 text-slate-400 select-none" style={{ fontSize: '9.5px', letterSpacing: '0.09em' }}>
       {label}
     </p>
   )
@@ -45,12 +45,16 @@ function NavItem({ to, label, Icon, end }: NavItemProps) {
       end={end}
       className={({ isActive }) =>
         clsx(
-          'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+          'flex items-center gap-2.5 px-3 py-2 rounded-[--radius-md] text-sm transition-all duration-150',
           isActive
-            ? 'bg-[#C8102E] text-white font-semibold shadow-sm'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+            ? 'text-white font-semibold'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80',
         )
       }
+      style={({ isActive }) => isActive ? {
+        background: 'linear-gradient(135deg, #7A1B2E, #661523)',
+        boxShadow: '0 2px 8px -2px rgba(122,27,46,0.45)',
+      } : undefined}
     >
       {({ isActive }) => (
         <>
@@ -59,7 +63,7 @@ function NavItem({ to, label, Icon, end }: NavItemProps) {
             className={clsx('shrink-0', isActive ? 'text-white' : 'text-slate-400')}
           />
           <span className="truncate flex-1 text-[13px]">{label}</span>
-          {isActive && <ChevronRight size={10} className="shrink-0 opacity-60" />}
+          {isActive && <ChevronRight size={10} className="shrink-0 opacity-70" />}
         </>
       )}
     </NavLink>
@@ -73,12 +77,12 @@ export default function ProjectSidebar() {
   const base = `/projects/${projectId}`
 
   return (
-    <aside className="w-60 shrink-0 bg-white h-full flex flex-col overflow-hidden border-r border-slate-200 shadow-sm">
+    <aside className="w-60 shrink-0 h-full flex flex-col overflow-hidden border-r" style={{ background: 'var(--sidebar)', borderColor: 'var(--sidebar-border)' }}>
 
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
       <div className="px-4 pt-5 pb-4 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-2.5 mb-3">
-          <div className="bg-white rounded-md p-1 shadow-sm border border-slate-100">
+          <div className="bg-white rounded-md p-1 shadow-xs border border-slate-100">
             <img src="/mcgill.png" alt="McGill" className="h-7 w-auto" />
           </div>
           <div className="min-w-0">
@@ -87,9 +91,9 @@ export default function ProjectSidebar() {
           </div>
         </div>
         {/* Project pill */}
-        <div className="px-2.5 py-1.5 bg-[#C8102E]/8 rounded-lg border border-[#C8102E]/15">
-          <p className="text-[11.5px] font-bold text-[#C8102E] truncate leading-tight">Meat & Cheese DB</p>
-          <p className="text-[9.5px] text-[#C8102E]/60 leading-tight mt-0.5">Research Platform</p>
+        <div className="relative px-2.5 py-1.5 rounded-[--radius-md] overflow-hidden" style={{ background: 'rgba(122,27,46,0.07)', border: '1px solid rgba(122,27,46,0.16)' }}>
+          <p className="font-display text-[12px] font-semibold truncate leading-tight" style={{ color: 'var(--primary)' }}>Meat &amp; Cheese DB</p>
+          <p className="text-[9.5px] leading-tight mt-0.5" style={{ color: 'rgba(122,27,46,0.6)' }}>Research Platform</p>
         </div>
       </div>
 
@@ -127,8 +131,8 @@ export default function ProjectSidebar() {
       <div className="shrink-0 border-t border-slate-100 px-3 py-3">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-bold shadow-sm"
-            style={{ background: 'linear-gradient(135deg, #C8102E, #8B0000)' }}
+            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-bold shadow-xs"
+            style={{ background: 'linear-gradient(135deg, #7A1B2E, #4E0F1C)' }}
           >
             {user?.full_name?.charAt(0)?.toUpperCase() ?? 'U'}
           </div>
@@ -139,7 +143,7 @@ export default function ProjectSidebar() {
           <button
             onClick={() => { logout(); navigate('/login') }}
             title="Sign out"
-            className="p-1.5 text-slate-400 hover:text-[#C8102E] hover:bg-red-50 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-[#7A1B2E] hover:bg-red-50 rounded-lg transition-colors"
           >
             <LogOut size={13} />
           </button>

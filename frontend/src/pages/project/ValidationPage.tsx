@@ -458,7 +458,7 @@ export default function ValidationPage() {
       {/* Header */}
       <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Validation</h1>
+          <h1 className="type-h1 text-slate-900">Validation</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Review evidence packages and send selected content to Llama 4 for extraction
           </p>
@@ -470,7 +470,7 @@ export default function ValidationPage() {
           <select
             value={paperId ?? ''}
             onChange={(e) => setPaperId(Number(e.target.value))}
-            className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[280px] truncate"
+            className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#7A1B2E]/30 max-w-[280px] truncate"
           >
             <option value="">Select a paper…</option>
             {papers.map((p) => (
@@ -738,7 +738,7 @@ export default function ValidationPage() {
                     className={clsx(
                       'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all',
                       canSend && !sending
-                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                        ? 'bg-[#7A1B2E] text-white hover:bg-[#661523] shadow-sm'
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     )}
                   >

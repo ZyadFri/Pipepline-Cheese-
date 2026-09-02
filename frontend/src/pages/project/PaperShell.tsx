@@ -115,7 +115,7 @@ export default function PaperShell() {
   const base = `/projects/${projectId}/papers/${paperId}`
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[#f8f9fb]">
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--canvas)' }}>
 
       {/* ── Context header ─────────────────────────────────────────────────── */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3 min-w-0">
@@ -159,7 +159,7 @@ export default function PaperShell() {
                   !active
                     ? 'pointer-events-none border-transparent text-slate-300'
                     : isActive
-                    ? 'border-[#C8102E] text-[#C8102E] font-semibold'
+                    ? 'border-[#7A1B2E] text-[#7A1B2E] font-semibold'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200 cursor-pointer',
                 )
               }

@@ -59,10 +59,10 @@ export default function NormalizationPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Normalization Mappings</h1>
+        <h1 className="type-h1 text-slate-900">Normalization Mappings</h1>
         <div className="flex gap-2">
           <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">
+            className="flex items-center gap-1 text-sm bg-[#7A1B2E] text-white px-3 py-1.5 rounded hover:bg-[#661523]">
             <Plus size={14} /> Add Mapping
           </button>
           <button onClick={handleApply} disabled={applying}
@@ -76,7 +76,7 @@ export default function NormalizationPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex gap-3 items-end">
+        <div className="surface p-4 mb-4 flex gap-3 items-end">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Type</label>
             <select className="border border-gray-300 rounded px-2 py-1 text-sm" value={form.mapping_type}
@@ -94,7 +94,7 @@ export default function NormalizationPage() {
             <input className="border border-gray-300 rounded px-2 py-1 text-sm w-full" value={form.canonical_term}
               onChange={(e) => setForm({ ...form, canonical_term: e.target.value })} placeholder="e.g. soft ripened" />
           </div>
-          <button onClick={handleCreate} className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700">Save</button>
+          <button onClick={handleCreate} className="bg-[#7A1B2E] text-white text-sm px-3 py-1 rounded hover:bg-[#661523]">Save</button>
           <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 px-2 py-1">Cancel</button>
         </div>
       )}

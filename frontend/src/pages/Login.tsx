@@ -55,7 +55,7 @@ function ParticleCanvas() {
             ctx.beginPath()
             ctx.moveTo(particles[i].x, particles[i].y)
             ctx.lineTo(particles[j].x, particles[j].y)
-            ctx.strokeStyle = `rgba(255,200,210,${alpha})`
+            ctx.strokeStyle = `rgba(232,190,200,${alpha})`
             ctx.lineWidth = 0.8
             ctx.stroke()
           }
@@ -80,8 +80,8 @@ function ParticleCanvas() {
 
 function Feature({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
   return (
-    <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white/10 backdrop-blur-sm rounded-full border border-white/20 hover:bg-white/15 transition-colors">
-      <Icon size={14} className="text-white shrink-0" />
+    <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white/[0.08] backdrop-blur-md rounded-full border border-white/15 hover:bg-white/[0.14] hover:border-white/25 transition-all duration-300">
+      <Icon size={14} className="text-white/90 shrink-0" />
       <span className="text-white/90 text-sm font-medium">{text}</span>
     </div>
   )
@@ -104,7 +104,12 @@ export default function Login() {
       setAuth(data.access_token, { id: data.user_id, email: data.email, full_name: data.full_name })
       navigate('/')
     } catch (err: unknown) {
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Login failed')
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+      toast.error(
+        Array.isArray(detail)
+          ? detail.map((d) => (typeof d === 'string' ? d : d?.msg)).filter(Boolean).join('; ') || 'Login failed'
+          : (typeof detail === 'string' ? detail : 'Login failed')
+      )
     } finally {
       setLoading(false)
     }
@@ -114,12 +119,17 @@ export default function Login() {
     <div className="min-h-screen flex bg-white">
       {/* ── Left panel: animated branded hero ──────────────────────────────── */}
       <div className="hidden lg:flex lg:w-[54%] relative overflow-hidden flex-col">
-        {/* Layered gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#6B0018] via-[#C8102E] to-[#8B0000]" />
-        {/* Subtle animated blobs */}
-        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-white/5 animate-blob1" />
-        <div className="absolute bottom-[-10%] left-[-15%] w-[400px] h-[400px] rounded-full bg-white/5 animate-blob2" />
-        <div className="absolute top-[40%] left-[30%] w-[250px] h-[250px] rounded-full bg-[#FFB3C1]/10 animate-blob3" />
+        {/* Layered gradient background — burgundy anchored, violet/rose undertone */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#4E0F1C] via-[#7A1B2E] to-[#661523]" />
+        <div className="absolute inset-0 opacity-70" style={{
+          background: 'radial-gradient(60% 50% at 15% 8%, rgba(110,91,255,0.25), transparent 70%), radial-gradient(55% 45% at 90% 95%, rgba(194,85,122,0.28), transparent 70%)',
+        }} />
+        {/* Organic drifting + morphing blobs — two independent animations per
+            element (transform for drift, border-radius for shape) so neither
+            cancels the other out in the cascade. */}
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-white/[0.06] animate-blob1 animate-morph-a" />
+        <div className="absolute bottom-[-10%] left-[-15%] w-[400px] h-[400px] bg-white/[0.06] animate-blob2 animate-morph-b" />
+        <div className="absolute top-[40%] left-[30%] w-[250px] h-[250px] rounded-full bg-[#E8A9B8]/[0.08] animate-blob3" />
         {/* Particle network overlay */}
         <ParticleCanvas />
 
@@ -140,11 +150,11 @@ export default function Login() {
           <div className="mt-auto mb-auto pt-20">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 rounded-full border border-white/25 mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-white/90 text-xs font-medium">AI-Powered Research Platform</span>
+              <span className="type-eyebrow text-white/90">AI-Powered Research Platform</span>
             </div>
-            <h1 className="text-5xl font-extrabold text-white leading-tight tracking-tight mb-4">
-              Meat & Cheese<br />
-              <span className="text-white/80">Database</span>
+            <h1 className="font-display text-white leading-[1.04] tracking-tight mb-4" style={{ fontSize: 'clamp(2.75rem, 4.2vw, 3.75rem)', fontWeight: 540 }}>
+              Meat &amp; Cheese<br />
+              <span className="text-white/75">Database</span>
             </h1>
             <p className="text-white/75 text-lg leading-relaxed max-w-md">
               Extract structured scientific data from research papers using Docling,
@@ -167,7 +177,7 @@ export default function Login() {
                 { value: '6', label: 'Kinetic models' },
               ].map(({ value, label }) => (
                 <div key={label} className="border-l-2 border-white/30 pl-4">
-                  <div className="text-2xl font-bold text-white">{value}</div>
+                  <div className="font-display text-2xl text-white" style={{ fontWeight: 560 }}>{value}</div>
                   <div className="text-white/60 text-xs mt-0.5">{label}</div>
                 </div>
               ))}
@@ -182,14 +192,14 @@ export default function Login() {
       </div>
 
       {/* ── Right panel: login form ─────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8 py-12 bg-slate-50 relative">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 py-12 relative" style={{ background: 'linear-gradient(180deg, #FCFCFC 0%, #F7F5F5 100%)' }}>
         {/* Top-right subtle decoration */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#C8102E]/5 to-transparent rounded-bl-full pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#7A1B2E]/[0.06] to-transparent rounded-bl-full pointer-events-none" />
 
-        <div className="w-full max-w-[380px]">
+        <div className="w-full max-w-[400px] surface p-8">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="bg-[#C8102E] rounded-lg p-1.5">
+            <div className="bg-[#7A1B2E] rounded-lg p-1.5">
               <img src="/mcgill.png" alt="McGill" className="h-7 w-auto brightness-0 invert" />
             </div>
             <div>
@@ -200,20 +210,20 @@ export default function Login() {
 
           {/* Welcome */}
           <div className="mb-8">
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome back</h2>
+            <h2 className="type-h1" style={{ color: 'var(--foreground)' }}>Welcome back</h2>
             <p className="text-slate-500 text-sm mt-1.5">Sign in to your research account to continue</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
+              <label className="label">
                 Email address
               </label>
               <div className="relative">
                 <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="email"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 pl-10 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/40 focus:border-[#C8102E] transition shadow-sm"
+                  className="input pl-10"
                   placeholder="you@university.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -224,14 +234,14 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
+              <label className="label">
                 Password
               </label>
               <div className="relative">
                 <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="password"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 pl-10 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/40 focus:border-[#C8102E] transition shadow-sm"
+                  className="input pl-10"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -243,7 +253,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-[#C8102E] hover:bg-[#a60d26] active:bg-[#8B0000] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#C8102E]/25 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="btn-primary w-full justify-center py-3 text-sm disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -259,21 +269,21 @@ export default function Login() {
           <div className="mt-6 pt-6 border-t border-slate-200 text-center">
             <p className="text-sm text-slate-500">
               No account?{' '}
-              <Link to="/register" className="text-[#C8102E] hover:text-[#a60d26] font-semibold transition-colors">
+              <Link to="/register" className="text-[#7A1B2E] hover:text-[#661523] font-semibold transition-colors">
                 Create one
               </Link>
             </p>
           </div>
+        </div>
 
-          {/* Institutional badge */}
-          <div className="mt-8 flex items-center justify-center gap-2 text-slate-400">
-            <div className="h-px bg-slate-200 flex-1" />
-            <div className="flex items-center gap-1.5 px-3">
-              <img src="/mcgill.png" alt="" className="h-4 w-auto opacity-30" />
-              <span className="text-[10px] font-medium">McGill University</span>
-            </div>
-            <div className="h-px bg-slate-200 flex-1" />
+        {/* Institutional badge */}
+        <div className="mt-6 flex items-center justify-center gap-2 text-slate-400">
+          <div className="h-px bg-slate-200 w-16" />
+          <div className="flex items-center gap-1.5 px-3">
+            <img src="/mcgill.png" alt="" className="h-4 w-auto opacity-30" />
+            <span className="text-[10px] font-medium">McGill University</span>
           </div>
+          <div className="h-px bg-slate-200 w-16" />
         </div>
       </div>
     </div>

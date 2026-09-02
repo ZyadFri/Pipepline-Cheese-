@@ -391,7 +391,7 @@ export default function ExtractionWorkspacePage() {
         {selectedCount > 0 && (
           <button
             onClick={() => navigate(`/projects/${pid}/validation?paperId=${paperIdNum}`)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-[#7A1B2E] text-white rounded-lg text-xs font-semibold hover:bg-[#661523] transition-colors"
           >
             <Star size={12} />
             {selectedCount} for LLM
@@ -428,7 +428,7 @@ export default function ExtractionWorkspacePage() {
               onClick={() => setActiveFilter(f.id)}
               className={clsx(
                 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors whitespace-nowrap',
-                activeFilter === f.id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100',
+                activeFilter === f.id ? 'bg-[#7A1B2E] text-white' : 'text-slate-500 hover:bg-slate-100',
               )}
             >
               {f.icon}{f.label}
