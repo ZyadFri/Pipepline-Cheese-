@@ -31,7 +31,7 @@ from app.db.models import (
     ExtIngredient, ExtIndicator, ExtMeasurement,
     Job, Paper, Project, User,
 )
-from app.services.asset_classifier import classify_figure, score_relevance
+from app.services.asset_classifier import _is_decorative, classify_figure, score_relevance
 from app.services.chart_converter import convert_charts
 from app.services.context_linker import build_context_links
 from app.services.docling_extractor import extract_pdf
@@ -305,14 +305,19 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
 
         db.commit()
 
+        # Skip the LLM call for figures already caption-identifiable as decorative
+        # (publisher logos, license icons) — no point spending a vision call on those.
+        chart_candidates = [
+            fig for fig in docling_result.figures
+            if not _is_decorative(fig.caption, fig.page_number, fig.item_ref)
+        ]
+
         job.progress  = 65
-        job.current_step = (
-            f"Converting {len(docling_result.figures)} figures with PP-Chart2Table"
-        )
+        job.current_step = f"Reading {len(chart_candidates)} chart figures"
         db.commit()
 
-        # ── Step 5: Chart conversion ──────────────────────────────────────────
-        chart_results = convert_charts(docling_result.figures, docling_result.cache_dir)
+        # ── Step 5: Chart figure -> data table (vision LLM) ────────────────────
+        chart_results = convert_charts(chart_candidates, docling_result.cache_dir)
         cr_map = {cr.item_ref: cr for cr in chart_results}
 
         for fig in docling_result.figures:
@@ -322,6 +327,7 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first()
             if not asset:
                 continue
+
             cr = cr_map.get(fig.item_ref)
             if cr:
                 if cr.status == "valid":
@@ -373,30 +379,14 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         n_fig = sum(1 for a in all_assets if a.asset_type == "figure")
         n_tbl = sum(1 for a in all_assets if a.asset_type == "native_table")
         n_chart = sum(1 for a in all_assets if a.classification == "chart")
-        n_skipped_charts = sum(
-            1 for a in all_assets
-            if a.asset_type == "figure" and a.conversion_status == "skipped"
-        )
         n_logos = sum(
             1 for a in all_assets
             if a.classification in ("publisher_logo", "license_icon", "decorative_asset")
         )
 
-        # Build a stage-specific completion message — never say "Complete" if PP was skipped
-        from app.services.chart_converter import _chart_model_error
-        pp_available = _chart_model_error is None
-        if n_fig == 0:
-            chart_status = "no figures"
-        elif pp_available and n_chart > 0:
-            chart_status = f"{n_chart} charts converted"
-        elif pp_available and n_chart == 0:
-            chart_status = "0 charts (no chart figures found)"
-        else:
-            chart_status = f"chart conversion unavailable (PaddleOCR not installed)"
-
         step_summary = (
             f"Docling completed — {n_fig} figures, {n_tbl} tables · "
-            f"Chart stage: {chart_status}"
+            f"{n_chart} charts read"
         )
         if n_logos:
             step_summary += f" · {n_logos} decorative/logo assets excluded"
@@ -413,8 +403,6 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             "texts": len(docling_result.texts),
             "total_assets": len(all_assets),
             "page_count": docling_result.page_count,
-            "chart_conversion_available": pp_available,
-            "skipped_charts": n_skipped_charts,
             "decorative_excluded": n_logos,
         })
         db.commit()
@@ -586,28 +574,6 @@ def get_asset(
             }
             for lnk in sorted(asset.context_links, key=lambda l: -l.score)
         ],
-    }
-
-
-@router.get("/chart2table/health")
-def chart2table_health():
-    """Report whether PP-Chart2Table is available in this process."""
-    from app.services.chart_converter import _chart_model, _chart_model_error, _get_chart_model
-    import torch
-    model = _chart_model  # don't force-load here — just report current state
-    available = model is not None
-    device = "unknown"
-    if available:
-        try:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        except Exception:
-            pass
-    return {
-        "available": available,
-        "model_loaded": available,
-        "device": device if available else None,
-        "model_name": "PP-Chart2Table" if available else None,
-        "last_error": _chart_model_error,
     }
 
 
@@ -1174,7 +1140,6 @@ def get_evidence_packages(
             "completed_at": last_job.completed_at.isoformat() if last_job.completed_at else None,
         }
 
-    from app.services.chart_converter import _chart_model_error
     return {
         "paragraphs": paragraphs,
         "native_tables": native_tables,
@@ -1186,8 +1151,6 @@ def get_evidence_packages(
             "chart_csvs": len(chart_csvs),
             "excluded": len(excluded),
         },
-        "chart_conversion_available": _chart_model_error is None,
-        "chart_conversion_error": _chart_model_error,
         "last_job": last_job_data,
     }
 

@@ -95,7 +95,7 @@ class Paper(Base):
     project         = relationship("Project", back_populates="papers")
     rows            = relationship("ExtractedRow", back_populates="paper", cascade="all, delete-orphan")
     extraction_runs = relationship("ExtractionRun", back_populates="paper", cascade="all, delete-orphan")
-    study           = relationship("Study", back_populates="paper", uselist=False)
+    study           = relationship("Study", back_populates="paper", uselist=False, cascade="all, delete-orphan")
 
 
 class ExtractedRow(Base):
@@ -134,8 +134,8 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id              = Column(Integer, primary_key=True, index=True)
-    project_id      = Column(Integer, ForeignKey("projects.id"), nullable=True)
-    paper_id        = Column(Integer, ForeignKey("papers.id"), nullable=True)
+    project_id      = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    paper_id        = Column(Integer, ForeignKey("papers.id", ondelete="CASCADE"), nullable=True)
     job_type        = Column(String, nullable=False)   # extraction|modelling|export|normalization
     status          = Column(String, default="queued") # queued|parsing|chunking|extracting_metadata|extracting_tables|extracting_observations|normalizing|validating|awaiting_review|completed|partial_success|failed|cancelled
     progress        = Column(Integer, default=0)        # 0-100
@@ -210,8 +210,8 @@ class Study(Base):
     __tablename__ = "studies"
 
     id                    = Column(Integer, primary_key=True, index=True)
-    project_id            = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    paper_id              = Column(Integer, ForeignKey("papers.id"), nullable=True)
+    project_id            = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    paper_id              = Column(Integer, ForeignKey("papers.id", ondelete="CASCADE"), nullable=True)
     title                 = Column(Text)
     authors_json          = Column(Text, default="[]")   # [str]
     publication_year      = Column(Integer)
@@ -467,7 +467,7 @@ class ProvenanceRecord(Base):
     study_id            = Column(Integer, ForeignKey("studies.id"), nullable=True)
     observation_id      = Column(Integer, ForeignKey("observations.id"), nullable=True)
     field_name          = Column(String)     # which specific field this provenance covers
-    paper_id            = Column(Integer, ForeignKey("papers.id"), nullable=False)
+    paper_id            = Column(Integer, ForeignKey("papers.id", ondelete="CASCADE"), nullable=False)
     page_number         = Column(Integer)
     page_label          = Column(String)    # e.g. "S3" for supplementary
     section_name        = Column(String)
@@ -638,7 +638,7 @@ class TrajectoryDefinition(Base):
     __tablename__ = "trajectory_definitions"
 
     id                  = Column(Integer, primary_key=True, index=True)
-    project_id          = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id          = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     experiment_id       = Column(Integer, ForeignKey("experiments.id"), nullable=True)
     treatment_arm_id    = Column(Integer, ForeignKey("treatment_arms.id"), nullable=True)
     label               = Column(String)

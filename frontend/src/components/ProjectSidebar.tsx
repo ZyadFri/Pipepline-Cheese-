@@ -1,7 +1,7 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Upload, Cpu, FileText,
-  Database, FlaskConical, Activity, GitBranch, Download, Users, Settings,
+  Database, FlaskConical, Activity, ShieldAlert, Download, Users, Settings,
   History, LogOut, ChevronRight,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -17,16 +17,12 @@ const DATABASE_NAV = [
   { to: 'dataset',      label: 'Scientific Database', Icon: Database },
   { to: 'experiments',  label: 'Experiments',         Icon: FlaskConical },
   { to: 'trajectories', label: 'Trajectories',        Icon: Activity },
-]
-
-const MODELS_NAV = [
-  { to: 'model-lab',  label: 'Kinetic Models',   Icon: GitBranch },
-  { to: 'thresholds', label: 'Shelf-Life Models', Icon: Activity },
-  { to: 'export',     label: 'Model Registry',    Icon: Download },
+  { to: 'thresholds',   label: 'Safety Thresholds',   Icon: ShieldAlert },
 ]
 
 const ADMIN_NAV = [
   { to: 'team',     label: 'Team',          Icon: Users },
+  { to: 'export',   label: 'Export Dataset', Icon: Download },
   { to: 'settings', label: 'Settings',      Icon: Settings },
   { to: 'audit',    label: 'Audit Log',     Icon: History },
   { to: 'jobs',     label: 'Pipeline Jobs', Icon: Cpu },
@@ -115,13 +111,6 @@ export default function ProjectSidebar() {
         <SectionLabel label="Scientific Database" />
         <div className="space-y-0.5">
           {DATABASE_NAV.map(({ to, label, Icon }) => (
-            <NavItem key={label} to={`${base}/${to}`} label={label} Icon={Icon} />
-          ))}
-        </div>
-
-        <SectionLabel label="Analysis & Models" />
-        <div className="space-y-0.5">
-          {MODELS_NAV.map(({ to, label, Icon }) => (
             <NavItem key={label} to={`${base}/${to}`} label={label} Icon={Icon} />
           ))}
         </div>

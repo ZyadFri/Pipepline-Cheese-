@@ -26,9 +26,6 @@ import DatasetPage from './pages/project/DatasetPage'
 import NormalizationPage from './pages/project/NormalizationPage'
 import MissingDataPage from './pages/project/MissingDataPage'
 import TrajectoriesPage from './pages/project/TrajectoriesPage'
-import ModelLabPage from './pages/project/ModelLabPage'
-import ModelTrainingPage from './pages/project/ModelTrainingPage'
-import ModelGuidePage from './pages/project/ModelGuidePage'
 import ImputationsPage from './pages/project/ImputationsPage'
 import TreatmentsPage from './pages/project/TreatmentsPage'
 import ThresholdShelfLifePage from './pages/project/ThresholdShelfLifePage'
@@ -89,9 +86,6 @@ export default function App() {
 
         {/* Analysis */}
         <Route path="trajectories" element={<TrajectoriesPage />} />
-        <Route path="models" element={<ModelLabPage />} />
-        <Route path="model-lab" element={<ModelTrainingPage />} />
-        <Route path="model-lab/guide/:modelId" element={<ModelGuidePage />} />
         <Route path="imputations" element={<ImputationsPage />} />
         <Route path="treatments" element={<TreatmentsPage />} />
         <Route path="thresholds" element={<ThresholdShelfLifePage />} />

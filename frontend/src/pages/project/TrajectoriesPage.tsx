@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { trajectoriesApi } from '../../services/api'
-import type { Trajectory, ModelRun } from '../../types'
-import { Play, RefreshCw, Cpu } from 'lucide-react'
-import toast from 'react-hot-toast'
+import type { Trajectory } from '../../types'
+import { RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
 
 const PROCESS_COLORS: Record<string, string> = {
@@ -17,7 +16,6 @@ export default function TrajectoriesPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const [trajectories, setTrajectories] = useState<Trajectory[]>([])
   const [loading, setLoading] = useState(true)
-  const [fittingId, setFittingId] = useState<number | null>(null)
   const [processFilter, setProcessFilter] = useState('')
 
   const load = () => {
@@ -29,18 +27,6 @@ export default function TrajectoriesPage() {
   }
 
   useEffect(() => { load() }, [projectId, processFilter])
-
-  const handleFit = async (id: number) => {
-    setFittingId(id)
-    try {
-      const run: ModelRun = await trajectoriesApi.fitModels(id)
-      toast.success(`Model fitting started (run #${run.id})`)
-    } catch {
-      toast.error('Failed to start fitting')
-    } finally {
-      setFittingId(null)
-    }
-  }
 
   return (
     <div>
@@ -61,7 +47,7 @@ export default function TrajectoriesPage() {
       </div>
 
       <div className="mb-3 text-sm text-gray-500">
-        Trajectories group observations with the same conditions into temporal series ready for model fitting.
+        Trajectories group observations with the same conditions into temporal series, ready for export.
       </div>
 
       {loading ? (
@@ -74,34 +60,24 @@ export default function TrajectoriesPage() {
       ) : (
         <div className="space-y-2">
           {trajectories.map((t) => (
-            <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{t.label ?? `Trajectory #${t.id}`}</span>
-                  {t.process_class && (
-                    <span className={clsx('px-2 py-0.5 rounded-full text-xs font-medium', PROCESS_COLORS[t.process_class] ?? 'bg-gray-100 text-gray-600')}>
-                      {t.process_class}
-                    </span>
-                  )}
-                  {!t.data_sufficient && (
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">insufficient data</span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {t.measurement_type}
-                  {t.measurement_subtype ? ` · ${t.measurement_subtype}` : ''}
-                  {' · '}{t.n_points} points
-                  {t.time_min_days != null ? ` · ${t.time_min_days}–${t.time_max_days} days` : ''}
-                </p>
+            <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">{t.label ?? `Trajectory #${t.id}`}</span>
+                {t.process_class && (
+                  <span className={clsx('px-2 py-0.5 rounded-full text-xs font-medium', PROCESS_COLORS[t.process_class] ?? 'bg-gray-100 text-gray-600')}>
+                    {t.process_class}
+                  </span>
+                )}
+                {!t.data_sufficient && (
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">insufficient data</span>
+                )}
               </div>
-              <button
-                onClick={() => handleFit(t.id)}
-                disabled={fittingId === t.id || !t.data_sufficient}
-                className="flex items-center gap-1 text-sm px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-40"
-              >
-                <Cpu size={14} />
-                {fittingId === t.id ? 'Starting…' : 'Fit Models'}
-              </button>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {t.measurement_type}
+                {t.measurement_subtype ? ` · ${t.measurement_subtype}` : ''}
+                {' · '}{t.n_points} points
+                {t.time_min_days != null ? ` · ${t.time_min_days}–${t.time_max_days} days` : ''}
+              </p>
             </div>
           ))}
         </div>

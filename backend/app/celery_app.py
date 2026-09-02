@@ -56,14 +56,6 @@ def food_extract_paper_task(self, paper_id: int, project_id: int, job_id: int) -
         raise self.retry(exc=exc)
 
 
-@celery_app.task(bind=True, name="tasks.fit_trajectory")
-def fit_trajectory_task(self, run_id: int) -> dict:
-    """Celery task wrapper for model fitting."""
-    from app.services.model_registry import fit_trajectory_async
-    fit_trajectory_async(run_id)
-    return {"status": "completed", "run_id": run_id}
-
-
 @celery_app.task(bind=True, name="tasks.build_export")
 def build_export_task(self, run_id: int) -> dict:
     """Celery task wrapper for export building."""

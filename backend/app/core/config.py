@@ -35,9 +35,14 @@ class Settings(BaseSettings):
     # --- Groq (free tier, no billing needed) ---
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "groq/compound"
-    # llama-3.3-70b-versatile used directly for food extraction (12 000 TPM, JSON mode native).
-    # groq/compound misroutes response_format requests to openai/gpt-oss-120b (8 000 TPM only).
-    GROQ_FOOD_MODEL: str = "llama-3.3-70b-versatile"
+    # llama-3.3-70b-versatile was retired from Groq's catalog (confirmed via GET /v1/models
+    # returning model_not_found) — switched directly to openai/gpt-oss-120b, which supports
+    # json_mode/structured_outputs natively. Re-check GET /v1/models if this ever 404s again;
+    # Groq's catalog has already changed once under this codebase.
+    GROQ_FOOD_MODEL: str = "openai/gpt-oss-120b"
+    # Vision-capable model for reading chart figures directly (replaces the old local
+    # PP-Chart2Table model, which took minutes per figure on CPU-only hardware).
+    GROQ_VISION_MODEL: str = "qwen/qwen3.8-27b"
 
     AI_MAX_TOKENS: int = 16384
 

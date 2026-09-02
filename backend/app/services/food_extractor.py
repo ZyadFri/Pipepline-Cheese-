@@ -204,38 +204,45 @@ def _groq_client():
         raise RuntimeError("openai package required — pip install openai")
     if not settings.GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not set in backend/.env")
-    return OpenAI(api_key=settings.GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+    # max_retries=0: the SDK's own default retry-with-backoff on 5xx can silently
+    # burn minutes per call. _groq_call() below does its own bounded retry instead.
+    return OpenAI(
+        api_key=settings.GROQ_API_KEY, base_url="https://api.groq.com/openai/v1",
+        max_retries=0,
+    )
 
 
 def _groq_call(
     client,
     model: str,
-    system: str,
-    user_content: str,
+    system: Optional[str],
+    user_content,                      # str, for text; list[dict], for vision content parts
     max_tokens: int = 4096,
+    json_mode: bool = True,
 ) -> str:
     """
     Single Groq API call with adaptive retry:
-      • 413 (request too large) → halve text and retry
+      • 413 (request too large) → halve text and retry (text content only —
+        vision content parts are a fixed image + short prompt, nothing to shrink)
       • 429 (rate limit)        → sleep as requested, then retry
+      • 503 (model overloaded)  → 2 short retries (a few seconds apart), then give up —
+        a transient shared-model capacity issue, not something worth burning minutes on
     Returns the raw response content string.
     """
-    max_chars = len(user_content)
+    is_text = isinstance(user_content, str)
+    max_chars = len(user_content) if is_text else None
     content = user_content
+    retries_503 = 0
 
     for _attempt in range(8):
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user",   "content": content},
-        ]
+        messages = [{"role": "user", "content": content}]
+        if system:
+            messages.insert(0, {"role": "system", "content": system})
         try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.05,
-                response_format={"type": "json_object"},
-            )
+            kwargs = dict(model=model, messages=messages, max_tokens=max_tokens, temperature=0.05)
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            resp = client.chat.completions.create(**kwargs)
             raw = resp.choices[0].message.content or "{}"
             if resp.choices[0].finish_reason == "length":
                 logger.warning("Response truncated (finish_reason=length)")
@@ -244,7 +251,7 @@ def _groq_call(
             err = str(exc)
             is_413 = "413" in err or "request_too_large" in err or "Request Entity Too Large" in err
             is_429 = "429" in err or "rate_limit_exceeded" in err
-            if is_413 and max_chars > 1000:
+            if is_413 and is_text and max_chars > 1000:
                 max_chars //= 2
                 content = user_content[:max_chars] + "\n\n[Content truncated]"
                 logger.warning("Groq 413 — retrying with %d chars", max_chars)
@@ -253,6 +260,10 @@ def _groq_call(
                 wait = min(float(m.group(1)) + 2.0, 30.0) if m else 10.0
                 logger.warning("Groq 429 — waiting %.1fs", wait)
                 time.sleep(wait)
+            elif "503" in err and retries_503 < 2:
+                retries_503 += 1
+                logger.warning("Groq 503 (model overloaded) — retry %d/2 in 4s", retries_503)
+                time.sleep(4.0)
             else:
                 raise
 

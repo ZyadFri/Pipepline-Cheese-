@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import Base, engine, apply_column_migrations
 from app.api.routes import (
     auth, projects, papers, extraction, review,
-    analytics, export, schema, model_lab,
+    analytics, export, schema,
     food_extraction, extraction_workspace,
 )
 from app.api.routes import (
@@ -69,9 +69,6 @@ app.include_router(thresholds.router, prefix="/api")
 # ── Infrastructure ────────────────────────────────────────────────────────
 app.include_router(jobs.router, prefix="/api")
 app.include_router(snapshots.router, prefix="/api")
-
-# ── Model Lab ─────────────────────────────────────────────────────────────────
-app.include_router(model_lab.router, prefix="/api")
 
 # ── Food-safety extraction (new schema) ───────────────────────────────────────
 app.include_router(food_extraction.router, prefix="/api")

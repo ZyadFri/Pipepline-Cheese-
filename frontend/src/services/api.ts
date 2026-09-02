@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/auth'
 import type {
   Study, Experiment, TreatmentArm, Observation, Microorganism,
   Job, ProjectMember, NormalizationMapping, Trajectory,
-  ModelRun, ImputationProposal, Threshold, DatasetSnapshot,
+  ImputationProposal, Threshold, DatasetSnapshot,
   ExportRun, AuditEvent, ValidationIssue, ProvenanceRecord,
   ExperimentMicroorganism, ProjectStats,
 } from '../types'
@@ -291,10 +291,6 @@ export const trajectoriesApi = {
   create: (data: Record<string, unknown>): Promise<Trajectory> =>
     api.post('/trajectories', data).then((r) => r.data),
   delete: (id: number) => api.delete(`/trajectories/${id}`),
-  fitModels: (id: number): Promise<ModelRun> =>
-    api.post(`/trajectories/${id}/fit`).then((r) => r.data),
-  listRuns: (id: number): Promise<ModelRun[]> =>
-    api.get(`/trajectories/${id}/runs`).then((r) => r.data),
 }
 
 // ── Imputations ───────────────────────────────────────────────────────────

@@ -1,15 +1,15 @@
-"""Trajectory definitions + model fitting."""
+"""Trajectory definitions — groups of observations forming a temporal series."""
 
 import json
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.db.models import Observation, TrajectoryDefinition, User
-from app.schemas.canonical import TrajectoryCreate, TrajectoryOut, ModelRunOut
+from app.schemas.canonical import TrajectoryCreate, TrajectoryOut
 
 router = APIRouter(prefix="/trajectories", tags=["trajectories"])
 
@@ -101,42 +101,3 @@ def delete_trajectory(
     traj = _get_or_404(traj_id, db)
     db.delete(traj)
     db.commit()
-
-
-@router.post("/{traj_id}/fit", response_model=ModelRunOut)
-def fit_models(
-    traj_id: int,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Launch model fitting for this trajectory."""
-    traj = _get_or_404(traj_id, db)
-    from app.db.models import ModelRun
-    run = ModelRun(
-        trajectory_id=traj_id,
-        project_id=traj.project_id,
-        status="pending",
-        created_by=current_user.id,
-    )
-    db.add(run)
-    db.commit()
-    db.refresh(run)
-
-    from app.services.model_registry import fit_trajectory_async
-    background_tasks.add_task(fit_trajectory_async, run.id)
-    return run
-
-
-@router.get("/{traj_id}/runs", response_model=list[ModelRunOut])
-def list_model_runs(
-    traj_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _get_or_404(traj_id, db)
-    from app.db.models import ModelRun
-    return (db.query(ModelRun)
-              .filter(ModelRun.trajectory_id == traj_id)
-              .order_by(ModelRun.created_at.desc())
-              .all())
