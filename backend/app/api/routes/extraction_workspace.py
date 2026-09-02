@@ -178,7 +178,11 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         paper.status  = "extracting"
         job.status    = "running"
         job.started_at = datetime.utcnow()
-        job.current_step = "Parsing document structure with Docling"
+        # Docling parses the whole document in one call — there's no per-page hook
+        # to report progress during this step, unlike the asset/chart steps below
+        # which now commit incrementally. Set expectations instead of going quiet.
+        page_note = f" ({paper.page_count} pages — this can take a minute or two)" if paper.page_count else ""
+        job.current_step = f"Parsing document structure with Docling{page_note}"
         job.progress  = 5
         db.commit()
 
@@ -247,7 +251,10 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
                 selected_for_llm = False,
             )
             db.add(asset)
-            db.flush()
+            # Commit per asset (not batched at the end of the loop) — the frontend
+            # polls /assets every 2.5s, so this is what makes elements actually
+            # appear in the Live Gallery as they're extracted, instead of all at once.
+            db.commit()
             asset_map[fig.item_ref] = asset.id
 
         for i, tbl in enumerate(docling_result.tables):
@@ -273,10 +280,8 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
                 selected_for_llm = False,
             )
             db.add(asset)
-            db.flush()
+            db.commit()
             asset_map[tbl.item_ref] = asset.id
-
-        db.commit()
 
         job.progress  = 50
         job.current_step = "Linking context to visual elements"
@@ -316,42 +321,57 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         job.current_step = f"Reading {len(chart_candidates)} chart figures"
         db.commit()
 
-        # ── Step 5: Chart figure -> data table (vision LLM) ────────────────────
-        chart_results = convert_charts(chart_candidates, docling_result.cache_dir)
-        cr_map = {cr.item_ref: cr for cr in chart_results}
-
-        for fig in docling_result.figures:
-            aid = asset_map.get(fig.item_ref)
-            if not aid:
-                continue
-            asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first()
-            if not asset:
-                continue
-
-            cr = cr_map.get(fig.item_ref)
-            if cr:
-                if cr.status == "valid":
-                    asset.conversion_status = "complete"
-                    asset.csv_path  = cr.csv_path
-                    asset.csv_rows  = cr.row_count
-                    asset.csv_cols  = cr.col_count
-                elif cr.status == "rejected":
-                    asset.conversion_status = "not_a_chart"
-                elif cr.status == "error":
-                    asset.conversion_status = "failed"
-                    asset.conversion_error  = cr.reject_reason
-                else:
-                    asset.conversion_status = "skipped"
-            else:
-                asset.conversion_status = "skipped"
-
+        def _classify_and_commit(asset) -> None:
             asset.classification = classify_figure(
                 asset.image_path, asset.csv_path, asset.csv_rows, asset.csv_cols,
                 asset.caption, asset.conversion_status,
                 page_number=asset.page_number, item_ref=asset.docling_item_ref,
             )
+            db.commit()
 
-        db.commit()
+        # ── Step 5: Chart figure -> data table (vision LLM) ────────────────────
+        # Decorative figures never go to the API — classify them immediately.
+        candidate_refs = {fig.item_ref for fig in chart_candidates}
+        for fig in docling_result.figures:
+            if fig.item_ref in candidate_refs:
+                continue
+            aid = asset_map.get(fig.item_ref)
+            asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first() if aid else None
+            if not asset:
+                continue
+            asset.conversion_status = "skipped"
+            _classify_and_commit(asset)
+
+        # Consumed as a generator, not a list: each ChartResult is committed to the
+        # DB the moment it's produced (one figure ~1.5-5s away, not the whole batch),
+        # so the Live Gallery updates per-figure instead of going quiet until the
+        # slowest step in the whole pipeline finishes.
+        n_read = 0
+        for cr in convert_charts(chart_candidates, docling_result.cache_dir):
+            aid = asset_map.get(cr.item_ref)
+            asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first() if aid else None
+            if not asset:
+                continue
+
+            if cr.status == "valid":
+                asset.conversion_status = "complete"
+                asset.csv_path  = cr.csv_path
+                asset.csv_rows  = cr.row_count
+                asset.csv_cols  = cr.col_count
+            elif cr.status == "rejected":
+                asset.conversion_status = "not_a_chart"
+            elif cr.status == "error":
+                asset.conversion_status = "failed"
+                asset.conversion_error  = cr.reject_reason
+            else:
+                asset.conversion_status = "skipped"
+
+            _classify_and_commit(asset)
+
+            n_read += 1
+            job.progress = 65 + min(20, int(20 * n_read / max(1, len(chart_candidates))))
+            job.current_step = f"Read {n_read}/{len(chart_candidates)} chart figures"
+            db.commit()
 
         job.progress  = 85
         job.current_step = "Scoring scientific relevance"

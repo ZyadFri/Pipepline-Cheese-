@@ -182,32 +182,37 @@ def _skip_all(figures: list, reason: str) -> list:
     ]
 
 
-def convert_charts(figures: list, cache_dir: str) -> list:
+def convert_charts(figures: list, cache_dir: str):
     """
     Ask a vision-capable Groq model (settings.GROQ_VISION_MODEL) to read each
     figure and return its underlying data, if any.
+
+    A generator, not a list-returning function: each figure can take a couple
+    of seconds (API call + inter-request spacing), and the caller commits each
+    ChartResult to the DB as it arrives so the UI can show results appearing
+    one by one instead of going quiet until every figure is done.
 
     Parameters
     ----------
     figures  : list[DoclingFigure]   — figures from docling_extractor.extract_pdf()
     cache_dir: str                   — unused; kept for call-site compatibility
 
-    Returns list[ChartResult] — one per figure, with status valid/rejected/error/skipped.
+    Yields ChartResult — one per figure, with status valid/rejected/error/skipped.
     """
     if not settings.GROQ_API_KEY:
-        return _skip_all(figures, "GROQ_API_KEY not set")
+        yield from _skip_all(figures, "GROQ_API_KEY not set")
+        return
 
     client = _groq_client()
-    results: list = []
     called_api = False
 
     for idx, fig in enumerate(figures, start=1):
         if not fig.image_path or not Path(fig.image_path).exists():
-            results.append(ChartResult(
+            yield ChartResult(
                 item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                 image_hash=None, csv_path=None, status="error",
                 reject_reason="image file missing",
-            ))
+            )
             continue
 
         img_hash = _image_hash(fig.image_path)
@@ -223,11 +228,11 @@ def convert_charts(figures: list, cache_dir: str) -> list:
             with Image.open(fig.image_path) as im:
                 w, h = im.size
             if w < _MIN_IMAGE_DIM or h < _MIN_IMAGE_DIM:
-                results.append(ChartResult(
+                yield ChartResult(
                     item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                     image_hash=img_hash, csv_path=None, status="rejected",
                     reject_reason=f"image too small ({w}x{h}px) to be a readable chart",
-                ))
+                )
                 continue
         except Exception:
             pass  # if PIL can't read it, let the normal flow below try/fail cleanly
@@ -245,22 +250,22 @@ def convert_charts(figures: list, cache_dir: str) -> list:
                 df = pd.read_csv(str(csv_candidate))
                 valid, _ = _validate_dataframe(df)
                 if valid:
-                    results.append(ChartResult(
+                    yield ChartResult(
                         item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                         image_hash=img_hash, csv_path=str(csv_candidate), status="valid",
                         reject_reason=None, row_count=len(df), col_count=len(df.columns),
-                    ))
+                    )
                     continue
             except Exception:
                 pass  # corrupt cached CSV — re-run below
 
         data_url = _image_to_data_url(fig.image_path)
         if data_url is None:
-            results.append(ChartResult(
+            yield ChartResult(
                 item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                 image_hash=img_hash, csv_path=None, status="error",
                 reject_reason="could not read image file",
-            ))
+            )
             continue
 
         logger.info("Reading chart %d/%d with %s: %s",
@@ -277,51 +282,43 @@ def convert_charts(figures: list, cache_dir: str) -> list:
             ).strip()
 
             if raw.upper().startswith("NOT_A_CHART"):
-                results.append(ChartResult(
+                yield ChartResult(
                     item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                     image_hash=img_hash, csv_path=None, status="rejected",
                     reject_reason="model reports this is not a data chart",
-                ))
+                )
                 continue
 
             df = _parse_markdown_table(raw)
             if df is None:
-                results.append(ChartResult(
+                yield ChartResult(
                     item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                     image_hash=img_hash, csv_path=None, status="rejected",
                     reject_reason="markdown table parse failed",
-                ))
+                )
                 continue
 
             valid, reason = _validate_dataframe(df)
             if not valid:
-                results.append(ChartResult(
+                yield ChartResult(
                     item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                     image_hash=img_hash, csv_path=None, status="rejected",
                     reject_reason=reason,
-                ))
+                )
                 continue
 
             csv_path = img_p.parent / f"{img_p.stem}_data.csv"
             df.to_csv(str(csv_path), index=False)
-            results.append(ChartResult(
+            yield ChartResult(
                 item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                 image_hash=img_hash, csv_path=str(csv_path), status="valid",
                 reject_reason=None, row_count=len(df), col_count=len(df.columns),
-            ))
+            )
 
         except Exception as exc:
             logger.warning("Chart extraction error for %s: %s", img_p.name, exc)
-            results.append(ChartResult(
+            yield ChartResult(
                 item_ref=fig.item_ref, figure_index=idx, image_path=fig.image_path,
                 image_hash=img_hash, csv_path=None, status="error",
                 reject_reason=str(exc)[:200],
-            ))
-
-    valid_count = sum(1 for r in results if r.status == "valid")
-    rejected_count = sum(1 for r in results if r.status == "rejected")
-    logger.info(
-        "Chart extraction: %d valid, %d rejected, %d error/skipped",
-        valid_count, rejected_count, len(results) - valid_count - rejected_count,
-    )
-    return results
+            )

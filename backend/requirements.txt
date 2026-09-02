@@ -36,3 +36,8 @@ httpx>=0.27.0
 
 # Docling PDF extraction pipeline
 docling>=2.14.0,<3.0
+# Pinned explicitly: docling's own rapidocr/docling-ibm-models dependencies pull this
+# in transitively with loose version bounds, which has already let pip resolve an
+# incompatible 5.x build once (docling-ibm-models actually requires <5.0.0.0) and left
+# cv2 in a broken half-installed state. Keep this pin if either dependency's bounds change.
+opencv-python>=4.6.0.66,<5.0.0.0
