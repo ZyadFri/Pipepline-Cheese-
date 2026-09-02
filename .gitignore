@@ -1,23 +1,52 @@
-# Environment / secrets — NEVER commit
+# ── Secrets & environment ──────────────────────────────────────────
+.env
+.env.local
+.env.production
 backend/.env
-backend/*.db
-backend/food_research.db
+backend/*.env
 
-# Python
+# ── Databases (never commit — contains user research data) ─────────
+*.db
+*.sqlite
+*.sqlite3
+backend/food_research.db
+backend/test.db
+
+# ── Python ─────────────────────────────────────────────────────────
+__pycache__/
 backend/venv/
-backend/__pycache__/
+backend/.venv/
 backend/**/__pycache__/
 backend/**/*.pyc
+backend/**/*.pyo
 backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/htmlcov/
+backend/.coverage
 
-# Uploads (user data)
+# ── Uploads (user research PDFs — never commit) ───────────────────
 backend/uploads/
 
-# Node
+# ── Node / Frontend ────────────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/.vercel/
+node_modules/
 
-# OS
+# ── Logs ───────────────────────────────────────────────────────────
+*.log
+logs/
+celery*.log
+worker.log
+
+# ── OS ─────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+
+# ── Stray backup archives (not source, not meant to be tracked) ────
+backend/app.zip
+frontend/src.zip
