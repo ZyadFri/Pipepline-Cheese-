@@ -14,7 +14,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--canvas)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
       {/* Top nav */}
       <header className="sticky top-0 z-40 border-b" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px) saturate(120%)', borderColor: 'var(--border)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">

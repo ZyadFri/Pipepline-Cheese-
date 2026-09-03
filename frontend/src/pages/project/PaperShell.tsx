@@ -115,7 +115,7 @@ export default function PaperShell() {
   const base = `/projects/${projectId}/papers/${paperId}`
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--canvas)' }}>
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--background)' }}>
 
       {/* ── Context header ─────────────────────────────────────────────────── */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3 min-w-0">

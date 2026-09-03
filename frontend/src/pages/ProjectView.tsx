@@ -424,7 +424,7 @@ export default function ProjectView() {
   // "excessive/confusing" pattern this app is trying to move away from. Just
   // the project name and one clear next step, until there's something to show.
   if (papers.length === 0) return (
-    <div className="flex flex-col items-center justify-center min-h-full p-6 text-center" style={{ background: 'var(--canvas)' }}>
+    <div className="flex flex-col items-center justify-center min-h-full p-6 text-center" style={{ background: 'var(--background)' }}>
       <p className="type-eyebrow text-slate-400 mb-2">{project.name}</p>
       <FileText size={40} strokeWidth={1} className="text-slate-200 mb-4" />
       <h1 className="type-h1 mb-1.5" style={{ color: 'var(--foreground)' }}>No papers yet</h1>
@@ -438,7 +438,7 @@ export default function ProjectView() {
   )
 
   return (
-    <div className="flex gap-6 p-6 min-h-full" style={{ background: 'var(--canvas)' }}>
+    <div className="flex gap-6 p-6 min-h-full" style={{ background: 'var(--background)' }}>
 
       {/* ── Main column ─────────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 space-y-5">
