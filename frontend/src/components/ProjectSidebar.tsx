@@ -1,31 +1,19 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Cpu, FileText, UploadCloud,
-  Database, FlaskConical, Activity, ShieldAlert, Download, Users, Settings,
-  History,  LogOut, ChevronRight,
+  LayoutDashboard, FileText, UploadCloud,
+  ShieldCheck, Download, Settings,
+  LogOut, ChevronRight,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '../store/auth'
 
-const PIPELINE_NAV = [
-  { to: '',       end: true, label: 'Dashboard',     Icon: LayoutDashboard },
-  { to: 'upload',            label: 'Upload Papers',  Icon: UploadCloud },
-  { to: 'papers',            label: 'Papers',         Icon: FileText },
-]
-
-const DATABASE_NAV = [
-  { to: 'dataset',      label: 'Scientific Database', Icon: Database },
-  { to: 'experiments',  label: 'Experiments',         Icon: FlaskConical },
-  { to: 'trajectories', label: 'Trajectories',        Icon: Activity },
-  { to: 'thresholds',   label: 'Safety Thresholds',   Icon: ShieldAlert },
-]
-
-const ADMIN_NAV = [
-  { to: 'team',     label: 'Team',          Icon: Users },
-  { to: 'export',   label: 'Export Dataset', Icon: Download },
-  { to: 'settings', label: 'Settings',      Icon: Settings },
-  { to: 'audit',    label: 'Audit Log',     Icon: History },
-  { to: 'jobs',     label: 'Pipeline Jobs', Icon: Cpu },
+const PROJECT_NAV = [
+  { to: '',           end: true, label: 'Overview',        Icon: LayoutDashboard },
+  { to: 'papers',                label: 'Papers',           Icon: FileText },
+  { to: 'upload',                label: 'Extractions',      Icon: UploadCloud },
+  { to: 'validation',            label: 'Validation Queue', Icon: ShieldCheck },
+  { to: 'export',                label: 'Exports',          Icon: Download },
+  { to: 'settings',              label: 'Settings',         Icon: Settings },
 ]
 
 function SectionLabel({ label }: { label: string }) {
@@ -77,7 +65,10 @@ export default function ProjectSidebar() {
   const base = `/projects/${projectId}`
 
   return (
-    <aside className="w-60 shrink-0 h-full flex flex-col overflow-hidden border-r" style={{ background: 'var(--sidebar)', borderColor: 'var(--sidebar-border)' }}>
+    <aside
+      className="w-60 shrink-0 h-full flex flex-col overflow-hidden border-r"
+      style={{ background: 'linear-gradient(180deg, #fff 0%, #fffdfd 52%, #fffafa 100%)', borderColor: 'var(--sidebar-border)' }}
+    >
 
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
       <div className="px-4 pt-5 pb-4 border-b border-slate-100 shrink-0">
@@ -99,9 +90,9 @@ export default function ProjectSidebar() {
 
       {/* ── Nav ───────────────────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 scrollbar-none">
-        <SectionLabel label="Extraction Pipeline" />
+        <SectionLabel label="Project" />
         <div className="space-y-0.5">
-          {PIPELINE_NAV.map(({ to, end, label, Icon }) => (
+          {PROJECT_NAV.map(({ to, end, label, Icon }) => (
             <NavItem
               key={label}
               to={end ? base : `${base}/${to}`}
@@ -109,20 +100,6 @@ export default function ProjectSidebar() {
               Icon={Icon}
               end={end}
             />
-          ))}
-        </div>
-
-        <SectionLabel label="Scientific Database" />
-        <div className="space-y-0.5">
-          {DATABASE_NAV.map(({ to, label, Icon }) => (
-            <NavItem key={label} to={`${base}/${to}`} label={label} Icon={Icon} />
-          ))}
-        </div>
-
-        <SectionLabel label="Administration" />
-        <div className="space-y-0.5">
-          {ADMIN_NAV.map(({ to, label, Icon }) => (
-            <NavItem key={label} to={`${base}/${to}`} label={label} Icon={Icon} />
           ))}
         </div>
       </nav>
