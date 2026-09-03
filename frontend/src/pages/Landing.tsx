@@ -6,13 +6,11 @@ import {
 import { useState } from 'react'
 import { useAuthStore } from '../store/auth'
 
-const MODEL_ASSETS = 'https://raw.githubusercontent.com/ZyadFri/cheese-shelf-Life-v7/main/frontend/public/marketing'
-
 const IMAGES = {
-  hero: `${MODEL_ASSETS}/cheeses.jpg`,
-  aging: `${MODEL_ASSETS}/cheese-aging.jpg`,
-  lab: `${MODEL_ASSETS}/lab.jpg`,
-  campus: `${MODEL_ASSETS}/campus.jpg`,
+  hero: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=2200&q=86',
+  aging: 'https://images.unsplash.com/photo-1781785165275-6ac4deea7a9b?auto=format&fit=crop&fm=jpg&q=84&w=1800',
+  lab: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1600&q=84',
+  campus: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1600&q=84',
   paperDesk: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1200&q=82',
   paperRead: 'https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=1200&q=82',
   laptop: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=82',
@@ -332,7 +330,7 @@ export default function Landing() {
                       <Icon size={15} />
                     </div>
                   </div>
-                  <div className="p-4.5 p-5">
+                  <div className="p-5">
                     <h3 className="text-[14px] font-semibold text-[#241c1f]">{title}</h3>
                     <p className="mt-2 text-[12px] leading-[1.58] text-[#766970]">{body}</p>
                   </div>
@@ -385,7 +383,7 @@ export default function Landing() {
                 {[
                   [IMAGES.aging, 'Cheese maturation'],
                   [IMAGES.lab, 'Controlled studies'],
-                  [IMAGES.campus, 'Macdonald Campus'],
+                  [IMAGES.campus, 'Research environment'],
                   [IMAGES.hero, 'Cheese matrices'],
                 ].map(([src, label]) => (
                   <figure key={label} className="group relative h-[185px] overflow-hidden rounded-[18px] border border-[#eadde1] bg-[#f5edef]">
@@ -403,9 +401,9 @@ export default function Landing() {
           <div className="mx-auto max-w-[980px] overflow-hidden rounded-[28px] border border-[#7A1B2E]/15 bg-[linear-gradient(110deg,#4d0e1b,#7A1B2E_55%,#8e2940)] px-7 py-10 shadow-[0_28px_70px_-48px_rgba(76,16,30,.65)] sm:px-12 lg:px-16">
             <div className="grid items-center gap-8 lg:grid-cols-[1fr_auto]">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/65">Your research dataset</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">Your research dataset</p>
                 <h2 className="mt-2 font-display text-[clamp(2.1rem,4vw,3.5rem)] leading-none tracking-[-0.035em] text-white">Start building your dataset</h2>
-                <p className="mt-4 max-w-[610px] text-sm leading-6 text-white/72">
+                <p className="mt-4 max-w-[610px] text-sm leading-6 text-white/75">
                   Create a project, upload your first paper, and move from scientific literature to structured, reviewable data without manual transcription.
                 </p>
               </div>
