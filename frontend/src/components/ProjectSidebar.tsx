@@ -1,25 +1,23 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Cpu, FileText, ClipboardList,
+  LayoutDashboard, Cpu, FileText, UploadCloud,
   Database, FlaskConical, Activity, ShieldAlert, Download, Users, Settings,
-  History, LogOut, ChevronRight,
+  History,  LogOut, ChevronRight,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuthStore } from '../store/auth'
 
-// Upload isn't a nav destination — it's reachable via the "Upload Paper" CTA on
-// the Dashboard and Papers pages, so it isn't duplicated here.
-const PROJECT_NAV = [
-  { to: '',       end: true, label: 'Dashboard',           Icon: LayoutDashboard },
-  { to: 'papers',            label: 'Papers',               Icon: FileText },
-  { to: 'review',            label: 'Review',                Icon: ClipboardList },
-  { to: 'dataset',           label: 'Scientific Database',   Icon: Database },
+const PIPELINE_NAV = [
+  { to: '',       end: true, label: 'Dashboard',     Icon: LayoutDashboard },
+  { to: 'upload',            label: 'Upload Papers',  Icon: UploadCloud },
+  { to: 'papers',            label: 'Papers',         Icon: FileText },
 ]
 
-const ANALYSIS_NAV = [
-  { to: 'experiments',  label: 'Experiments',       Icon: FlaskConical },
-  { to: 'thresholds',   label: 'Safety Thresholds', Icon: ShieldAlert },
-  { to: 'trajectories', label: 'Trajectories',      Icon: Activity },
+const DATABASE_NAV = [
+  { to: 'dataset',      label: 'Scientific Database', Icon: Database },
+  { to: 'experiments',  label: 'Experiments',         Icon: FlaskConical },
+  { to: 'trajectories', label: 'Trajectories',        Icon: Activity },
+  { to: 'thresholds',   label: 'Safety Thresholds',   Icon: ShieldAlert },
 ]
 
 const ADMIN_NAV = [
@@ -94,16 +92,16 @@ export default function ProjectSidebar() {
         </div>
         {/* Project pill */}
         <div className="relative px-2.5 py-1.5 rounded-[--radius-md] overflow-hidden" style={{ background: 'rgba(122,27,46,0.07)', border: '1px solid rgba(122,27,46,0.16)' }}>
-          <p className="font-display text-[12px] font-semibold truncate leading-tight" style={{ color: 'var(--primary)' }}>Cheese Shelf-Life DB</p>
+          <p className="font-display text-[12px] font-semibold truncate leading-tight" style={{ color: 'var(--primary)' }}>Cheese Database</p>
           <p className="text-[9.5px] leading-tight mt-0.5" style={{ color: 'rgba(122,27,46,0.6)' }}>Research Platform</p>
         </div>
       </div>
 
       {/* ── Nav ───────────────────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 scrollbar-none">
-        <SectionLabel label="Project" />
+        <SectionLabel label="Extraction Pipeline" />
         <div className="space-y-0.5">
-          {PROJECT_NAV.map(({ to, end, label, Icon }) => (
+          {PIPELINE_NAV.map(({ to, end, label, Icon }) => (
             <NavItem
               key={label}
               to={end ? base : `${base}/${to}`}
@@ -114,9 +112,9 @@ export default function ProjectSidebar() {
           ))}
         </div>
 
-        <SectionLabel label="Data Analysis" />
+        <SectionLabel label="Scientific Database" />
         <div className="space-y-0.5">
-          {ANALYSIS_NAV.map(({ to, label, Icon }) => (
+          {DATABASE_NAV.map(({ to, label, Icon }) => (
             <NavItem key={label} to={`${base}/${to}`} label={label} Icon={Icon} />
           ))}
         </div>

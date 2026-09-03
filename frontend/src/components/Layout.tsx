@@ -19,14 +19,14 @@ export default function Layout() {
       <header className="sticky top-0 z-40 border-b" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px) saturate(120%)', borderColor: 'var(--border)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo */}
-          <NavLink to="/" className="flex items-center gap-3 group">
-            <div className="bg-white rounded-md p-1 shadow-xs border border-slate-100 group-hover:shadow-sm transition-shadow">
-              <img src="/mcgill.png" alt="McGill" className="h-7 w-auto" />
-            </div>
-            <div className="hidden sm:block">
-              <span className="font-display font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Cheese Shelf-Life</span>
-              <span className="font-display font-semibold text-sm" style={{ color: 'var(--primary)' }}> Database</span>
-            </div>
+          <NavLink to="/" className="flex items-center gap-3">
+            <img src="/mcgill.png" alt="McGill" className="h-8 w-auto" />
+            <span className="font-display text-[19px] font-bold tracking-[-0.01em]" style={{ color: 'var(--primary)' }}>McGill</span>
+            <span className="hidden h-6 w-px bg-slate-200 sm:block" />
+            <span className="hidden font-display text-[15px] sm:block">
+              <span className="font-semibold" style={{ color: 'var(--foreground)' }}>Cheese </span>
+              <span className="font-semibold" style={{ color: 'var(--primary)' }}>Database</span>
+            </span>
           </NavLink>
 
           {/* User menu */}
