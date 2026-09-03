@@ -1,47 +1,10 @@
-import { useState, FormEvent, useEffect, useRef } from 'react'
+import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, User, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authApi } from '../services/api'
 import { useAuthStore } from '../store/auth'
-
-function ParticleCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    let animId: number
-    const W = canvas.width = canvas.offsetWidth
-    const H = canvas.height = canvas.offsetHeight
-    type P = { x: number; y: number; vx: number; vy: number; r: number }
-    const pts: P[] = Array.from({ length: 55 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
-      r: Math.random() * 2 + 1,
-    }))
-    const tick = () => {
-      ctx.clearRect(0, 0, W, H)
-      for (const p of pts) {
-        p.x += p.vx; p.y += p.vy
-        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
-        if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill()
-      }
-      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
-        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y
-        const d = Math.sqrt(dx * dx + dy * dy)
-        if (d < 120) { ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.strokeStyle = `rgba(232,190,200,${(1 - d / 120) * 0.22})`; ctx.lineWidth = 0.7; ctx.stroke() }
-      }
-      animId = requestAnimationFrame(tick)
-    }
-    tick()
-    return () => cancelAnimationFrame(animId)
-  }, [])
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-}
+import ParticleNetwork from '../components/ParticleNetwork'
 
 export default function Register() {
   const [email, setEmail] = useState('')
@@ -105,7 +68,7 @@ export default function Register() {
         }} />
         <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-white/[0.06] animate-blob1 animate-morph-a" />
         <div className="absolute bottom-[-10%] left-[-15%] w-[400px] h-[400px] bg-white/[0.06] animate-blob2 animate-morph-b" />
-        <ParticleCanvas />
+        <ParticleNetwork />
         <div className="relative z-10 flex flex-col h-full p-12">
           <div className="flex items-center gap-3">
             <div className="bg-white rounded-lg p-1.5 shadow-lg">
@@ -125,10 +88,10 @@ export default function Register() {
               Create Your<br /><span className="text-white/75">Account</span>
             </h1>
             <p className="text-white/75 text-lg leading-relaxed max-w-md">
-              Start collaborating on food preservation research. Upload papers, extract data with AI, and share findings with your team.
+              Start extracting structured data from cheese research papers. Upload PDFs, review AI-extracted measurements, and build one shared scientific database with your team.
             </p>
           </div>
-          <p className="text-white/40 text-xs">© 2025 McGill University · Food Science Research Program</p>
+          <p className="text-white/40 text-xs">© 2026 McGill University · Food Science Research Program</p>
         </div>
       </div>
 

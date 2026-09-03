@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 
-// Auth pages
+// Public / auth pages
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
@@ -48,17 +49,22 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+// Signed-out visitors see the marketing Landing page at "/"; signed-in users
+// see the Dashboard through the normal top-nav Layout — same route, no
+// redirect either way, so "/" always resolves to the right thing.
+function RootGate() {
+  const token = useAuthStore((s) => s.token)
+  return token ? <Layout /> : <Landing />
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Dashboard — uses top-nav Layout */}
-      <Route
-        path="/"
-        element={<RequireAuth><Layout /></RequireAuth>}
-      >
+      {/* Dashboard — uses top-nav Layout; Landing when signed out */}
+      <Route path="/" element={<RootGate />}>
         <Route index element={<Dashboard />} />
       </Route>
 
