@@ -22,8 +22,13 @@ class Settings(BaseSettings):
     VERTEX_MODEL: str = "gemini-2.5-flash"
 
     # --- Google AI Studio (free API key, no GCP IAM needed) ---
+    # Used as the fallback provider in food_extractor.py when Groq's free-tier
+    # quota is exhausted (see _groq_call). gemini-2.0-flash was the original
+    # default but isn't in this key's available-models list as of 2026-09-03 —
+    # gemini-2.5-flash is confirmed available and, being natively multimodal,
+    # covers both the text-extraction and chart-reading fallback with one model.
     GOOGLE_API_KEY: str = ""
-    GOOGLE_AI_MODEL: str = "gemini-2.0-flash"
+    GOOGLE_AI_MODEL: str = "gemini-2.5-flash"
 
     # --- OpenAI ---
     OPENAI_API_KEY: str = ""

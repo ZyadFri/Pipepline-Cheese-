@@ -199,7 +199,7 @@ def _recover_experiments(raw: str) -> list:
     return objects
 
 
-# ─── Groq client ──────────────────────────────────────────────────────────────
+# ─── LLM clients (Groq primary, Gemini fallback) ───────────────────────────────
 
 def _groq_client():
     try:
@@ -209,23 +209,45 @@ def _groq_client():
     if not settings.GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not set in backend/.env")
     # max_retries=0: the SDK's own default retry-with-backoff on 5xx can silently
-    # burn minutes per call. _groq_call() below does its own bounded retry instead.
+    # burn minutes per call. _provider_call() below does its own bounded retry instead.
     return OpenAI(
         api_key=settings.GROQ_API_KEY, base_url="https://api.groq.com/openai/v1",
         max_retries=0,
     )
 
 
-def _groq_call(
+def _gemini_client():
+    """
+    Fallback provider for when Groq's free-tier quota is exhausted. Gemini's
+    OpenAI-compatible endpoint accepts the exact same chat.completions request
+    shape (including the vision content-parts format chart_converter.py uses),
+    so this is a drop-in second provider — no prompt or parsing changes needed
+    on either side, just a different client + model.
+    """
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError("openai package required — pip install openai")
+    if not settings.GOOGLE_API_KEY:
+        raise RuntimeError("GOOGLE_API_KEY is not set in backend/.env")
+    return OpenAI(
+        api_key=settings.GOOGLE_API_KEY,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        max_retries=0,
+    )
+
+
+def _provider_call(
     client,
     model: str,
     system: Optional[str],
     user_content,                      # str, for text; list[dict], for vision content parts
-    max_tokens: int = 4096,
-    json_mode: bool = True,
+    max_tokens: int,
+    json_mode: bool,
+    provider_label: str,
 ) -> str:
     """
-    Single Groq API call with adaptive retry:
+    Single provider API call with adaptive retry:
       • 413 (request too large) → halve text and retry (text content only —
         vision content parts are a fixed image + short prompt, nothing to shrink)
       • 429 (rate limit)        → sleep as requested, then retry
@@ -254,24 +276,54 @@ def _groq_call(
         except Exception as exc:
             err = str(exc)
             is_413 = "413" in err or "request_too_large" in err or "Request Entity Too Large" in err
-            is_429 = "429" in err or "rate_limit_exceeded" in err
+            is_429 = "429" in err or "rate_limit_exceeded" in err or "RESOURCE_EXHAUSTED" in err
             if is_413 and is_text and max_chars > 1000:
                 max_chars //= 2
                 content = user_content[:max_chars] + "\n\n[Content truncated]"
-                logger.warning("Groq 413 — retrying with %d chars", max_chars)
+                logger.warning("%s 413 — retrying with %d chars", provider_label, max_chars)
             elif is_429:
                 m = re.search(r"try again in ([\d.]+)s", err)
                 wait = min(float(m.group(1)) + 2.0, 30.0) if m else 10.0
-                logger.warning("Groq 429 — waiting %.1fs", wait)
+                logger.warning("%s 429 — waiting %.1fs", provider_label, wait)
                 time.sleep(wait)
             elif "503" in err and retries_503 < 2:
                 retries_503 += 1
-                logger.warning("Groq 503 (model overloaded) — retry %d/2 in 4s", retries_503)
+                logger.warning("%s 503 (model overloaded) — retry %d/2 in 4s", provider_label, retries_503)
                 time.sleep(4.0)
             else:
                 raise
 
-    raise RuntimeError("Groq call failed after maximum retries")
+    raise RuntimeError(f"{provider_label} call failed after maximum retries")
+
+
+def _groq_call(
+    client,
+    model: str,
+    system: Optional[str],
+    user_content,                      # str, for text; list[dict], for vision content parts
+    max_tokens: int = 4096,
+    json_mode: bool = True,
+) -> str:
+    """
+    Calls Groq (with its own adaptive retry, see _provider_call). If Groq's
+    retries are fully exhausted — the free-tier quota is the expected real-world
+    cause — and GOOGLE_API_KEY is configured, falls back to Gemini
+    (settings.GOOGLE_AI_MODEL) for this one call instead of failing the
+    extraction. Used identically for text extraction and chart reading, so both
+    get the fallback for free. Silent no-op fallback-wise when no Gemini key is
+    set: behavior is unchanged from Groq-only.
+    """
+    try:
+        return _provider_call(client, model, system, user_content, max_tokens, json_mode, "Groq")
+    except Exception as exc:
+        if not settings.GOOGLE_API_KEY:
+            raise
+        logger.warning("Groq exhausted (%s) — falling back to Gemini", str(exc)[:200])
+        gemini_client = _gemini_client()
+        return _provider_call(
+            gemini_client, settings.GOOGLE_AI_MODEL, system, user_content,
+            max_tokens, json_mode, "Gemini",
+        )
 
 
 # ─── Evidence ref validation ───────────────────────────────────────────────────
