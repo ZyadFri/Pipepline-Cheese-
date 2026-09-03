@@ -212,7 +212,7 @@ export default function ExtractionWorkspacePage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold text-slate-900 truncate">{paperName || `Paper ${paperIdNum}`}</h1>
-              <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+              <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border" style={{ color: 'var(--primary)', background: 'rgba(122,27,46,0.06)', borderColor: 'rgba(122,27,46,0.16)' }}>
                 <Loader2 size={9} className="animate-spin" /> Running
               </span>
             </div>
@@ -223,7 +223,7 @@ export default function ExtractionWorkspacePage() {
           <div className="shrink-0 flex items-center gap-3">
             <span className="text-sm font-bold text-slate-700">{progress}%</span>
             <div className="w-28 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, background: 'var(--primary)' }} />
             </div>
           </div>
         </div>
@@ -237,11 +237,11 @@ export default function ExtractionWorkspacePage() {
                 <div className={clsx(
                   'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all',
                   state === 'done'   ? 'bg-emerald-50 text-emerald-700' :
-                  state === 'active' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' :
+                  state === 'active' ? 'text-white' :
                                        'bg-white text-slate-300 border border-slate-100',
-                )}>
+                )} style={state === 'active' ? { background: 'var(--primary)' } : undefined}>
                   {state === 'done'   ? <CheckCircle2 size={10} className="text-emerald-500" /> :
-                   state === 'active' ? <Loader2 size={10} className="animate-spin text-blue-500" /> :
+                   state === 'active' ? <Loader2 size={10} className="animate-spin text-white" /> :
                                         <Circle size={10} className="text-slate-200" />}
                   {stage.label}
                 </div>
@@ -264,13 +264,13 @@ export default function ExtractionWorkspacePage() {
                   return (
                     <div key={stage.id} className="flex items-center gap-2">
                       {state === 'done'   ? <CheckCircle2 size={13} className="text-emerald-500 shrink-0" /> :
-                       state === 'active' ? <Loader2 size={13} className="text-blue-500 animate-spin shrink-0" /> :
+                       state === 'active' ? <Loader2 size={13} className="animate-spin shrink-0" style={{ color: 'var(--primary)' }} /> :
                                             <Circle size={13} className="text-slate-200 shrink-0" />}
                       <span className={clsx('text-[11px] leading-snug',
                         state === 'done'   ? 'text-slate-600' :
-                        state === 'active' ? 'text-blue-700 font-semibold' :
+                        state === 'active' ? 'font-semibold' :
                                              'text-slate-300',
-                      )}>{stage.label}</span>
+                      )} style={state === 'active' ? { color: 'var(--primary)' } : undefined}>{stage.label}</span>
                     </div>
                   )
                 })}
