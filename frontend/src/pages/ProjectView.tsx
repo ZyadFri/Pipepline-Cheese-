@@ -396,12 +396,11 @@ export default function ProjectView() {
 
   // Pipeline overview segments
   const segments = [
-    { label: 'Docling Completed', count: docklingDone, color: '#22c55e' },
-    { label: 'Charts Completed',  count: papers.filter((p) => p.stages.charts === 'completed').length, color: '#a855f7' },
-    { label: 'Awaiting Review',   count: awaitingReview, color: '#f59e0b' },
-    { label: 'Awaiting Review',   count: awaitingReview, color: '#f59e0b' },
-    { label: 'Failed',            count: failed, color: '#ef4444' },
-    { label: 'Not Started',       count: papers.filter((p) => p.badge === 'uploaded').length, color: '#cbd5e1' },
+    { label: 'Docling Completed', count: docklingDone, color: '#7A1B2E' },
+    { label: 'Charts Completed',  count: papers.filter((p) => p.stages.charts === 'completed').length, color: '#c2536b' },
+    { label: 'Awaiting Review',   count: awaitingReview, color: '#e8a94a' },
+    { label: 'Failed',            count: failed, color: '#c0392b' },
+    { label: 'Not Started',       count: papers.filter((p) => p.badge === 'uploaded').length, color: '#e5dbde' },
   ].filter((s, i, arr) => arr.findIndex((x) => x.label === s.label) === i)
 
   // Recent activity (last 5 papers sorted by uploaded_at)
@@ -489,28 +488,28 @@ export default function ProjectView() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
-              label: 'Total Papers', value: total,
+              label: 'Uploaded Papers', value: total,
               sub: total === 0 ? 'No papers yet' : 'All uploaded',
-              color: 'bg-blue-50', icon: FileText, iconCls: 'text-blue-500', bar: null,
+              icon: FileText, bar: null,
             },
             {
-              label: 'Docling Completed', value: docklingDone,
-              sub: total ? `${Math.round((docklingDone / total) * 100)}%` : '0%',
-              color: 'bg-emerald-50', icon: CheckCircle2, iconCls: 'text-emerald-500',
-              bar: total ? docklingDone / total : 0, barColor: 'bg-emerald-500',
-              detail: 'Ready for next steps',
+              label: 'Extraction Progress', value: `${total ? Math.round((docklingDone / total) * 100) : 0}%`,
+              sub: `${docklingDone} / ${total} papers`,
+              icon: CheckCircle2,
+              bar: total ? docklingDone / total : 0,
+              detail: `${docklingDone} / ${total} papers`,
             },
             {
-              label: 'LLM Extraction', value: llmDone,
+              label: 'LLM Extractions', value: llmDone,
               sub: total ? `${Math.round((llmDone / total) * 100)}%` : '0%',
-              color: 'bg-violet-50', icon: FlaskConical, iconCls: 'text-violet-500',
-              bar: total ? llmDone / total : 0, barColor: 'bg-violet-500',
-              detail: llmDone === 0 ? 'Not started' : 'Completed',
+              icon: FlaskConical,
+              bar: total ? llmDone / total : 0,
+              detail: llmDone === 0 ? 'Not started' : `${Math.round((llmDone / Math.max(total, 1)) * 100)}% of papers`,
             },
             {
               label: 'Approved Rows', value: approvedRows,
               sub: approvedRows === 0 ? '0%' : 'Reviewed',
-              color: 'bg-amber-50', icon: CheckCircle2, iconCls: approvedRows > 0 ? 'text-amber-500' : 'text-slate-300',
+              icon: ShieldCheck,
               bar: null,
               detail: approvedRows === 0 ? 'Ready to promote' : `${approvedRows} rows approved`,
               warn: approvedRows === 0,
@@ -518,8 +517,8 @@ export default function ProjectView() {
           ].map((card) => (
             <div key={card.label} className="surface p-4">
               <div className="flex items-start justify-between mb-3">
-                <div className={clsx('w-9 h-9 rounded-xl flex items-center justify-center', card.color)}>
-                  <card.icon size={16} className={card.iconCls} />
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'rgba(122,27,46,0.08)' }}>
+                  <card.icon size={16} style={{ color: 'var(--primary)' }} />
                 </div>
                 {card.warn && <AlertCircle size={13} className="text-amber-400 mt-0.5" />}
               </div>
@@ -528,8 +527,8 @@ export default function ProjectView() {
               {card.bar != null && (
                 <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className={clsx('h-full rounded-full transition-all', (card as any).barColor)}
-                    style={{ width: `${Math.round(card.bar * 100)}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${Math.round(card.bar * 100)}%`, background: 'var(--primary)' }}
                   />
                 </div>
               )}
