@@ -2,19 +2,23 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight, Upload, Cpu, Brain, ClipboardList, Database,
   FlaskConical, BarChart3, ShieldCheck, FileSearch, Menu, X,
+  FileSpreadsheet, FileJson, FileText,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../store/auth'
 
+// All photographs verified by direct screenshot before being wired in here —
+// several earlier candidates (a lecture hall, a plate of food) looked plausible
+// by filename/description alone but were visibly wrong on inspection.
 const IMAGES = {
   hero: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=2200&q=86',
-  aging: 'https://images.unsplash.com/photo-1781785165275-6ac4deea7a9b?auto=format&fit=crop&fm=jpg&q=84&w=1800',
-  lab: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1600&q=84',
-  campus: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1600&q=84',
-  paperDesk: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1200&q=82',
-  paperRead: 'https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=1200&q=82',
-  laptop: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=82',
+  paperA: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=1200&q=82',
+  paperB: 'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?auto=format&fit=crop&w=1200&q=82',
+  reviewing: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1200&q=82',
   dashboard: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=82',
+  lab: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=1600&q=84',
+  campus: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1600&q=84',
+  cheeseWheels: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=1600&q=84',
 }
 
 const NAV = [
@@ -106,34 +110,60 @@ function LandingHeader() {
   )
 }
 
+// ─── Workflow (pipeline) steps ──────────────────────────────────────────────
+// Step 3 renders a format-badge composition instead of a photo — "a real image
+// of Excel/CSV/database logos" reads more honestly as recognizable format
+// icons than as a stock photo, which would have to fake that concept.
+
+function DataFormatBadges() {
+  const items = [
+    { label: 'XLSX', Icon: FileSpreadsheet },
+    { label: 'CSV', Icon: FileText },
+    { label: 'JSON', Icon: FileJson },
+    { label: 'DB', Icon: Database },
+  ]
+  return (
+    <div className="grid h-full w-full grid-cols-2 place-items-center gap-1.5 bg-[#f9f1f3] p-3">
+      {items.map(({ label, Icon }) => (
+        <span
+          key={label}
+          className="flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-full border border-[#eadde1] bg-white px-2 py-1.5 text-[10px] font-semibold text-[#7A1B2E] shadow-[0_6px_16px_-10px_rgba(64,25,38,.4)]"
+        >
+          <Icon size={12} className="shrink-0" /> {label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 const WORKFLOW = [
   {
     step: '01',
     Icon: Upload,
     title: 'Upload paper',
     body: 'Drop in one or more scientific PDFs and keep every paper organized inside its project.',
-    image: IMAGES.paperDesk,
+    image: IMAGES.paperA,
   },
   {
     step: '02',
     Icon: Cpu,
     title: 'Paper is read',
     body: 'Text, tables, figures, captions, and context are identified as scientific evidence.',
-    image: IMAGES.paperRead,
+    image: IMAGES.paperB,
   },
   {
     step: '03',
     Icon: Brain,
     title: 'Data is extracted',
     body: 'Cheese products, treatments, ingredients, conditions, and measurements become structured records.',
-    image: IMAGES.laptop,
+    special: 'formats' as const,
   },
   {
     step: '04',
     Icon: ClipboardList,
     title: 'You review it',
     body: 'Approve, edit, or reject extracted values while keeping their original evidence one click away.',
-    image: IMAGES.lab,
+    image: IMAGES.reviewing,
   },
   {
     step: '05',
@@ -143,6 +173,8 @@ const WORKFLOW = [
     image: IMAGES.dashboard,
   },
 ]
+
+// ─── Capabilities ─────────────────────────────────────────────────────────────
 
 const CAPABILITIES = [
   {
@@ -172,44 +204,61 @@ const CAPABILITIES = [
   },
 ]
 
+// ─── Research team ────────────────────────────────────────────────────────────
+// Only Dr. Karboune's portrait is published here, matching how the sibling
+// shelf-life-modelling project's own landing page handles this — it
+// deliberately does not publish portraits for the other two collaborators,
+// using initials in place of a photo instead.
+
+const TEAM = [
+  {
+    name: 'Salwa Karboune', credential: 'PhD', role: 'Faculty lead',
+    affiliation: 'McGill University · Food Science',
+    bio: 'Food-science supervision and research direction for the platform.',
+    photo: '/marketing/karboune.jpg',
+  },
+  {
+    name: 'Zahra Allahdad', credential: 'PhD', role: 'Research Associate',
+    affiliation: 'Karboune Lab · McGill University',
+    bio: 'Contributes food-science expertise and research guidance within the Karboune Lab.',
+    initials: 'ZA', color: '#8e2940',
+  },
+  {
+    name: 'Loubna Benabbou', credential: 'PhD', role: 'Research Chair Professor',
+    affiliation: 'Université du Québec à Rimouski',
+    bio: 'Collaborating researcher supporting the lab’s wider research initiatives.',
+    initials: 'LB', color: '#5c2432',
+  },
+]
+
+// ─── Hero floating cards ─────────────────────────────────────────────────────
+
 function MiniPaper() {
   return (
-    <div className="absolute left-[8%] top-[8%] hidden w-[250px] rotate-[-1.4deg] rounded-[18px] border border-white/70 bg-white/95 p-5 shadow-[0_28px_70px_-28px_rgba(40,16,24,.55)] backdrop-blur-md lg:block xl:w-[270px]">
-      <p className="text-[8px] uppercase tracking-[0.18em] text-slate-400">Journal of Dairy Science · Research article</p>
+    <div className="absolute left-[6%] top-[7%] hidden w-[250px] rotate-[-1.4deg] rounded-[18px] border border-white bg-white p-5 shadow-[0_28px_70px_-28px_rgba(40,16,24,.55)] lg:block xl:w-[270px]">
+      <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-500">Journal of Dairy Science · Research article</p>
       <h3 className="mt-2 font-display text-[17px] leading-[1.08] text-[#241c1f]">
         Effect of ripening temperature on the texture and flavor of semi-hard cheeses
       </h3>
-      <p className="mt-1.5 text-[8px] text-slate-400">A. M. Landry · J. B. Thibault · et al.</p>
+      <p className="mt-1.5 text-[8px] text-slate-500">A. M. Landry · J. B. Thibault · et al.</p>
       <div className="my-3 h-px bg-slate-100" />
-      <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-500">Abstract</p>
-      <p className="mt-1 text-[7.5px] leading-[1.55] text-slate-500">
+      <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-600">Abstract</p>
+      <p className="mt-1 text-[7.5px] leading-[1.55] text-slate-600">
         This study evaluated the effect of temperature and ripening time on physicochemical and sensory properties of cheese during maturation.
       </p>
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="relative h-[52px] overflow-hidden rounded-md bg-[#fbf4f6] p-1.5">
-            <div className="absolute inset-x-2 bottom-2 h-px bg-[#d8c7cd]" />
-            <div className="absolute bottom-2 left-2 h-[18px] w-px bg-[#d8c7cd]" />
-            <svg viewBox="0 0 70 35" className="h-full w-full" aria-hidden="true">
-              <polyline points="5,28 20,23 36,18 52,12 65,8" fill="none" stroke={i === 0 ? '#7A1B2E' : i === 1 ? '#b17182' : '#64748b'} strokeWidth="2" />
-              {[5, 20, 36, 52, 65].map((x, idx) => <circle key={x} cx={x} cy={[28, 23, 18, 12, 8][idx]} r="1.6" fill="#7A1B2E" />)}
-            </svg>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
 
 function ExtractionPreview() {
   return (
-    <div className="absolute bottom-[9%] right-[8%] w-[62%] max-w-[520px] rounded-[20px] border border-white/70 bg-white/95 p-4 shadow-[0_30px_80px_-30px_rgba(40,16,24,.58)] backdrop-blur-xl sm:p-5 lg:right-[5%] lg:w-[58%]">
+    <div className="absolute bottom-[6%] right-[6%] max-h-[240px] w-[58%] max-w-[480px] overflow-hidden rounded-[20px] border border-white bg-white p-4 shadow-[0_30px_80px_-30px_rgba(40,16,24,.58)] sm:p-5 lg:right-[4%] lg:w-[54%]">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold text-[#7A1B2E]">Extracted rows</p>
-          <p className="mt-0.5 text-[9px] text-slate-400">Structured measurements with source evidence</p>
+          <p className="mt-0.5 text-[9px] text-slate-500">Structured measurements with source evidence</p>
         </div>
-        <span className="rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-semibold text-emerald-700">Evidence linked</span>
+        <span className="rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-semibold text-emerald-700 shrink-0">Evidence linked</span>
       </div>
       <div className="mt-3 overflow-hidden rounded-xl border border-[#eee4e7] bg-white">
         <div className="grid grid-cols-[1.35fr_.75fr_.65fr_.8fr] bg-[#fbf7f8] px-3 py-2 text-[8px] font-semibold text-slate-500">
@@ -219,7 +268,6 @@ function ExtractionPreview() {
           ['Gouda · control', '0', '5.32', 'Reviewed'],
           ['Gouda · LPO system', '15', '5.21', 'Reviewed'],
           ['Gouda · essential oil', '30', '5.19', 'Review'],
-          ['Semi-hard · coating', '60', '5.08', 'Reviewed'],
         ].map((row, idx) => (
           <div key={idx} className="grid grid-cols-[1.35fr_.75fr_.65fr_.8fr] border-t border-[#f1e9eb] px-3 py-2 text-[8px] text-slate-600">
             <span className="truncate pr-2 font-medium text-slate-700">{row[0]}</span>
@@ -229,13 +277,11 @@ function ExtractionPreview() {
           </div>
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-between text-[8px] text-slate-400">
-        <span>Paper → evidence → reviewed data</span>
-        <span className="font-semibold text-[#7A1B2E]">View extracted data →</span>
-      </div>
     </div>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Landing() {
   return (
@@ -243,6 +289,9 @@ export default function Landing() {
       <LandingHeader />
 
       <main>
+        {/* ── Hero — explicit height on the section itself (not derived from
+            sibling grid content) is what fixes the floating cards spilling
+            past the section boundary at wide viewports. ──────────────────── */}
         <section className="relative overflow-hidden border-b border-[#eadde1]">
           <div className="absolute inset-0 bg-[linear-gradient(100deg,#fffdfd_0%,#fff8fa_42%,rgba(255,248,250,.55)_58%,rgba(255,255,255,.03)_100%)]" />
           <div className="absolute inset-y-0 right-0 w-[56%] bg-cover bg-center opacity-95" style={{ backgroundImage: `url(${IMAGES.hero})` }} />
@@ -250,14 +299,14 @@ export default function Landing() {
           <div className="absolute -left-28 top-10 h-96 w-96 rounded-full bg-[#f4dbe2]/35 blur-3xl" />
           <div className="absolute right-[34%] top-16 h-72 w-72 rounded-full bg-white/45 blur-3xl" />
 
-          <div className="relative z-10 mx-auto grid min-h-[650px] max-w-[1440px] grid-cols-1 lg:grid-cols-[.92fr_1.08fr]">
-            <div className="flex items-center px-6 py-20 sm:px-10 lg:px-12 xl:px-14">
+          <div className="relative z-10 mx-auto grid min-h-[720px] max-w-[1440px] grid-cols-1 lg:grid-cols-[.92fr_1.08fr]">
+            <div className="flex items-center px-6 py-16 sm:px-10 lg:px-12 xl:px-14">
               <div className="max-w-[570px]">
                 <div className="inline-flex items-center rounded-full border border-[#e8c6d0] bg-white/80 px-3.5 py-1.5 shadow-[0_12px_30px_-22px_rgba(155,28,60,.65)] backdrop-blur-sm">
                   <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9b1c3c]">AI-powered research extraction</span>
                 </div>
 
-                <h1 className="mt-7 font-display text-[clamp(3.2rem,6vw,6.7rem)] leading-[.91] tracking-[-0.045em] text-[#211b1e]">
+                <h1 className="mt-7 font-display text-[clamp(2.75rem,5.2vw,5.75rem)] leading-[.95] tracking-[-0.04em] text-[#211b1e]">
                   From research papers<br />
                   to <span className="text-[#8e1734]">reliable data</span><br />
                   you can trust.
@@ -284,29 +333,15 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="relative min-h-[540px] lg:min-h-full">
+            <div className="relative min-h-[420px] lg:min-h-[720px]">
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,252,253,.10),rgba(74,28,39,.08))]" />
               <MiniPaper />
-              <div className="absolute right-[8%] top-[7%] hidden w-[230px] rounded-[18px] border border-white/70 bg-white/95 p-4 shadow-[0_26px_65px_-28px_rgba(40,16,24,.55)] backdrop-blur-xl sm:block lg:right-[5%] xl:w-[250px]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[9px] font-semibold text-[#30252a]">Texture over ripening time</p>
-                    <p className="text-[7px] text-slate-400">Figure values digitized</p>
-                  </div>
-                  <span className="rounded-full bg-[#fbf0f3] px-2 py-1 text-[7px] font-semibold text-[#8e1734]">Chart</span>
-                </div>
-                <svg viewBox="0 0 220 95" className="mt-2 w-full" aria-hidden="true">
-                  {[18, 38, 58, 78].map((y) => <line key={y} x1="18" y1={y} x2="210" y2={y} stroke="#efe7e9" strokeWidth="1" />)}
-                  <polyline points="18,72 55,61 95,48 140,34 205,20" fill="none" stroke="#8e1734" strokeWidth="2.3" />
-                  <polyline points="18,79 55,70 95,61 140,52 205,40" fill="none" stroke="#a87684" strokeWidth="2" />
-                  <polyline points="18,84 55,78 95,71 140,64 205,55" fill="none" stroke="#64748b" strokeWidth="2" />
-                </svg>
-              </div>
               <ExtractionPreview />
             </div>
           </div>
         </section>
 
+        {/* ── How it works ──────────────────────────────────────────────── */}
         <section id="pipeline" className="px-5 py-24 sm:px-8 lg:px-10">
           <div className="mx-auto max-w-[1320px]">
             <div className="mx-auto mb-12 max-w-2xl text-center">
@@ -320,15 +355,23 @@ export default function Landing() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              {WORKFLOW.map(({ step, Icon, title, body, image }) => (
+              {WORKFLOW.map(({ step, Icon, title, body, image, special }) => (
                 <article key={step} className="group overflow-hidden rounded-[18px] border border-[#eadde1] bg-white shadow-[0_18px_44px_-38px_rgba(64,25,38,.45)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_52px_-34px_rgba(64,25,38,.42)]">
                   <div className="relative h-[145px] overflow-hidden bg-[#f4ecef]">
-                    <img src={image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#2f1620]/35 via-transparent to-white/5" />
+                    {special === 'formats' ? (
+                      <DataFormatBadges />
+                    ) : (
+                      <>
+                        <img src={image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#2f1620]/35 via-transparent to-white/5" />
+                      </>
+                    )}
                     <div className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-[#7A1B2E] text-[10px] font-bold text-white shadow-lg">{step}</div>
-                    <div className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg border border-white/70 bg-white/90 text-[#7A1B2E] backdrop-blur-md">
-                      <Icon size={15} />
-                    </div>
+                    {special !== 'formats' && (
+                      <div className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg border border-white/70 bg-white/90 text-[#7A1B2E] backdrop-blur-md">
+                        <Icon size={15} />
+                      </div>
+                    )}
                   </div>
                   <div className="p-5">
                     <h3 className="text-[14px] font-semibold text-[#241c1f]">{title}</h3>
@@ -340,14 +383,20 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* ── Capabilities — plain card grid, no flanking photos ──────────── */}
         <section id="capabilities" className="border-y border-[#eadde1] bg-[#fffafa] px-5 py-20 sm:px-8 lg:px-10">
-          <div className="mx-auto max-w-[1380px]">
-            <div className="grid items-stretch gap-4 lg:grid-cols-[220px_repeat(5,1fr)_220px]">
-              <div className="relative hidden overflow-hidden rounded-[18px] lg:block">
-                <img src={IMAGES.aging} alt="Cheese aging shelves" className="h-full min-h-[220px] w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#30141f]/45 to-transparent" />
-              </div>
+          <div className="mx-auto max-w-[1320px]">
+            <div className="mx-auto mb-12 max-w-2xl text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9b1c3c]">Capabilities</p>
+              <h2 className="mt-3 font-display text-[clamp(2.2rem,4vw,3.6rem)] leading-none tracking-[-0.035em] text-[#241c1f]">
+                Built for scientific rigor, not just speed
+              </h2>
+              <p className="mt-4 text-sm leading-6 text-[#7c6e74]">
+                Extraction is only useful if you can trust — and check — what came out of it.
+              </p>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               {CAPABILITIES.map(({ Icon, title, body }) => (
                 <div key={title} className="rounded-[18px] border border-[#eadde1] bg-white p-5 shadow-[0_18px_44px_-40px_rgba(64,25,38,.38)]">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f9ecef] text-[#8e1734]">
@@ -357,16 +406,12 @@ export default function Landing() {
                   <p className="mt-2 text-[11px] leading-[1.6] text-[#7a6c72]">{body}</p>
                 </div>
               ))}
-
-              <div className="relative hidden overflow-hidden rounded-[18px] lg:block">
-                <img src={IMAGES.hero} alt="Cheese collection" className="h-full min-h-[220px] w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#30141f]/45 to-transparent" />
-              </div>
             </div>
           </div>
         </section>
 
-        <section id="research" className="px-5 py-20 sm:px-8 lg:px-10">
+        {/* ── Research + team ──────────────────────────────────────────── */}
+        <section id="research" className="px-5 py-24 sm:px-8 lg:px-10">
           <div className="mx-auto max-w-[1320px]">
             <div className="grid gap-7 lg:grid-cols-[260px_1fr] lg:items-center">
               <div>
@@ -379,12 +424,11 @@ export default function Landing() {
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-3">
                 {[
-                  [IMAGES.aging, 'Cheese maturation'],
+                  [IMAGES.cheeseWheels, 'Cheese matrices'],
                   [IMAGES.lab, 'Controlled studies'],
                   [IMAGES.campus, 'Research environment'],
-                  [IMAGES.hero, 'Cheese matrices'],
                 ].map(([src, label]) => (
                   <figure key={label} className="group relative h-[185px] overflow-hidden rounded-[18px] border border-[#eadde1] bg-[#f5edef]">
                     <img src={src} alt={label} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]" />
@@ -394,9 +438,44 @@ export default function Landing() {
                 ))}
               </div>
             </div>
+
+            {/* Team */}
+            <div className="mt-16">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9b1c3c]">Research team</p>
+              <h3 className="mt-2 font-display text-[clamp(1.75rem,2.6vw,2.5rem)] leading-[1.02] tracking-[-0.03em] text-[#241c1f]">
+                Project collaborators
+              </h3>
+
+              <div className="mt-7 grid gap-4 sm:grid-cols-3">
+                {TEAM.map((person) => (
+                  <article key={person.name} className="overflow-hidden rounded-[20px] border border-[#eadde1] bg-white shadow-[0_18px_44px_-38px_rgba(64,25,38,.4)]">
+                    <div className="h-[190px] w-full overflow-hidden bg-[#f4ecef]">
+                      {person.photo ? (
+                        <img src={person.photo} alt={person.name} className="h-full w-full object-cover object-top" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center" style={{ background: person.color }}>
+                          <span className="font-display text-4xl text-white/90" style={{ fontWeight: 540 }}>{person.initials}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5">
+                      <span className="inline-flex rounded-full border border-[#e8c6d0] bg-[#fff8fa] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#9b1c3c]">
+                        {person.role}
+                      </span>
+                      <h4 className="mt-3 font-display text-[19px] leading-tight text-[#241c1f]">
+                        {person.name}, {person.credential}
+                      </h4>
+                      <p className="mt-1 text-[11px] font-semibold text-[#9b1c3c]">{person.affiliation}</p>
+                      <p className="mt-2 text-[12px] leading-[1.6] text-[#786a70]">{person.bio}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
+        {/* ── Database / final CTA ─────────────────────────────────────── */}
         <section id="database" className="px-5 pb-20 pt-4 sm:px-8 lg:px-10">
           <div className="mx-auto max-w-[980px] overflow-hidden rounded-[28px] border border-[#7A1B2E]/15 bg-[linear-gradient(110deg,#4d0e1b,#7A1B2E_55%,#8e2940)] px-7 py-10 shadow-[0_28px_70px_-48px_rgba(76,16,30,.65)] sm:px-12 lg:px-16">
             <div className="grid items-center gap-8 lg:grid-cols-[1fr_auto]">
