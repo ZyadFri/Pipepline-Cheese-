@@ -286,7 +286,7 @@ function ParagraphRow({ item }: { item: ParagraphItem }) {
           {item.text.length > 160 && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-[10px] text-blue-500 hover:text-blue-700 mt-1"
+              className="text-[10px] text-[#7A1B2E] hover:text-[#661523] mt-1"
             >
               {expanded ? 'Show less' : 'Show more'}
             </button>
@@ -339,12 +339,12 @@ function AssetRow({ item, type }: { item: AssetItem; type: 'table' | 'chart' | '
             <>
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="text-[10px] text-blue-500 hover:text-blue-700 mt-1"
+                className="text-[10px] text-[#7A1B2E] hover:text-[#661523] mt-1"
               >
                 {expanded ? 'Hide context' : `Show ${item.context_links.length} context link(s)`}
               </button>
               {expanded && (
-                <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-blue-100">
+                <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-[#f3dde2]">
                   {item.context_links.slice(0, 4).map((lnk) => (
                     <p key={lnk.id} className="text-[11px] text-slate-600 leading-relaxed line-clamp-2">
                       {lnk.text}
@@ -522,7 +522,7 @@ export default function ValidationPage() {
         </div>
       ) : loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 size={28} className="animate-spin text-blue-500" />
+          <Loader2 size={28} className="animate-spin text-[#7A1B2E]" />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
@@ -545,7 +545,7 @@ export default function ValidationPage() {
                   isClean     ? 'bg-green-50 border-green-200' :
                   needsReview ? 'bg-amber-50 border-amber-200' :
                   job.status === 'failed' ? 'bg-red-50 border-red-200' :
-                  'bg-blue-50 border-blue-200'
+                  'bg-[#fdf3f5] border-[#e8c6d0]'
                 )}>
                   {isClean ? (
                     <CheckCircle2 size={18} className="text-green-600 mt-0.5 shrink-0" />
@@ -554,7 +554,7 @@ export default function ValidationPage() {
                   ) : job.status === 'failed' ? (
                     <XCircle size={18} className="text-red-600 mt-0.5 shrink-0" />
                   ) : (
-                    <Loader2 size={18} className="text-blue-600 mt-0.5 shrink-0 animate-spin" />
+                    <Loader2 size={18} className="text-[#7A1B2E] mt-0.5 shrink-0 animate-spin" />
                   )}
                   <div className="flex-1">
                     <p className={clsx(
@@ -562,7 +562,7 @@ export default function ValidationPage() {
                       isClean     ? 'text-green-800' :
                       needsReview ? 'text-amber-800' :
                       job.status === 'failed' ? 'text-red-800' :
-                      'text-blue-800'
+                      'text-[#661523]'
                     )}>
                       {isClean     ? 'Extraction complete' :
                        needsReview ? 'Extraction finished — review required' :
@@ -571,9 +571,9 @@ export default function ValidationPage() {
                     </p>
                     <p className="text-xs text-slate-600 mt-0.5">{job.current_step}</p>
                     {isRunning && (
-                      <div className="mt-2 h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                      <div className="mt-2 h-1.5 bg-[#f3dde2] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                          className="h-full bg-[#7A1B2E] rounded-full transition-all duration-500"
                           style={{ width: `${job.progress}%` }}
                         />
                       </div>
@@ -598,7 +598,7 @@ export default function ValidationPage() {
                         )}
                         <button
                           onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
-                          className="text-xs text-blue-600 font-semibold hover:underline"
+                          className="text-xs text-[#7A1B2E] font-semibold hover:underline"
                         >
                           Review results →
                         </button>
@@ -769,13 +769,13 @@ export default function ValidationPage() {
 
                 {isRunning ? (
                   <div className="space-y-2">
-                    <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-[#f3dde2] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        className="h-full bg-[#7A1B2E] rounded-full transition-all duration-500"
                         style={{ width: `${job!.progress}%` }}
                       />
                     </div>
-                    <p className="text-xs text-blue-700 font-medium">{job!.current_step}</p>
+                    <p className="text-xs text-[#661523] font-medium">{job!.current_step}</p>
                     <p className="text-[10px] text-slate-400">{job!.progress}% complete</p>
                   </div>
                 ) : (

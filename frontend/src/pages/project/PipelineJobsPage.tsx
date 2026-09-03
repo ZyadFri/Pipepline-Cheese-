@@ -8,7 +8,7 @@ import clsx from 'clsx'
 
 const JOB_TYPE_META: Record<string, { label: string; color: string }> = {
   workspace_extraction: { label: 'Docling Extraction', color: 'bg-violet-50 text-violet-700' },
-  llm_validation:       { label: 'LLM Validation',     color: 'bg-blue-50 text-blue-700' },
+  llm_validation:       { label: 'LLM Validation',     color: 'bg-[#fdf3f5] text-[#661523]' },
   extraction:           { label: 'Legacy Extraction',   color: 'bg-slate-100 text-slate-500' },
 }
 
@@ -18,7 +18,7 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   failed:          { label: 'Failed',    cls: 'bg-red-50 text-red-600 border-red-200' },
   cancelled:       { label: 'Cancelled', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
   queued:          { label: 'Queued',    cls: 'bg-sky-50 text-sky-700 border-sky-200' },
-  running:         { label: 'Running',   cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  running:         { label: 'Running',   cls: 'bg-[#fdf3f5] text-[#661523] border-[#e8c6d0]' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -50,7 +50,7 @@ function JobRow({ job, onCancel }: { job: Job; onCancel: (id: number) => void })
         )}
         {job.progress > 0 && job.progress < 100 && (
           <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden w-48">
-            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${job.progress}%` }} />
+            <div className="h-full bg-[#7A1B2E] rounded-full transition-all" style={{ width: `${job.progress}%` }} />
           </div>
         )}
         {job.error_message && (
@@ -96,7 +96,7 @@ function PaperJobGroup({
         <Layers size={13} className="text-slate-400 shrink-0" />
         <span className="text-[12px] font-bold text-slate-700 flex-1">Paper #{group.paperId}</span>
         {hasActive && (
-          <span className="flex items-center gap-1 text-[10px] text-blue-600 font-semibold">
+          <span className="flex items-center gap-1 text-[10px] text-[#7A1B2E] font-semibold">
             <Loader2 size={9} className="animate-spin" /> Active
           </span>
         )}

@@ -16,7 +16,7 @@ const NON_SCIENTIFIC = ['publisher_logo', 'license_icon', 'decorative_asset']
 
 const CLASS_META: Record<string, { label: string; cls: string }> = {
   chart:               { label: 'Chart',              cls: 'bg-emerald-100 text-emerald-700' },
-  native_table:        { label: 'Native Table',       cls: 'bg-blue-100 text-blue-700' },
+  native_table:        { label: 'Native Table',       cls: 'bg-[#f3dde2] text-[#661523]' },
   photograph:          { label: 'Photograph',         cls: 'bg-slate-100 text-slate-600' },
   diagram:             { label: 'Diagram',            cls: 'bg-violet-100 text-violet-700' },
   chemical_structure:  { label: 'Chemical Structure', cls: 'bg-amber-100 text-amber-700' },
@@ -65,7 +65,7 @@ function AssetRow({ asset, pid, paperIdNum, onToggle, onClick }: AssetRowProps) 
         'group flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all',
         'hover:shadow-sm hover:border-slate-300',
         asset.selected_for_llm
-          ? 'border-blue-300 bg-blue-50/20'
+          ? 'border-[#d9a5b3] bg-[#fdf3f5]/20'
           : 'border-slate-200 bg-white',
       )}
     >
@@ -118,7 +118,7 @@ function AssetRow({ asset, pid, paperIdNum, onToggle, onClick }: AssetRowProps) 
             className={clsx(
               'shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100',
               asset.selected_for_llm
-                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 opacity-100'
+                ? 'bg-[#f3dde2] text-[#661523] hover:bg-[#e8c6d0] opacity-100'
                 : 'bg-slate-100 text-slate-400 hover:bg-slate-200',
             )}
           >
@@ -334,7 +334,7 @@ export default function DoclingResultsPage() {
           paperIdNum={paperIdNum}
           onToggle={handleToggle}
           onClick={setSelectedAsset}
-          countCls="bg-blue-100 text-blue-700"
+          countCls="bg-[#f3dde2] text-[#661523]"
         />
         <Section
           title="Charts"

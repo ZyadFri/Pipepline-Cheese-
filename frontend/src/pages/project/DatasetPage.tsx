@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { reviewQueueApi } from '../../services/api'
 import type { ReviewObservation } from '../../types'
-import { RefreshCw, Download, Database } from 'lucide-react'
+import { RefreshCw, Download, Database, Search, CheckCircle2, Clock, XCircle } from 'lucide-react'
 
 const STATUS_CLS: Record<string, string> = {
   approved: 'bg-emerald-50 text-emerald-700',
@@ -24,6 +24,27 @@ export default function DatasetPage() {
   const [observations, setObservations] = useState<ReviewObservation[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
+
+  const counts = useMemo(() => {
+    const c = { approved: 0, needs_review: 0, rejected: 0 }
+    for (const o of observations) {
+      if (o.review_status === 'approved') c.approved++
+      else if (o.review_status === 'rejected') c.rejected++
+      else c.needs_review++
+    }
+    return c
+  }, [observations])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return observations
+    const q = search.trim().toLowerCase()
+    return observations.filter((o) =>
+      (o.product_name ?? '').toLowerCase().includes(q) ||
+      (o.treatment_label ?? '').toLowerCase().includes(q) ||
+      (o.measurement_subtype ?? o.measurement_type ?? '').toLowerCase().includes(q),
+    )
+  }, [observations, search])
 
   const load = () => {
     if (!projectId) return
@@ -67,6 +88,15 @@ export default function DatasetPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search product, treatment, indicator…"
+              className="border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-sm w-56 focus:outline-none focus:border-[#7A1B2E]/40"
+            />
+          </div>
           <select className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All statuses</option>
             <option value="approved">Approved</option>
@@ -81,6 +111,27 @@ export default function DatasetPage() {
           </button>
         </div>
       </div>
+
+      {!loading && observations.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          {[
+            { label: 'Total Rows', value: observations.length, Icon: Database, color: 'var(--primary)' },
+            { label: 'Approved', value: counts.approved, Icon: CheckCircle2, color: '#0f9d58' },
+            { label: 'Needs Review', value: counts.needs_review, Icon: Clock, color: '#c78a1e' },
+            { label: 'Rejected', value: counts.rejected, Icon: XCircle, color: '#c0392b' },
+          ].map(({ label, value, Icon, color }) => (
+            <div key={label} className="surface p-3.5 flex items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${color}14` }}>
+                <Icon size={15} style={{ color }} />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-slate-900 leading-tight">{value}</p>
+                <p className="text-[10px] text-slate-400">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-slate-400 text-sm">Loading observations…</p>
@@ -105,7 +156,7 @@ export default function DatasetPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {observations.slice(0, 500).map((o) => (
+              {filtered.slice(0, 500).map((o) => (
                 <tr key={o.id} className="hover:bg-slate-50/60">
                   <td className="px-3 py-2 font-medium text-slate-800">{o.product_name ?? '—'}</td>
                   <td className="px-3 py-2 text-slate-600">
@@ -130,8 +181,8 @@ export default function DatasetPage() {
               ))}
             </tbody>
           </table>
-          {observations.length > 500 && (
-            <p className="text-xs text-slate-400 text-center py-2">Showing first 500 of {observations.length}. Use Export CSV for the full dataset.</p>
+          {filtered.length > 500 && (
+            <p className="text-xs text-slate-400 text-center py-2">Showing first 500 of {filtered.length}. Use Export CSV for the full dataset.</p>
           )}
         </div>
       )}

@@ -82,34 +82,34 @@ export default function ExperimentsPage() {
           >
             <Plus size={14} /> New Experiment
           </button>
-          <button onClick={load} className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 rounded px-2 py-1">
+          <button onClick={load} className="flex items-center gap-1 text-sm text-slate-600 border border-slate-200 rounded px-2 py-1">
             <RefreshCw size={14} />
           </button>
         </div>
       </div>
 
       {showForm && (
-        <div className="bg-white border border-blue-200 rounded-lg p-4 mb-4 shadow-sm">
+        <div className="bg-white border border-[#e8c6d0] rounded-lg p-4 mb-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-medium text-gray-900">New Experiment</h2>
-            <button onClick={() => { setShowForm(false); setForm(EMPTY) }} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            <h2 className="font-medium text-slate-900">New Experiment</h2>
+            <button onClick={() => { setShowForm(false); setForm(EMPTY) }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs text-gray-500 mb-1">Study *</label>
-              <select className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" value={form.study_id} onChange={set('study_id')}>
+              <label className="block text-xs text-slate-500 mb-1">Study *</label>
+              <select className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" value={form.study_id} onChange={set('study_id')}>
                 <option value="">— select a study —</option>
                 {studies.map((s) => <option key={s.id} value={s.id}>{s.title ?? `Study #${s.id}`}</option>)}
               </select>
               {studies.length === 0 && <p className="text-xs text-amber-600 mt-1">No studies yet — create a study first.</p>}
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Label</label>
-              <input className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" placeholder="e.g. Exp-1" value={form.experiment_label} onChange={set('experiment_label')} />
+              <label className="block text-xs text-slate-500 mb-1">Label</label>
+              <input className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" placeholder="e.g. Exp-1" value={form.experiment_label} onChange={set('experiment_label')} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Food category</label>
-              <select className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" value={form.food_category} onChange={set('food_category')}>
+              <label className="block text-xs text-slate-500 mb-1">Food category</label>
+              <select className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" value={form.food_category} onChange={set('food_category')}>
                 <option value="">— select —</option>
                 {['cheese', 'meat', 'poultry', 'seafood', 'dairy', 'produce', 'bakery', 'beverage', 'other'].map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -117,24 +117,24 @@ export default function ExperimentsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Product name</label>
-              <input className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" placeholder="e.g. Camembert cheese" value={form.product_name_original} onChange={set('product_name_original')} />
+              <label className="block text-xs text-slate-500 mb-1">Product name</label>
+              <input className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" placeholder="e.g. Camembert cheese" value={form.product_name_original} onChange={set('product_name_original')} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Storage temp (°C)</label>
-              <input type="number" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" placeholder="4" value={form.storage_temperature_c} onChange={set('storage_temperature_c')} />
+              <label className="block text-xs text-slate-500 mb-1">Storage temp (°C)</label>
+              <input type="number" className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" placeholder="4" value={form.storage_temperature_c} onChange={set('storage_temperature_c')} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Duration (days)</label>
-              <input type="number" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" placeholder="30" value={form.storage_duration_days} onChange={set('storage_duration_days')} />
+              <label className="block text-xs text-slate-500 mb-1">Duration (days)</label>
+              <input type="number" className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" placeholder="30" value={form.storage_duration_days} onChange={set('storage_duration_days')} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Packaging</label>
-              <input className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" placeholder="e.g. vacuum, MAP" value={form.packaging_type} onChange={set('packaging_type')} />
+              <label className="block text-xs text-slate-500 mb-1">Packaging</label>
+              <input className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" placeholder="e.g. vacuum, MAP" value={form.packaging_type} onChange={set('packaging_type')} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Atmosphere</label>
-              <select className="border border-gray-300 rounded px-2 py-1.5 text-sm w-full" value={form.atmosphere_type} onChange={set('atmosphere_type')}>
+              <label className="block text-xs text-slate-500 mb-1">Atmosphere</label>
+              <select className="border border-slate-200 rounded px-2 py-1.5 text-sm w-full" value={form.atmosphere_type} onChange={set('atmosphere_type')}>
                 <option value="">— select —</option>
                 {['aerobic', 'anaerobic', 'MAP', 'vacuum', 'modified_atmosphere'].map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
@@ -144,7 +144,7 @@ export default function ExperimentsPage() {
             <button onClick={handleCreate} disabled={saving} className="bg-[#7A1B2E] text-white text-sm px-4 py-1.5 rounded hover:bg-[#661523] disabled:opacity-50">
               {saving ? 'Creating…' : 'Create Experiment'}
             </button>
-            <button onClick={() => { setShowForm(false); setForm(EMPTY) }} className="text-sm text-gray-500 px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">
+            <button onClick={() => { setShowForm(false); setForm(EMPTY) }} className="text-sm text-slate-500 px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50">
               Cancel
             </button>
           </div>
@@ -158,26 +158,26 @@ export default function ExperimentsPage() {
       )}
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Loading…</p>
+        <p className="text-slate-500 text-sm">Loading…</p>
       ) : experiments.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-slate-400">
           <p className="text-lg font-medium">No experiments yet</p>
           <p className="text-sm mt-1">Create a study first, then add experiments under it.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
+        <div className="overflow-x-auto bg-white rounded-lg border border-slate-200">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 {['ID', 'Label', 'Product', 'Category', 'Temp (°C)', 'Duration (d)', 'Packaging', 'Status'].map((h) => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-3 py-2 text-left font-medium text-slate-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {experiments.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400 text-xs">{e.id}</td>
+                <tr key={e.id} className="hover:bg-slate-50">
+                  <td className="px-3 py-2 text-slate-400 text-xs">{e.id}</td>
                   <td className="px-3 py-2 font-medium">{e.experiment_label ?? '—'}</td>
                   <td className="px-3 py-2">{e.product_name_normalized ?? e.product_name_original ?? '—'}</td>
                   <td className="px-3 py-2">{e.food_category ?? '—'}</td>
@@ -185,7 +185,7 @@ export default function ExperimentsPage() {
                   <td className="px-3 py-2">{e.storage_duration_days != null ? e.storage_duration_days : '—'}</td>
                   <td className="px-3 py-2">{e.packaging_type ?? '—'}</td>
                   <td className="px-3 py-2">
-                    <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">{e.review_status}</span>
+                    <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{e.review_status}</span>
                   </td>
                 </tr>
               ))}

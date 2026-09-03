@@ -160,7 +160,7 @@ function MeasurementRow({
                 <button onClick={() => setStatus('rejected')} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Reject">
                   <X size={13} />
                 </button>
-                <button onClick={() => setEditing(true)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Edit">
+                <button onClick={() => setEditing(true)} className="p-1.5 rounded-lg hover:bg-[#fdf3f5]" style={{ color: 'var(--primary)' }} title="Edit">
                   <Edit3 size={12} />
                 </button>
                 {hasEvidence && (
