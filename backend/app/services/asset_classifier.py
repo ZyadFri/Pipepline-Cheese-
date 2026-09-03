@@ -102,6 +102,11 @@ _SCORE_MAP = {
     "beef": 1, "chicken": 1, "pork": 1, "lamb": 1, "fish": 1, "salmon": 1,
     "sausage": 1, "minced": 1, "ground meat": 1,
     "cheese": 1, "milk": 1, "whey": 1, "casein": 1,
+    "gouda": 1, "cheddar": 1, "brie": 1, "mozzarella": 1, "camembert": 1,
+    "feta": 1, "parmesan": 1, "emmental": 1, "halloumi": 1, "ricotta": 1,
+    "blue cheese": 1, "semi-hard": 1, "semi-soft": 1,
+    "rind": 1, "brine": 1, "brining": 1, "affinage": 1, "curd": 1, "rennet": 1,
+    "psychrotroph": 1, "psychrotrophic": 1, "starter culture": 1,
     # Statistical signals
     "significant": 0.5, "p<0.05": 1, "p < 0.05": 1, "mean ±": 0.5,
 }

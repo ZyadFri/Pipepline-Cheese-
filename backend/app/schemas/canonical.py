@@ -524,6 +524,34 @@ class ObservationBulkCreate(BaseModel):
     observations: list[ObservationCreate]
 
 
+class ObservationBulkApprove(BaseModel):
+    observation_ids: list[int]
+
+
+class ObservationReviewOut(ObservationOut):
+    """
+    ObservationOut plus the paper/study/product/treatment context and evidence
+    that the Review and Scientific Database pages need — neither can be built from
+    the generic /observations list without either breaking its other caller
+    (Trajectories) or duplicating these joins in two places.
+    """
+    paper_id: Optional[int] = None
+    paper_name: Optional[str] = None
+    study_id: Optional[int] = None
+    study_title: Optional[str] = None
+    experiment_id: Optional[int] = None
+    experiment_label: Optional[str] = None
+    product_name: Optional[str] = None
+    food_category: Optional[str] = None
+    treatment_label: Optional[str] = None
+    is_control: Optional[bool] = None
+    ingredient_name: Optional[str] = None
+    concentration_value: Optional[float] = None
+    concentration_unit: Optional[str] = None
+    storage_temperature_c: Optional[float] = None
+    evidence: list["ProvenanceRecordOut"] = Field(default_factory=list)
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # PROVENANCE
 # ════════════════════════════════════════════════════════════════════════════
@@ -543,6 +571,9 @@ class ProvenanceRecordOut(BaseModel):
     source_snippet: Optional[str]
     confidence: Optional[float]
     manually_verified: bool
+    docling_item_ref: Optional[str] = None
+    extraction_asset_id: Optional[int] = None
+    has_image: bool = False
     created_at: datetime
 
 

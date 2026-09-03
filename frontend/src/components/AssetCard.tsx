@@ -110,7 +110,7 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
               ? 'bg-blue-600 border-blue-600 text-white'
               : 'bg-white border-slate-200 text-slate-400 opacity-0 group-hover:opacity-100',
           )}
-          title={asset.selected_for_llm ? 'Remove from LLM package' : 'Add to LLM package'}
+          title={asset.selected_for_llm ? 'Remove from evidence' : 'Include as evidence'}
         >
           {asset.selected_for_llm ? <CheckCircle size={14} /> : <Star size={14} />}
         </button>

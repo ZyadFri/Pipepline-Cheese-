@@ -68,53 +68,76 @@ interface LlmJob {
   current_step: string
   error_message?: string | null
   result?: {
-    experiments: number
-    measurements: number
+    experiments_reported: number
+    experiments_stored: number
+    measurements_reported: number
+    measurements_stored: number
     reasoning: string
     low_confidence_count: number
+    warnings: string[]
   } | null
   completed_at?: string | null
 }
 
 // ─── Validation check helpers ──────────────────────────────────────────────────
 
+// These confirm the paper is ready for extraction (evidence was found and
+// prepared) — they are NOT a scientific validation of the paper's content, and
+// must never be described as such.
 function computeChecks(pkg: EvidencePackages | null) {
   if (!pkg) return []
   const t = pkg.totals
   return [
     {
-      label: 'Assets extracted',
+      label: 'Evidence gathered from the paper',
       ok: (t.paragraphs + t.native_tables + t.chart_csvs + t.excluded) > 0,
-      detail: `${t.paragraphs + t.native_tables + t.chart_csvs + t.excluded} total assets`,
+      detail: `${t.paragraphs + t.native_tables + t.chart_csvs + t.excluded} item(s) found`,
     },
     {
-      label: 'Items selected for LLM',
+      label: 'Evidence ready for extraction',
       ok: (t.paragraphs + t.native_tables + t.chart_csvs) > 0,
-      detail: `${t.paragraphs + t.native_tables + t.chart_csvs} selected`,
+      detail: `${t.paragraphs + t.native_tables + t.chart_csvs} item(s) included`,
     },
     {
-      label: 'Relevant paragraphs found',
+      label: 'Relevant text found',
       ok: t.paragraphs > 0,
       detail: `${t.paragraphs} text segment(s)`,
     },
     {
-      label: 'Native tables present',
+      label: 'Tables found',
       ok: t.native_tables > 0,
       detail: `${t.native_tables} table(s)`,
     },
     {
-      label: 'Chart CSV data available',
+      label: 'Charts available',
       ok: t.chart_csvs > 0,
-      detail: `${t.chart_csvs} chart(s) converted`,
+      detail: `${t.chart_csvs} chart(s) read`,
     },
     {
-      label: 'Sufficient evidence for LLM',
+      label: 'Enough evidence to extract',
       ok: (t.paragraphs + t.native_tables + t.chart_csvs) >= 2,
       detail: (t.paragraphs + t.native_tables + t.chart_csvs) >= 2
-        ? 'Ready to send'
+        ? 'Ready to extract'
         : 'Need at least 2 evidence items',
     },
   ]
+}
+
+// Papers often surface the same sentence multiple times (once as its own
+// paragraph, again as a caption neighbor, again as a keyword match) — collapse
+// those to one card each so the list reads as distinct evidence, not noise.
+// Each dropped duplicate's own link stays counted (paragraphs.length keeps its
+// real total), it just isn't rendered as a second identical card.
+function dedupeParagraphs(items: ParagraphItem[]): ParagraphItem[] {
+  const seen = new Set<string>()
+  const out: ParagraphItem[] = []
+  for (const item of items) {
+    const key = item.text.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 200)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(item)
+  }
+  return out
 }
 
 // ─── Donut chart (pure SVG, no library) ────────────────────────────────────────
@@ -432,7 +455,7 @@ export default function ValidationPage() {
     try {
       const resp = await workspaceApi.sendToLlm(pid, paperId)
       setJob({ job_id: resp.job_id, status: 'queued', progress: 0, current_step: 'Queued' })
-      toast.success('Sent to Llama 4 — extraction running…')
+      toast.success('Extraction started…')
       startPolling(paperId, resp.job_id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -458,9 +481,9 @@ export default function ValidationPage() {
       {/* Header */}
       <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
         <div>
-          <h1 className="type-h1 text-slate-900">Validation</h1>
+          <h1 className="type-h1 text-slate-900">Evidence Review</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Review evidence packages and send selected content to Llama 4 for extraction
+            Review the evidence gathered from this paper, then extract structured data from it
           </p>
         </div>
 
@@ -507,16 +530,27 @@ export default function ValidationPage() {
             {/* ── Left: Evidence packages (2/3) ─────────────────────────────── */}
             <div className="flex-1 min-w-0 overflow-y-auto p-5 space-y-4 border-r border-slate-200">
 
-              {/* LLM job status banner */}
-              {job && (
+              {/* Extraction status banner — confidence-aware: only green when
+                  nothing needs a second look, amber when it finished but has
+                  low-confidence values or unstored items, red on failure. */}
+              {job && (() => {
+                const needsReview = job.status === 'completed' && (
+                  (job.result?.low_confidence_count ?? 0) > 0 ||
+                  (job.result?.warnings?.length ?? 0) > 0
+                )
+                const isClean = job.status === 'completed' && !needsReview
+                return (
                 <div className={clsx(
                   'rounded-xl p-4 border flex items-start gap-3',
-                  job.status === 'completed' ? 'bg-green-50 border-green-200' :
-                  job.status === 'failed'    ? 'bg-red-50 border-red-200' :
+                  isClean     ? 'bg-green-50 border-green-200' :
+                  needsReview ? 'bg-amber-50 border-amber-200' :
+                  job.status === 'failed' ? 'bg-red-50 border-red-200' :
                   'bg-blue-50 border-blue-200'
                 )}>
-                  {job.status === 'completed' ? (
+                  {isClean ? (
                     <CheckCircle2 size={18} className="text-green-600 mt-0.5 shrink-0" />
+                  ) : needsReview ? (
+                    <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
                   ) : job.status === 'failed' ? (
                     <XCircle size={18} className="text-red-600 mt-0.5 shrink-0" />
                   ) : (
@@ -525,13 +559,15 @@ export default function ValidationPage() {
                   <div className="flex-1">
                     <p className={clsx(
                       'text-sm font-semibold',
-                      job.status === 'completed' ? 'text-green-800' :
-                      job.status === 'failed'    ? 'text-red-800' :
+                      isClean     ? 'text-green-800' :
+                      needsReview ? 'text-amber-800' :
+                      job.status === 'failed' ? 'text-red-800' :
                       'text-blue-800'
                     )}>
-                      {job.status === 'completed' ? 'LLM Extraction Complete' :
-                       job.status === 'failed'    ? 'Extraction Failed' :
-                       'LLM Extraction Running…'}
+                      {isClean     ? 'Extraction complete' :
+                       needsReview ? 'Extraction finished — review required' :
+                       job.status === 'failed' ? 'Extraction failed' :
+                       'Extracting structured data…'}
                     </p>
                     <p className="text-xs text-slate-600 mt-0.5">{job.current_step}</p>
                     {isRunning && (
@@ -543,23 +579,28 @@ export default function ValidationPage() {
                       </div>
                     )}
                     {job.result && job.status === 'completed' && (
-                      <div className="mt-2 flex gap-4 flex-wrap">
-                        <span className="text-xs text-green-700 font-medium">
-                          {job.result.experiments} experiment(s)
+                      <div className="mt-2 flex gap-4 flex-wrap items-center">
+                        <span className={clsx('text-xs font-medium', isClean ? 'text-green-700' : 'text-amber-700')}>
+                          {job.result.experiments_stored} experiment(s)
                         </span>
-                        <span className="text-xs text-green-700 font-medium">
-                          {job.result.measurements} measurement(s)
+                        <span className={clsx('text-xs font-medium', isClean ? 'text-green-700' : 'text-amber-700')}>
+                          {job.result.measurements_stored} measurement(s)
                         </span>
                         {job.result.low_confidence_count > 0 && (
                           <span className="text-xs text-amber-600">
-                            {job.result.low_confidence_count} low-confidence
+                            {job.result.low_confidence_count} need review
+                          </span>
+                        )}
+                        {job.result.warnings.length > 0 && (
+                          <span className="text-xs text-amber-600" title={job.result.warnings.join(' ')}>
+                            {job.result.warnings.length} warning(s)
                           </span>
                         )}
                         <button
-                          onClick={() => navigate(`/projects/${pid}/experiments`)}
+                          onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
                           className="text-xs text-blue-600 font-semibold hover:underline"
                         >
-                          View results →
+                          Review results →
                         </button>
                       </div>
                     )}
@@ -568,25 +609,26 @@ export default function ValidationPage() {
                     )}
                   </div>
                 </div>
-              )}
+                )
+              })()}
 
               {pkgData === null ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <AlertCircle size={36} className="mb-3 opacity-30" />
-                  <p className="text-sm font-medium">No extracted assets found</p>
-                  <p className="text-xs mt-1">Run the Docling pipeline for this paper first</p>
+                  <p className="text-sm font-medium">No evidence found yet</p>
+                  <p className="text-xs mt-1">Reading the paper hasn't finished for this paper yet</p>
                   <button
-                    onClick={() => navigate(`/projects/${pid}/jobs`)}
+                    onClick={() => navigate(`/projects/${pid}/papers/${paperId}/overview`)}
                     className="mt-4 btn-secondary text-xs"
                   >
-                    Go to Pipeline
+                    Go to paper overview
                   </button>
                 </div>
               ) : (
                 <>
                   <p className="text-xs text-slate-500 px-1">
-                    Evidence below is ranked by relevance score. Items marked as{' '}
-                    <strong>Selected for LLM</strong> in the workspace will be included.
+                    Evidence below is ranked by relevance. Items marked{' '}
+                    <strong>Included</strong> in the workspace will be used for extraction.
                   </p>
 
                   {/* Relevant Paragraphs */}
@@ -600,27 +642,33 @@ export default function ValidationPage() {
                       <div className="px-4 py-3 text-xs text-slate-400">
                         No relevant text paragraphs found
                       </div>
-                    ) : (
-                      pkgData.paragraphs.slice(0, 30).map((item, i) => (
-                        <ParagraphRow key={`${item.asset_id}-${item.link_id}-${i}`} item={item} />
-                      ))
-                    )}
-                    {pkgData.paragraphs.length > 30 && (
-                      <div className="px-4 py-2 text-xs text-slate-400 bg-slate-50">
-                        + {pkgData.paragraphs.length - 30} more paragraphs
-                      </div>
-                    )}
+                    ) : (() => {
+                      const deduped = dedupeParagraphs(pkgData.paragraphs)
+                      const shown = deduped.slice(0, 30)
+                      return (
+                        <>
+                          {shown.map((item, i) => (
+                            <ParagraphRow key={`${item.asset_id}-${item.link_id}-${i}`} item={item} />
+                          ))}
+                          {deduped.length > 30 && (
+                            <div className="px-4 py-2 text-xs text-slate-400 bg-slate-50">
+                              + {deduped.length - 30} more paragraphs
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </EvidenceSection>
 
-                  {/* Native Tables */}
+                  {/* Tables */}
                   <EvidenceSection
                     icon={Table2}
-                    label="Native Tables"
+                    label="Tables"
                     count={pkgData.totals.native_tables}
                     colorClass="bg-emerald-100 text-emerald-600"
                   >
                     {pkgData.native_tables.length === 0 ? (
-                      <div className="px-4 py-3 text-xs text-slate-400">No native tables found</div>
+                      <div className="px-4 py-3 text-xs text-slate-400">No tables found</div>
                     ) : (
                       pkgData.native_tables.map((item) => (
                         <AssetRow key={item.id} item={item} type="table" />
@@ -628,16 +676,16 @@ export default function ValidationPage() {
                     )}
                   </EvidenceSection>
 
-                  {/* Chart CSV Files */}
+                  {/* Charts */}
                   <EvidenceSection
                     icon={BarChart3}
-                    label="Chart CSV Files"
+                    label="Charts"
                     count={pkgData.totals.chart_csvs}
                     colorClass="bg-amber-100 text-amber-600"
                   >
                     {pkgData.chart_csvs.length === 0 ? (
                       <div className="px-4 py-3 text-xs text-slate-400">
-                        No chart CSVs available
+                        No usable charts found
                       </div>
                     ) : (
                       pkgData.chart_csvs.map((item) => (
@@ -667,9 +715,9 @@ export default function ValidationPage() {
             {/* ── Right: Checks + summary + action (1/3) ──────────────────────── */}
             <div className="w-80 shrink-0 overflow-y-auto p-5 space-y-5 bg-slate-50">
 
-              {/* Local Validation Checks */}
+              {/* Paper preparation */}
               <div className="card">
-                <h3 className="section-title mb-3">Local Validation Checks</h3>
+                <h3 className="section-title mb-3">Paper preparation</h3>
                 <div className="space-y-2">
                   {checks.map((c) => (
                     <div key={c.label} className="flex items-start gap-2.5">
@@ -692,7 +740,7 @@ export default function ValidationPage() {
                   )}>
                     {allChecksPass ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
                     <span className="text-[11px] font-semibold">
-                      {allChecksPass ? 'All checks passed' : 'Some checks need attention'}
+                      {allChecksPass ? 'Ready to extract' : 'More evidence would help'}
                     </span>
                   </div>
                 )}
@@ -711,13 +759,12 @@ export default function ValidationPage() {
                 </div>
               )}
 
-              {/* Send to LLM */}
+              {/* Extract Structured Data */}
               <div className="card space-y-3">
-                <h3 className="section-title">Send to Llama 4</h3>
+                <h3 className="section-title">Extract Structured Data</h3>
                 <p className="text-xs text-slate-500">
-                  Selected evidence will be packaged and sent to{' '}
-                  <strong>llama-3.3-70b-versatile</strong> via Groq for food-safety
-                  data extraction. Results are saved to the database.
+                  Extract structured experiments and measurements from the included
+                  evidence. Results are saved automatically and appear in Review.
                 </p>
 
                 {isRunning ? (
@@ -747,7 +794,7 @@ export default function ValidationPage() {
                     ) : (
                       <Brain size={15} />
                     )}
-                    {sending ? 'Starting…' : 'Send Selected Evidence to Llama 4'}
+                    {sending ? 'Starting…' : 'Extract Structured Data'}
                     {!sending && <Send size={13} />}
                   </button>
                 )}
@@ -771,7 +818,7 @@ export default function ValidationPage() {
               {/* Reasoning summary */}
               {job?.result?.reasoning && job.status === 'completed' && (
                 <div className="card">
-                  <h3 className="section-title mb-2">LLM Reasoning</h3>
+                  <h3 className="section-title mb-2">Extraction notes</h3>
                   <p className="text-xs text-slate-600 leading-relaxed line-clamp-8">
                     {job.result.reasoning}
                   </p>

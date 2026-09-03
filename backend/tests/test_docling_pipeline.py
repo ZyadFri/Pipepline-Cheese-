@@ -189,8 +189,15 @@ def test_validate_dataframe_none():
 
 # ─── 3. Chart cache hit ───────────────────────────────────────────────────────
 
-def test_convert_charts_cache_hit(tmp_path):
-    """When a valid _data.csv already exists, model.predict must NOT be called."""
+def test_convert_charts_cache_hit(tmp_path, monkeypatch):
+    """When a valid _data.csv already exists, the vision model must NOT be called.
+
+    convert_charts() is a generator that reads a figure via a Groq vision model
+    (_groq_client()) instead of the retired local PP-Chart2Table model — gated on
+    settings.GROQ_API_KEY being set, checked before the cache-hit path is even
+    reached, so that must be patched too or every figure short-circuits to
+    status="skipped" without ever consulting the cache.
+    """
     img_p = tmp_path / "image_0.png"
     img_p.write_bytes(b"\x89PNG\r\n\x1a\n")
 
@@ -206,14 +213,16 @@ def test_convert_charts_cache_hit(tmp_path):
         bbox=None,
     )
 
-    mock_model = MagicMock()
-    with patch("app.services.chart_converter._get_chart_model", return_value=mock_model):
-        results = convert_charts([fig], str(tmp_path))
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "dummy-test-key")
+    mock_client = MagicMock()
+    with patch("app.services.chart_converter._groq_client", return_value=mock_client):
+        results = list(convert_charts([fig], str(tmp_path)))  # generator — must materialize
 
     assert len(results) == 1
     assert results[0].status == "valid"
     assert results[0].csv_path == str(csv_p)
-    mock_model.predict.assert_not_called()
+    mock_client.chat.completions.create.assert_not_called()
 
 
 # ─── 4. Evidence package builder ─────────────────────────────────────────────
@@ -315,7 +324,7 @@ def test_validate_refs_flags_invented_ref():
     known = {"#/tables/0", "#/texts/1"}
     experiments = [
         {
-            "meat_matrix": "chicken breast",
+            "cheese_product": "gouda",
             "treatment": "chitosan 1%",
             "experiment_evidence": [
                 {"docling_item_ref": "#/tables/99", "confidence": 0.9}
@@ -390,7 +399,7 @@ def test_duplicate_measurement_skipped(db):
     db.flush()
 
     exp = ExtExperiment(project_id=proj.id, paper_id=1, job_id=1,
-                        meat_matrix="beef", treatment="control")
+                        cheese_product="cheddar", treatment="control")
     db.add(exp)
     db.flush()
 
@@ -405,7 +414,7 @@ def test_duplicate_measurement_skipped(db):
     db.add(m1)
     db.flush()
 
-    # Simulate the duplicate guard from _run_food_extraction
+    # Simulate the duplicate guard from _run_llm_validation (extraction_workspace.py)
     existing = db.query(ExtMeasurement).filter(
         ExtMeasurement.experiment_id == exp.id,
         ExtMeasurement.day == 7,
@@ -439,7 +448,7 @@ def test_chart_derived_value_is_approximate():
         "reasoning_summary": "found data",
         "experiments": [
             {
-                "meat_matrix": "beef",
+                "cheese_product": "brie",
                 "treatment": "control",
                 "experiment_evidence": [],
                 "ingredients": [],
@@ -575,12 +584,12 @@ def test_parse_json_invalid_returns_empty():
 
 def test_recover_experiments_salvages_partial():
     partial = (
-        '{"experiments": [{"meat_matrix": "beef", "measurements": [{"day": 0}]}'
+        '{"experiments": [{"cheese_product": "camembert", "measurements": [{"day": 0}]}'
         # deliberately truncated — missing closing braces for outer object
     )
     recovered = _recover_experiments(partial)
     assert len(recovered) == 1
-    assert recovered[0]["meat_matrix"] == "beef"
+    assert recovered[0]["cheese_product"] == "camembert"
 
 
 # ─── 13. _apply_corrections ───────────────────────────────────────────────────

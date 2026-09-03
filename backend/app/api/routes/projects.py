@@ -112,9 +112,19 @@ def delete_project(project_id: int, db: Session = Depends(get_db), user: User = 
 
 @router.post("/{project_id}/promote-canonical", status_code=200)
 def promote_canonical(project_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Promote all extracted rows for every paper in this project to canonical hierarchy."""
+    """
+    Manual reconciliation/retry tool — NOT required for normal use. Extraction
+    (extraction_workspace.py) auto-promotes to canonical as soon as it completes, so
+    results reach Review/Scientific Database without this ever being called. This
+    endpoint exists for recovery: re-run it if a promotion step failed partway
+    through, or to sweep in any paper extracted before auto-promotion existed.
+    Covers both extraction generations — legacy ExtractedRow and the active Ext*
+    staging schema — since either could have papers pending promotion.
+    """
     from app.db.models import Job
-    from app.services.canonical_promoter import promote_paper_to_canonical
+    from app.services.canonical_promoter import (
+        promote_ext_paper_to_canonical, promote_paper_to_canonical,
+    )
 
     project = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
     if not project:
@@ -122,10 +132,19 @@ def promote_canonical(project_id: int, db: Session = Depends(get_db), user: User
 
     papers = db.query(Paper).filter(Paper.project_id == project_id).all()
     totals = {"studies": 0, "experiments": 0, "arms": 0, "observations": 0}
+    ext_totals = {
+        "experiments_created": 0, "experiments_updated": 0, "arms_created": 0,
+        "observations_created": 0, "observations_updated": 0,
+        "observations_skipped_approved": 0, "provenance_created": 0,
+    }
     for paper in papers:
         result = promote_paper_to_canonical(paper.id, project_id, db)
         for key in totals:
             totals[key] += result.get(key, 0)
+
+        ext_result = promote_ext_paper_to_canonical(paper.id, project_id, db)
+        for key in ext_totals:
+            ext_totals[key] += ext_result.get(key, 0)
 
         # Create retroactive job record for papers extracted before job tracking was added
         if paper.status in ("extracted", "error"):
@@ -146,7 +165,7 @@ def promote_canonical(project_id: int, db: Session = Depends(get_db), user: User
                 ))
                 db.commit()
 
-    return {"papers_processed": len(papers), **totals}
+    return {"papers_processed": len(papers), **totals, "ext_pipeline": ext_totals}
 
 
 @router.get("/{project_id}/stats")

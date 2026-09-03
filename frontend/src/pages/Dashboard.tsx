@@ -86,7 +86,7 @@ export default function Dashboard() {
                 <label className="label">Project Name *</label>
                 <input
                   className="input"
-                  placeholder="e.g. Antimicrobial Meat Study 2024"
+                  placeholder="e.g. Gouda Shelf-Life Study 2026"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -94,7 +94,7 @@ export default function Dashboard() {
                 />
               </div>
               <div>
-                <label className="label">Description</label>
+                <label className="label">Description (optional)</label>
                 <textarea
                   className="input resize-none h-20"
                   placeholder="Brief description of this research project…"
@@ -102,9 +102,6 @@ export default function Dashboard() {
                   onChange={(e) => setDesc(e.target.value)}
                 />
               </div>
-              <p className="type-caption text-slate-400">
-                A default food-preservation schema will be applied. You can customize it in Schema settings.
-              </p>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1 justify-center">
                   Cancel

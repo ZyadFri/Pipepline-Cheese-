@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings, UPLOAD_PATH
 from app.db.database import get_db
-from app.db.models import ExtractedRow, ExtractionAsset, Job, Paper, Project, Study, User
+from app.db.models import (
+    Experiment, ExtractedRow, ExtractionAsset, Job, Observation, Paper,
+    Project, Study, TreatmentArm, User,
+)
 from app.schemas.papers import PaperOut
 from app.services.pdf_extractor import extract_full_text
 
@@ -139,16 +142,41 @@ def papers_pipeline_status(
             .count()
         )
 
-        # Canonical promotion
+        # Canonical promotion — a Study row is created by either promoter
+        # (promote_paper_to_canonical or promote_ext_paper_to_canonical) as soon as
+        # anything has been promoted, so its existence alone is a reliable signal
+        # regardless of which extraction generation produced this paper's data.
         study = db.query(Study).filter(Study.paper_id == paper.id).first()
 
-        # Legacy extracted rows
+        # Canonical observations for this paper — the active pipeline's review
+        # signal. Previously this stage read only legacy ExtractedRow counts, which
+        # the active extraction_workspace.py pipeline never writes to: a fully
+        # extracted paper would show review="not_started" and fall through to the
+        # same badge as a paper never touched. Scoped via
+        # Observation → TreatmentArm → Experiment → Study.paper_id.
+        obs_q = (
+            db.query(Observation)
+            .join(TreatmentArm, Observation.treatment_arm_id == TreatmentArm.id)
+            .join(Experiment, TreatmentArm.experiment_id == Experiment.id)
+            .join(Study, Experiment.study_id == Study.id)
+            .filter(Study.paper_id == paper.id)
+        )
+        n_observations = obs_q.count()
+        n_obs_approved = obs_q.filter(Observation.review_status == "approved").count()
+
+        # Legacy extracted rows — kept for papers processed by the retired
+        # ExtractedRow-based pipeline generations; combined with canonical
+        # observations below so this stage reflects whichever pipeline actually
+        # produced this paper's data.
         n_rows = db.query(ExtractedRow).filter(ExtractedRow.paper_id == paper.id).count()
         n_approved = (
             db.query(ExtractedRow)
             .filter(ExtractedRow.paper_id == paper.id, ExtractedRow.status == "approved")
             .count()
         )
+
+        n_reviewable = n_rows + n_observations
+        n_reviewed_approved = n_approved + n_obs_approved
 
         ws_result = {}
         if ws_job and ws_job.result_json and ws_job.result_json != "{}":
@@ -197,11 +225,11 @@ def papers_pipeline_status(
         else:
             llm = "failed"
 
-        if n_rows == 0:
+        if n_reviewable == 0:
             review = "not_started"
-        elif n_approved == n_rows:
+        elif n_reviewed_approved == n_reviewable:
             review = "completed"
-        elif n_approved > 0:
+        elif n_reviewed_approved > 0:
             review = "partial"
         else:
             review = "pending"
@@ -267,8 +295,8 @@ def papers_pipeline_status(
             "counts": {
                 "assets":        n_assets,
                 "charts":        n_charts,
-                "rows":          n_rows,
-                "approved_rows": n_approved,
+                "rows":          n_reviewable,
+                "approved_rows": n_reviewed_approved,
             },
             "ws_result": ws_result,
             "ws_job_id":  ws_job.id  if ws_job  else None,

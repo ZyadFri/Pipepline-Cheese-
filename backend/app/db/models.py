@@ -489,6 +489,14 @@ class ProvenanceRecord(Base):
     verified_by         = Column(Integer, ForeignKey("users.id"), nullable=True)
     verified_at         = Column(DateTime, nullable=True)
     created_at          = Column(DateTime, default=datetime.utcnow)
+    # Docling/asset provenance anchor — set when promoted from the Ext* staging schema.
+    docling_item_ref    = Column(String, nullable=True)
+    extraction_asset_id = Column(Integer, ForeignKey("extraction_assets.id"), nullable=True)
+    # Copied (not re-generated) from ExtEvidence at promotion time — Ext*/ExtEvidence
+    # rows get wiped and rebuilt on every re-extraction, so this record must hold its
+    # own durable copy rather than a live reference that would orphan on re-run.
+    evidence_image_path     = Column(String, nullable=True)
+    evidence_thumbnail_path = Column(String, nullable=True)
 
     study       = relationship("Study", back_populates="provenance", foreign_keys=[study_id])
     observation = relationship("Observation", back_populates="provenance", foreign_keys=[observation_id])
@@ -976,8 +984,11 @@ class LabModelResult(Base):
 
 
 # ─── Food-Safety Extraction Schema ────────────────────────────────────────────
-# Targeted tables extracted by the new Llama 4 pipeline.
-# The ext_ prefix avoids conflicts with the legacy canonical hierarchy.
+# Staging tables for the LLM extraction pipeline (extraction_workspace.py).
+# The ext_ prefix avoids conflicts with the legacy canonical hierarchy. Rows here
+# are a working area only — promote_ext_paper_to_canonical() (canonical_promoter.py)
+# copies them into the canonical Study/Experiment/TreatmentArm/Observation model,
+# which is the authoritative, user-facing source of truth.
 
 class ExtIngredient(Base):
     """Reusable ingredient catalogue — one row per unique ingredient name per project."""
@@ -994,16 +1005,19 @@ class ExtIngredient(Base):
 
 
 class ExtExperiment(Base):
-    """One row per distinct (meat_matrix, treatment) combination in a paper."""
+    """One row per distinct (cheese_product, treatment) combination in a paper."""
     __tablename__ = "ext_experiments"
 
     id                  = Column(Integer, primary_key=True, index=True)
     project_id          = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     paper_id            = Column(Integer, ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
     job_id              = Column(Integer, ForeignKey("jobs.id"), nullable=True)
-    meat_matrix         = Column(String, nullable=False)
+    cheese_product      = Column(String, nullable=False)
     treatment           = Column(String, nullable=False)
     created_at          = Column(DateTime, default=datetime.utcnow)
+    # Promotion tracking — set once this row has been copied to canonical Experiment.
+    promoted_experiment_id = Column(Integer, ForeignKey("experiments.id"), nullable=True)
+    promoted_at         = Column(DateTime, nullable=True)
 
 
 class ExtExperimentIngredient(Base):
@@ -1097,7 +1111,7 @@ class DoclingCache(Base):
 
 
 class FigureConversionCache(Base):
-    """PP-Chart2Table result for one extracted figure image."""
+    """Cached chart-reading result for one extracted figure image."""
     __tablename__ = "figure_conversion_cache"
 
     id               = Column(Integer, primary_key=True, index=True)

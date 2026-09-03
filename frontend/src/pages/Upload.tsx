@@ -4,7 +4,7 @@ import { useDropzone } from 'react-dropzone'
 import { Upload as UploadIcon, FileText, X, ArrowLeft, CloudUpload, Microscope, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { papersApi } from '../services/api'
+import { papersApi, workspaceApi } from '../services/api'
 
 export default function Upload() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -41,10 +41,20 @@ export default function Upload() {
       const created: { id: number }[] = await papersApi.upload(pid, files)
       if (mode === 'workspace' && created.length === 1) {
         navigate(`/projects/${pid}/papers/${created[0].id}/overview`)
-      } else {
-        toast.success(`${files.length} paper${files.length > 1 ? 's' : ''} uploaded`)
-        navigate(`/projects/${pid}`)
+        return
       }
+      // Batch mode: start the same Docling/asset-extraction pipeline single
+      // uploads get, one paper at a time. Each call just enqueues a background
+      // job server-side, so this loop finishes quickly even though extraction
+      // itself keeps running after navigating away. Sequential, not concurrent —
+      // chart reading calls a vision-model API per figure, and firing every
+      // paper's figures at once would multiply that load unpredictably.
+      for (const paper of created) {
+        try { await workspaceApi.start(pid, paper.id) }
+        catch { /* one paper failing to start shouldn't block the rest */ }
+      }
+      toast.success(`${files.length} paper${files.length > 1 ? 's' : ''} uploaded — extraction started`)
+      navigate(`/projects/${pid}`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Upload failed')
     } finally {
@@ -114,7 +124,7 @@ export default function Upload() {
           <div>
             <p className="text-sm font-semibold text-slate-700">Batch Upload</p>
             <p className="text-xs text-slate-400 mt-0.5">
-              Up to 10 PDFs at once · legacy extraction flow
+              Up to 10 PDFs · extraction starts automatically for each
             </p>
           </div>
         </button>

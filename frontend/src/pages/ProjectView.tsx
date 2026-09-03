@@ -324,6 +324,14 @@ export default function ProjectView() {
   const [search, setSearch]     = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sort, setSort]         = useState<'newest' | 'oldest' | 'name'>('newest')
+  // Pipeline-stage detail (Docling/Assets/.../Promote pills) is hidden by
+  // default — the badge + Current Stage column already say this in plain
+  // language; the stage-by-stage breakdown is technical detail for anyone who
+  // wants it, not the default view.
+  const [showPipelineDetails, setShowPipelineDetails] = useState(false)
+  const rowGridCols = showPipelineDetails
+    ? 'grid-cols-[2fr_56px_1fr_1fr_100px_140px]'
+    : 'grid-cols-[2fr_56px_1fr_100px_140px]'
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
@@ -409,6 +417,24 @@ export default function ProjectView() {
     <div className="text-center py-24">
       <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
       <p className="text-slate-600">Project not found</p>
+    </div>
+  )
+
+  // A brand-new project has nothing to summarize yet — showing four zeroed
+  // stat cards and an empty chart before any data exists is exactly the
+  // "excessive/confusing" pattern this app is trying to move away from. Just
+  // the project name and one clear next step, until there's something to show.
+  if (papers.length === 0) return (
+    <div className="flex flex-col items-center justify-center min-h-full p-6 text-center" style={{ background: 'var(--canvas)' }}>
+      <p className="type-eyebrow text-slate-400 mb-2">{project.name}</p>
+      <FileText size={40} strokeWidth={1} className="text-slate-200 mb-4" />
+      <h1 className="type-h1 mb-1.5" style={{ color: 'var(--foreground)' }}>No papers yet</h1>
+      <p className="text-sm text-slate-400 mb-6 max-w-sm">
+        Upload a research paper to start extracting cheese preservation data from it.
+      </p>
+      <Link to={`/projects/${pid}/upload`} className="btn-primary">
+        <Upload size={15} /> Upload Paper
+      </Link>
     </div>
   )
 
@@ -554,13 +580,21 @@ export default function ProjectView() {
           </div>
 
           {/* Column headers */}
-          <div className="grid grid-cols-[2fr_56px_1fr_1fr_100px_140px] gap-3 px-5 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className={clsx('grid gap-3 px-5 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest items-center', rowGridCols)}>
             <span>Paper</span>
             <span>Pages</span>
-            <span>Pipeline Progress</span>
+            {showPipelineDetails && <span>Pipeline Progress</span>}
             <span>Current Stage</span>
             <span>Last Updated</span>
-            <span>Action</span>
+            <div className="flex items-center justify-between">
+              <span>Action</span>
+              <button
+                onClick={() => setShowPipelineDetails((v) => !v)}
+                className="normal-case font-medium text-slate-400 hover:text-slate-600 tracking-normal text-[10px]"
+              >
+                {showPipelineDetails ? 'Hide stages' : 'Show stages'}
+              </button>
+            </div>
           </div>
 
           {/* Rows */}
@@ -583,7 +617,7 @@ export default function ProjectView() {
                 return (
                   <div
                     key={paper.id}
-                    className="grid grid-cols-[2fr_56px_1fr_1fr_100px_140px] gap-3 items-center px-5 py-4 hover:bg-slate-50/60 transition-colors group"
+                    className={clsx('grid gap-3 items-center px-5 py-4 hover:bg-slate-50/60 transition-colors group', rowGridCols)}
                   >
                     {/* Paper name + badge */}
                     <div className="min-w-0">
@@ -631,10 +665,12 @@ export default function ProjectView() {
                     {/* Pages */}
                     <div className="text-xs text-slate-500 font-medium">{paper.page_count || '—'}</div>
 
-                    {/* Pipeline stages */}
-                    <div className="overflow-hidden">
-                      <PipelineBar stages={paper.stages} />
-                    </div>
+                    {/* Pipeline stages — technical detail, hidden by default */}
+                    {showPipelineDetails && (
+                      <div className="overflow-hidden">
+                        <PipelineBar stages={paper.stages} />
+                      </div>
+                    )}
 
                     {/* Current stage */}
                     <CurrentStageLabel paper={paper} />

@@ -153,19 +153,19 @@ export default function Login() {
               <span className="type-eyebrow text-white/90">AI-Powered Research Platform</span>
             </div>
             <h1 className="font-display text-white leading-[1.04] tracking-tight mb-4" style={{ fontSize: 'clamp(2.75rem, 4.2vw, 3.75rem)', fontWeight: 540 }}>
-              Meat &amp; Cheese<br />
+              Cheese Shelf-Life<br />
               <span className="text-white/75">Database</span>
             </h1>
             <p className="text-white/75 text-lg leading-relaxed max-w-md">
-              Extract structured scientific data from research papers using Docling,
-              PP-Chart2Table, and Llama 4 — all in one collaborative platform.
+              Extract structured scientific data from cheese research papers —
+              tables, charts, and evidence, all in one collaborative platform.
             </p>
 
             {/* Features */}
             <div className="mt-8 flex flex-wrap gap-2.5">
-              <Feature icon={FlaskConical} text="Docling Extraction" />
-              <Feature icon={BarChart3} text="Chart → CSV" />
-              <Feature icon={Brain} text="Llama 4 AI" />
+              <Feature icon={FlaskConical} text="Smart PDF Reading" />
+              <Feature icon={BarChart3} text="Chart Digitization" />
+              <Feature icon={Brain} text="AI Extraction" />
               <Feature icon={Database} text="Scientific Database" />
             </div>
 
@@ -174,7 +174,7 @@ export default function Login() {
               {[
                 { value: '100+', label: 'Papers processed' },
                 { value: '12K+', label: 'Measurements' },
-                { value: '6', label: 'Kinetic models' },
+                { value: 'Auto', label: 'Reviewed & tracked' },
               ].map(({ value, label }) => (
                 <div key={label} className="border-l-2 border-white/30 pl-4">
                   <div className="font-display text-2xl text-white" style={{ fontWeight: 560 }}>{value}</div>
@@ -203,7 +203,7 @@ export default function Login() {
               <img src="/mcgill.png" alt="McGill" className="h-7 w-auto brightness-0 invert" />
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-sm leading-tight">Meat & Cheese Database</p>
+              <p className="font-bold text-slate-900 text-sm leading-tight">Cheese Shelf-Life Database</p>
               <p className="text-slate-500 text-xs">McGill University</p>
             </div>
           </div>

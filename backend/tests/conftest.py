@@ -23,6 +23,12 @@ from app.main import app
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
+# NOTE: unlike the production engine (app/db/database.py), this test engine does
+# NOT enable PRAGMA foreign_keys=ON — doing so breaks Base.metadata.drop_all()'s
+# teardown here on a pre-existing, unrelated circular FK dependency between
+# extracted_rows/model_fits/model_runs/studies (visible as a SAWarning below).
+# Code that depends on ON DELETE CASCADE actually firing must not rely on this
+# test database to exercise that — delete child rows explicitly instead.
 engine = create_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},

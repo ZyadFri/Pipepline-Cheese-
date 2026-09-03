@@ -114,7 +114,7 @@ function AssetRow({ asset, pid, paperIdNum, onToggle, onClick }: AssetRowProps) 
           <button
             onClick={handleToggle}
             disabled={toggling}
-            title={asset.selected_for_llm ? 'Exclude from LLM package' : 'Include in LLM package'}
+            title={asset.selected_for_llm ? 'Remove from evidence' : 'Include as evidence'}
             className={clsx(
               'shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100',
               asset.selected_for_llm
@@ -129,7 +129,7 @@ function AssetRow({ asset, pid, paperIdNum, onToggle, onClick }: AssetRowProps) 
             ) : (
               <EyeOff size={9} />
             )}
-            {asset.selected_for_llm ? 'Included' : 'Exclude'}
+            {asset.selected_for_llm ? 'Included' : 'Include'}
           </button>
         </div>
 
@@ -260,7 +260,7 @@ export default function DoclingResultsPage() {
     if (selectedAsset?.id === assetId) {
       setSelectedAsset((prev) => prev ? { ...prev, selected_for_llm: updated.selected_for_llm } : prev)
     }
-    toast.success(val ? 'Included in LLM package' : 'Excluded from LLM package')
+    toast.success(val ? 'Included as evidence' : 'Removed from evidence')
   }
 
   // Group assets
@@ -314,7 +314,7 @@ export default function DoclingResultsPage() {
           <div>
             <h2 className="text-sm font-bold text-slate-900">Docling Extraction Results</h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              {assets.length} assets · {includedCount} included in LLM package
+              {assets.length} assets · {includedCount} included as evidence
             </p>
           </div>
           <button

@@ -3,7 +3,7 @@ food_extractor.py — LLM extraction from Docling evidence packages.
 
 Replaces the old full-document text approach with a targeted pipeline:
   1. Receives pre-built EvidencePackage objects (tables, chart CSVs, relevant text).
-  2. Sends each package to llama-3.3-70b-versatile with a strict JSON prompt.
+  2. Sends each package to settings.GROQ_FOOD_MODEL with a strict JSON prompt.
   3. Requires every returned value to cite a docling_item_ref from the known set.
   4. Validates all refs — invented refs are flagged, not silently accepted.
   5. Runs an optional Pass 2 verification for low-confidence items.
@@ -12,7 +12,8 @@ Token budget per package call (≤ 3 000 tokens content):
   system prompt    ≈  800 tokens
   package content  ≤ 3 000 tokens  (pre-controlled by evidence_package.py)
   output           ≤ 4 096 tokens
-  total            ≤ 7 896 tokens  — safely under llama-3.3-70b 12 000 TPM
+  total            ≤ 7 896 tokens  — model/provider is configured via settings,
+  not hardcoded; verify actual TPM limits against whatever model is active.
 
 API credentials never leave the server.
 """
@@ -36,7 +37,10 @@ Extract structured experimental data from the provided evidence and return ONLY 
 ## Target Schema
 
 ### experiments
-One row per distinct (meat_matrix, treatment) combination.
+One row per distinct (cheese_product, treatment) combination. Do not merge
+experiments that genuinely differ by cheese type, treatment, concentration,
+packaging, storage temperature, application method, or control status — each
+stays its own row even if several share the same paper.
 
 ### ingredients
 One entry per unique ingredient name.
@@ -93,7 +97,7 @@ Return ONLY valid JSON — no markdown fences, no prose before or after.
   "reasoning_summary": "brief description of what you found",
   "experiments": [
     {
-      "meat_matrix": "string",
+      "cheese_product": "string",
       "treatment": "string",
       "experiment_evidence": [evidence_object],
       "ingredients": [
@@ -186,7 +190,7 @@ def _recover_experiments(raw: str) -> list:
                 try:
                     obj = json.loads(raw[start: i + 1])
                     if isinstance(obj, dict) and (
-                        "meat_matrix" in obj or "measurements" in obj
+                        "cheese_product" in obj or "measurements" in obj
                     ):
                         objects.append(obj)
                 except json.JSONDecodeError:
@@ -445,7 +449,11 @@ def extract_food_data(
             for meas in exp.get("measurements", []):
                 ev_list = meas.get("evidence", [])
                 min_conf = min((e.get("confidence", 1.0) for e in ev_list), default=1.0)
-                if min_conf < 0.75:
+                # 0.6, not the prior 0.75: the prompt's own exemplars are 1.0/0.7/0.4
+                # for exact/inferred/chart-estimate, so 0.75 was routing "inferred"
+                # values into Pass-2 verification unconditionally — only true chart
+                # estimates and below should need a second pass.
+                if min_conf < 0.6:
                     low_conf_items.append({
                         "original_index": idx,
                         "experiment_treatment": exp.get("treatment"),

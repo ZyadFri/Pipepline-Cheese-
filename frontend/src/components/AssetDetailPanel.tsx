@@ -159,7 +159,7 @@ export default function AssetDetailPanel({ asset, projectId, paperId, onClose, o
               )}
             >
               {asset.selected_for_llm ? <CheckCircle size={13} /> : <Star size={13} />}
-              {asset.selected_for_llm ? 'In LLM package' : 'Add to LLM'}
+              {asset.selected_for_llm ? 'Included as evidence' : 'Include as evidence'}
             </button>
             <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
               <X size={18} className="text-slate-500" />

@@ -24,7 +24,7 @@ export default function Layout() {
               <img src="/mcgill.png" alt="McGill" className="h-7 w-auto" />
             </div>
             <div className="hidden sm:block">
-              <span className="font-display font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Meat & Cheese</span>
+              <span className="font-display font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Cheese Shelf-Life</span>
               <span className="font-display font-semibold text-sm" style={{ color: 'var(--primary)' }}> Database</span>
             </div>
           </NavLink>

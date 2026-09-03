@@ -46,6 +46,17 @@ const FILTERS = [
   { id: 'diagram',      label: 'Diagrams',icon: <Image size={12} /> },
 ]
 
+// Publisher logos, license icons, and decorative graphics — never scientific
+// evidence. Hidden from the gallery by default (same categories
+// DoclingResultsPage.tsx already segregates into its own collapsed section).
+const NON_SCIENTIFIC = ['publisher_logo', 'license_icon', 'decorative_asset']
+
+interface EvidencePreview {
+  totals: { paragraphs: number; native_tables: number; chart_csvs: number }
+  native_tables: { selected_for_llm: boolean }[]
+  chart_csvs: { selected_for_llm: boolean }[]
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExtractionWorkspacePage() {
@@ -61,6 +72,8 @@ export default function ExtractionWorkspacePage() {
   const [selectedAsset, setSelectedAsset] = useState<ExtractionAsset | null>(null)
   const [starting, setStarting]           = useState(false)
   const [previewUrl, setPreviewUrl]       = useState<string | null>(null)
+  const [showAllAssets, setShowAllAssets] = useState(false)
+  const [evidencePreview, setEvidencePreview] = useState<EvidencePreview | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const isRunning = status?.status === 'running' || status?.status === 'queued'
@@ -127,6 +140,14 @@ export default function ExtractionWorkspacePage() {
     if (isRunning && !pollRef.current) pollRef.current = setInterval(pollStatus, 2500)
   }, [isRunning, pollStatus])
 
+  // Preview of what extraction will actually use — the backend auto-includes
+  // high-relevance tables/charts beyond whatever the user manually starred, so
+  // "N starred" alone understates what gets processed. This resolves that gap.
+  useEffect(() => {
+    if (!isDone) return
+    workspaceApi.getEvidencePackages(pid, paperIdNum).then(setEvidencePreview).catch(() => null)
+  }, [isDone, pid, paperIdNum, assets])
+
   const handleToggleSelect = async (asset: ExtractionAsset, val: boolean) => {
     try {
       const updated = await workspaceApi.patchAsset(pid, paperIdNum, asset.id, { selected_for_llm: val })
@@ -138,15 +159,43 @@ export default function ExtractionWorkspacePage() {
     }
   }
 
-  const filteredAssets = assets.filter((a) => {
+  // "Figures" means a figure asset that ISN'T already counted under a more
+  // specific category (chart/photograph/diagram) — otherwise Figures and
+  // Charts/Photos/Diagrams double-count the same assets, matching the fix
+  // already applied in DoclingResultsPage.tsx's otherFigs computation.
+  const isOtherFigure = (a: ExtractionAsset) =>
+    a.asset_type === 'figure' && !['chart', 'photograph', 'diagram'].includes(a.classification) &&
+    !NON_SCIENTIFIC.includes(a.classification)
+
+  const nonScientific = assets.filter((a) => NON_SCIENTIFIC.includes(a.classification))
+  const scientificAssets = assets.filter((a) => !NON_SCIENTIFIC.includes(a.classification))
+  const visibleAssets = showAllAssets ? assets : scientificAssets
+
+  const filteredAssets = visibleAssets.filter((a) => {
     if (activeFilter === 'all') return true
-    if (activeFilter === 'figure') return a.asset_type === 'figure'
+    if (activeFilter === 'figure') return isOtherFigure(a)
     return a.classification === activeFilter
   })
 
   const selectedCount = assets.filter((a) => a.selected_for_llm).length
+
+  // Manual-vs-automatic breakdown: the backend auto-includes high-relevance
+  // tables/charts beyond whatever's manually starred, so "N starred" alone
+  // understates what extraction will actually use. evidencePreview mirrors
+  // extraction_workspace.py's own selection logic (same endpoint Evidence
+  // Review previews from), so counting selected_for_llm within it gives an
+  // accurate manual/auto split without duplicating that logic client-side.
+  const evidenceTotal = evidencePreview
+    ? evidencePreview.totals.paragraphs + evidencePreview.totals.native_tables + evidencePreview.totals.chart_csvs
+    : 0
+  const evidenceManual = evidencePreview
+    ? evidencePreview.native_tables.filter((a) => a.selected_for_llm).length
+      + evidencePreview.chart_csvs.filter((a) => a.selected_for_llm).length
+    : 0
+  const evidenceAuto = Math.max(0, evidenceTotal - evidenceManual)
+
   const progress  = status?.progress ?? 0
-  const nFigures  = assets.filter((a) => a.asset_type === 'figure').length
+  const nFigures  = assets.filter(isOtherFigure).length
   const nTables   = assets.filter((a) => a.asset_type === 'native_table').length
   const nCharts   = assets.filter((a) => a.classification === 'chart').length
 
@@ -372,7 +421,7 @@ export default function ExtractionWorkspacePage() {
             <p className="text-[11px] text-slate-400 mt-0.5">
               {status.result.page_count} pages · {status.result.figures} figures
               {status.result.chart_conversion_available === false
-                ? ' (charts: PP unavailable)'
+                ? ' (chart reading unavailable)'
                 : ` (${status.result.charts} charts)`}
               {' '}· {status.result.native_tables} tables
               {status.result.decorative_excluded
@@ -388,13 +437,18 @@ export default function ExtractionWorkspacePage() {
           <BarChart3 size={12} />
           Charts
         </Link>
-        {selectedCount > 0 && (
+        {evidenceTotal > 0 && (
           <button
             onClick={() => navigate(`/projects/${pid}/validation?paperId=${paperIdNum}`)}
             className="flex items-center gap-2 px-3 py-1.5 bg-[#7A1B2E] text-white rounded-lg text-xs font-semibold hover:bg-[#661523] transition-colors"
+            title={
+              `${evidenceTotal} item(s): ${evidenceManual} manually selected, ${evidenceAuto} automatically included ` +
+              `(${evidencePreview?.totals.paragraphs ?? 0} text, ${evidencePreview?.totals.native_tables ?? 0} tables, ${evidencePreview?.totals.chart_csvs ?? 0} charts)`
+            }
           >
             <Star size={12} />
-            {selectedCount} for LLM
+            {evidenceTotal} item{evidenceTotal !== 1 ? 's' : ''} ready
+            {evidenceManual > 0 && ` (${evidenceManual} starred)`}
             <ChevronRight size={11} />
           </button>
         )}
@@ -417,10 +471,10 @@ export default function ExtractionWorkspacePage() {
         <Filter size={12} className="text-slate-400 mr-1 shrink-0" />
         {FILTERS.map((f) => {
           const count = f.id === 'all'
-            ? assets.length
+            ? visibleAssets.length
             : f.id === 'figure'
-            ? assets.filter((a) => a.asset_type === 'figure').length
-            : assets.filter((a) => a.classification === f.id).length
+            ? visibleAssets.filter(isOtherFigure).length
+            : visibleAssets.filter((a) => a.classification === f.id).length
           if (count === 0 && f.id !== 'all') return null
           return (
             <button
@@ -436,6 +490,16 @@ export default function ExtractionWorkspacePage() {
             </button>
           )
         })}
+        {nonScientific.length > 0 && (
+          <button
+            onClick={() => setShowAllAssets((v) => !v)}
+            className="ml-auto text-[10px] text-slate-400 hover:text-slate-600 px-2 py-1 rounded-md hover:bg-slate-100 whitespace-nowrap"
+          >
+            {showAllAssets
+              ? 'Hide non-scientific images'
+              : `${nonScientific.length} non-scientific image${nonScientific.length !== 1 ? 's' : ''} hidden · Show all assets`}
+          </button>
+        )}
       </div>
 
       {/* Gallery */}
@@ -450,6 +514,14 @@ export default function ExtractionWorkspacePage() {
             <p className="text-[11px] text-slate-400 mb-3">
               {filteredAssets.length} element{filteredAssets.length !== 1 ? 's' : ''}
               {selectedCount > 0 && ` · ${selectedCount} starred`}
+              {evidenceTotal > 0 && (
+                <>
+                  {' · '}
+                  {evidenceTotal} item{evidenceTotal !== 1 ? 's' : ''} will be used for extraction:{' '}
+                  {evidenceManual} manually selected, {evidenceAuto} automatically included
+                  {' '}({evidencePreview?.totals.paragraphs ?? 0} text, {evidencePreview?.totals.native_tables ?? 0} tables, {evidencePreview?.totals.chart_csvs ?? 0} charts)
+                </>
+              )}
             </p>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filteredAssets.map((asset) => (

@@ -340,7 +340,35 @@ export interface ProvenanceRecord {
   source_snippet?: string
   confidence?: number
   manually_verified: boolean
+  docling_item_ref?: string
+  extraction_asset_id?: number
+  has_image: boolean
   created_at: string
+}
+
+// ── Review (canonical, joined) ────────────────────────────────────────────
+// Observation + the paper/study/product/treatment context and evidence that
+// the Review and Scientific Database pages need. Backed by
+// GET /projects/{project_id}/observations (review_queue.py) — distinct from
+// the plain Observation list used by Trajectories, which doesn't need this
+// context and would break if the shape changed under it.
+
+export interface ReviewObservation extends Observation {
+  paper_id?: number
+  paper_name?: string
+  study_id?: number
+  study_title?: string
+  experiment_id?: number
+  experiment_label?: string
+  product_name?: string
+  food_category?: string
+  treatment_label?: string
+  is_control?: boolean
+  ingredient_name?: string
+  concentration_value?: number
+  concentration_unit?: string
+  storage_temperature_c?: number
+  evidence: ProvenanceRecord[]
 }
 
 export interface ValidationIssue {

@@ -142,7 +142,7 @@ export default function Register() {
               <img src="/mcgill.png" alt="McGill" className="h-7 w-auto brightness-0 invert" />
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-sm leading-tight">Meat & Cheese Database</p>
+              <p className="font-bold text-slate-900 text-sm leading-tight">Cheese Shelf-Life Database</p>
               <p className="text-slate-500 text-xs">McGill University</p>
             </div>
           </div>

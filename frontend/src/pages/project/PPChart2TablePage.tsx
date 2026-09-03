@@ -257,15 +257,6 @@ export default function PPChart2TablePage() {
   const [activeTab, setActiveTab] = useState<Tab>('figure')
   const [expandedLinks, setExpandedLinks] = useState<Record<number, boolean>>({})
   const [imgErr, setImgErr] = useState(false)
-  const [ppHealth, setPpHealth] = useState<{ available: boolean; last_error: string | null } | null>(null)
-
-  // Fetch PP-Chart2Table health status
-  useEffect(() => {
-    fetch('/api/chart2table/health')
-      .then((r) => r.json())
-      .then(setPpHealth)
-      .catch(() => null)
-  }, [])
 
   // Fetch figures for THIS paper only — never project-wide
   const fetchAssets = useCallback(async () => {
@@ -349,24 +340,6 @@ export default function PPChart2TablePage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
-
-      {/* ── PP-Chart2Table health banner ───────────────────────────── */}
-      {ppHealth && !ppHealth.available && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 shrink-0">
-          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
-          <p className="text-xs text-amber-700">
-            <span className="font-semibold">PP-Chart2Table unavailable</span>
-            {ppHealth.last_error ? ` — ${ppHealth.last_error}` : ' — PaddleOCR not installed in this environment.'}
-            {' '}Chart images cannot be digitized; native tables and text evidence are still available.
-          </p>
-        </div>
-      )}
-      {ppHealth?.available && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border-b border-emerald-100 shrink-0">
-          <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-          <p className="text-xs text-emerald-700 font-medium">PP-Chart2Table model loaded and ready.</p>
-        </div>
-      )}
 
       <div className="flex flex-1 overflow-hidden">
 
@@ -510,8 +483,8 @@ export default function PPChart2TablePage() {
                         <p className="text-sm font-medium text-slate-400">No CSV data</p>
                         <p className="text-xs text-slate-300 mt-1">
                           {selected.conversion_status === 'not_a_chart' && 'This figure was classified as not a chart.'}
-                          {selected.conversion_status === 'skipped' && 'Chart conversion was skipped (PaddleOCR not installed).'}
-                          {selected.conversion_status === 'failed' && (selected.conversion_error ?? 'Conversion failed.')}
+                          {selected.conversion_status === 'skipped' && 'Chart reading was skipped for this figure.'}
+                          {selected.conversion_status === 'failed' && (selected.conversion_error ?? 'Could not read this chart.')}
                           {selected.asset_type === 'native_table' && 'Use the figure tab to view this table.'}
                         </p>
                       </div>

@@ -5,9 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.database import Base, engine, apply_column_migrations
 from app.api.routes import (
-    auth, projects, papers, extraction, review,
+    auth, projects, papers, review_queue,
     analytics, export, schema,
-    food_extraction, extraction_workspace,
+    extraction_workspace,
 )
 from app.api.routes import (
     studies, experiments, observations, microorganisms,
@@ -37,12 +37,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Legacy routes ─────────────────────────────────────────────────────────
+# ── Core routes ────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(papers.router, prefix="/api")
-app.include_router(extraction.router, prefix="/api")
-app.include_router(review.router, prefix="/api")
+app.include_router(review_queue.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 app.include_router(schema.router, prefix="/api")
@@ -70,10 +69,7 @@ app.include_router(thresholds.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(snapshots.router, prefix="/api")
 
-# ── Food-safety extraction (new schema) ───────────────────────────────────────
-app.include_router(food_extraction.router, prefix="/api")
-
-# ── Extraction Workspace ───────────────────────────────────────────────────────
+# ── Extraction Workspace (active extraction pipeline) ──────────────────────────
 app.include_router(extraction_workspace.router, prefix="/api")
 
 

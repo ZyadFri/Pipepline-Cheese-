@@ -40,22 +40,6 @@ def extract_paper_task(self, job_id: int) -> dict:
         db.close()
 
 
-@celery_app.task(bind=True, name="tasks.food_extract_paper", max_retries=2, default_retry_delay=30)
-def food_extract_paper_task(self, paper_id: int, project_id: int, job_id: int) -> dict:
-    """
-    Celery task for the full Docling-based food extraction pipeline.
-
-    Runs: Docling → PP-Chart2Table → evidence packages → LLM extraction → DB persist.
-    Falls back to retry on transient errors (e.g. GPU OOM, network hiccup).
-    """
-    try:
-        from app.api.routes.food_extraction import _run_food_extraction
-        _run_food_extraction(paper_id, project_id, job_id)
-        return {"status": "completed", "paper_id": paper_id, "job_id": job_id}
-    except Exception as exc:
-        raise self.retry(exc=exc)
-
-
 @celery_app.task(bind=True, name="tasks.build_export")
 def build_export_task(self, run_id: int) -> dict:
     """Celery task wrapper for export building."""

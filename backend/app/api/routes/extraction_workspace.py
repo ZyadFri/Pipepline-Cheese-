@@ -2,7 +2,11 @@
 extraction_workspace.py — Extraction Workspace API.
 
 Progressive PDF analysis pipeline (Docling → context linking → chart conversion → scoring).
-Decoupled from the LLM extraction step so users can review all evidence before sending to Llama 4.
+Decoupled from the LLM extraction step so users can review all evidence before extracting
+structured data. LLM-extracted results are staged into the Ext* tables and then
+automatically promoted into the canonical Study/Experiment/TreatmentArm/Observation
+model (see app.services.canonical_promoter.promote_ext_paper_to_canonical) — no manual
+promotion step is required for results to reach Review / Scientific Database.
 
 Routes:
   POST   /projects/{pid}/papers/{paper_id}/workspace            Start extraction job
@@ -13,6 +17,8 @@ Routes:
   GET    /projects/{pid}/papers/{paper_id}/assets/{id}/page-image  Serve full page PNG
   GET    /projects/{pid}/papers/{paper_id}/assets/{id}/csv      Download chart CSV
   PATCH  /projects/{pid}/papers/{paper_id}/assets/{id}          Update selection / classification
+  GET    /projects/{pid}/papers/{paper_id}/evidence/{id}/image      Serve evidence crop PNG
+  GET    /projects/{pid}/papers/{paper_id}/evidence/{id}/thumbnail  Serve evidence thumbnail PNG
 """
 import json
 import logging
@@ -25,21 +31,26 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import UPLOAD_PATH
 from app.db.database import SessionLocal, get_db
 from app.db.models import (
-    AssetContextLink, ExtractionAsset, ExtExperiment, ExtExperimentIngredient,
-    ExtIngredient, ExtIndicator, ExtMeasurement,
+    AssetContextLink, ExtractionAsset, ExtEvidence, ExtExperiment,
+    ExtExperimentIngredient, ExtIngredient, ExtIndicator, ExtMeasurement,
     Job, Paper, Project, User,
 )
 from app.services.asset_classifier import _is_decorative, classify_figure, score_relevance
+from app.services.canonical_promoter import promote_ext_paper_to_canonical
 from app.services.chart_converter import convert_charts
 from app.services.context_linker import build_context_links
 from app.services.docling_extractor import extract_pdf
+from app.services.evidence_capture import save_evidence_crop
 from app.services.evidence_package import EvidenceItem, EvidencePackage
 from app.services.food_extractor import extract_food_data
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["extraction-workspace"])
+
+EVIDENCE_BASE = UPLOAD_PATH / "evidence"
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -638,7 +649,10 @@ def get_asset_image(
     paper_id: int,
     asset_id: int,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
     asset = db.query(ExtractionAsset).filter(
         ExtractionAsset.id == asset_id,
         ExtractionAsset.paper_id == paper_id,
@@ -659,7 +673,10 @@ def get_page_image(
     paper_id: int,
     asset_id: int,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
     asset = db.query(ExtractionAsset).filter(
         ExtractionAsset.id == asset_id,
         ExtractionAsset.paper_id == paper_id,
@@ -680,7 +697,10 @@ def get_asset_csv(
     paper_id: int,
     asset_id: int,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
     asset = db.query(ExtractionAsset).filter(
         ExtractionAsset.id == asset_id,
         ExtractionAsset.paper_id == paper_id,
@@ -725,6 +745,50 @@ def update_asset(
 
     db.commit()
     return _asset_out(asset)
+
+
+@router.get("/projects/{project_id}/papers/{paper_id}/evidence/{evidence_id}/image")
+def get_evidence_image(
+    project_id: int,
+    paper_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
+    ev = db.query(ExtEvidence).filter(
+        ExtEvidence.id == evidence_id, ExtEvidence.paper_id == paper_id,
+    ).first()
+    if not ev or not ev.evidence_image_path:
+        raise HTTPException(404, "Evidence image not available")
+    p = Path(ev.evidence_image_path)
+    if not p.exists():
+        raise HTTPException(404, "Evidence image file not found on disk")
+    return FileResponse(str(p), media_type="image/png",
+                        headers={"Cache-Control": "max-age=3600"})
+
+
+@router.get("/projects/{project_id}/papers/{paper_id}/evidence/{evidence_id}/thumbnail")
+def get_evidence_thumbnail(
+    project_id: int,
+    paper_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
+    ev = db.query(ExtEvidence).filter(
+        ExtEvidence.id == evidence_id, ExtEvidence.paper_id == paper_id,
+    ).first()
+    if not ev or not ev.evidence_thumbnail_path:
+        raise HTTPException(404, "Evidence thumbnail not available")
+    p = Path(ev.evidence_thumbnail_path)
+    if not p.exists():
+        raise HTTPException(404, "Evidence thumbnail file not found on disk")
+    return FileResponse(str(p), media_type="image/png",
+                        headers={"Cache-Control": "max-age=3600"})
 
 
 # ─── LLM Validation endpoints ─────────────────────────────────────────────────
@@ -893,15 +957,16 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
             job.current_step = "Done — no relevant evidence found in selected assets"
             job.completed_at = datetime.utcnow()
             job.result_json = json.dumps({
-                "experiments": 0, "measurements": 0,
+                "experiments_reported": 0, "experiments_stored": 0,
+                "measurements_reported": 0, "measurements_stored": 0,
                 "reasoning": "No relevant evidence found in the selected assets.",
-                "low_confidence_count": 0,
+                "low_confidence_count": 0, "warnings": [], "promotion": {},
             })
             db.commit()
             return
 
         job.progress = 30
-        job.current_step = f"Sending {len(packages)} package(s) to Llama 4 via Groq"
+        job.current_step = f"Extracting structured data from {len(packages)} evidence package(s)"
         db.commit()
 
         result = extract_food_data(
@@ -911,11 +976,96 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
         )
 
         experiments_data = result.get("experiments", [])
+        experiments_reported = len(experiments_data)
+        measurements_reported = sum(len(e.get("measurements", [])) for e in experiments_data)
         job.progress = 75
-        job.current_step = f"Persisting {len(experiments_data)} experiment(s) to database"
+        job.current_step = f"Persisting {experiments_reported} experiment(s) to database"
         db.commit()
 
+        # Clear stale staging rows for this paper before writing fresh ones, so a
+        # re-run never leaves orphaned/duplicate Ext* data behind (and, critically,
+        # never lets a freshly re-created ExtExperiment silently inherit a prior
+        # run's leftover ExtMeasurement/ExtExperimentIngredient rows if SQLite
+        # reuses the freed id). Only paper-scoped rows are touched —
+        # ExtIngredient/ExtIndicator are project-level reusable catalogs shared
+        # across papers and must never be deleted here. Children are deleted
+        # explicitly rather than relied on to cascade from ExtExperiment: cascade
+        # requires SQLite's PRAGMA foreign_keys=ON on the connection actually in
+        # use, which the production engine sets but isn't guaranteed everywhere
+        # (e.g. a test/alternate engine) — explicit deletes work regardless of that
+        # setting or database backend. Safe unconditionally: nothing in the Ext*
+        # staging schema carries review state — already-approved canonical
+        # Observations are protected separately, in promote_ext_paper_to_canonical.
+        stale_exp_ids = [
+            row.id for row in
+            db.query(ExtExperiment.id).filter(ExtExperiment.paper_id == paper_id).all()
+        ]
+        if stale_exp_ids:
+            db.query(ExtMeasurement).filter(
+                ExtMeasurement.experiment_id.in_(stale_exp_ids)
+            ).delete(synchronize_session=False)
+            db.query(ExtExperimentIngredient).filter(
+                ExtExperimentIngredient.experiment_id.in_(stale_exp_ids)
+            ).delete(synchronize_session=False)
+        db.query(ExtEvidence).filter(ExtEvidence.paper_id == paper_id).delete(synchronize_session=False)
+        db.query(ExtExperiment).filter(ExtExperiment.paper_id == paper_id).delete(synchronize_session=False)
+        db.flush()
+
+        # Bbox lookup for evidence crops, built from the assets actually used in this
+        # extraction (ExtractionAsset.bbox_json is the same {x1,y1,x2,y2} fractional
+        # convention food_extraction.py's fresh-Docling-based version used).
+        ref_to_bbox: dict = {}
+        for a in selected:
+            if a.docling_item_ref and a.bbox_json:
+                try:
+                    ref_to_bbox[a.docling_item_ref] = json.loads(a.bbox_json)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    pass
+
         # ── Helpers (local, same logic as food_extraction.py) ─────────────────
+
+        def _save_evidence(entity_type: str, entity_key: dict,
+                            field_name: Optional[str], ev: dict) -> None:
+            """Persist one evidence_object from the LLM response as an ExtEvidence
+            row, with an image crop when a bbox is resolvable. Ported from the
+            (now-retired) food_extraction.py, which already solved this — the
+            active pipeline had never been wired to save evidence at all."""
+            item_ref = ev.get("docling_item_ref")
+            bbox = ref_to_bbox.get(item_ref) or {} if item_ref else {}
+            is_chart = (
+                ev.get("source_type") == "chart_csv"
+                or bool(ev.get("value_is_approximate", False))
+            )
+            rec = ExtEvidence(
+                paper_id=paper_id,
+                entity_type=entity_type,
+                entity_key=json.dumps(entity_key),
+                field_name=field_name,
+                page_number=ev.get("page_number"),
+                source_type=ev.get("source_type", "text"),
+                source_label=ev.get("source_label"),
+                exact_text=ev.get("exact_text"),
+                bbox_x1=bbox.get("x1"), bbox_y1=bbox.get("y1"),
+                bbox_x2=bbox.get("x2"), bbox_y2=bbox.get("y2"),
+                confidence=ev.get("confidence"),
+                figure_series=ev.get("figure_series"),
+                x_axis_value=ev.get("x_axis_value"),
+                y_axis_value=ev.get("y_axis_value"),
+                value_is_approximate=bool(ev.get("value_is_approximate", False)),
+                docling_item_ref=item_ref,
+                is_chart_derived=is_chart,
+            )
+            db.add(rec)
+            db.flush()
+
+            page_num = ev.get("page_number")
+            if page_num and bbox.get("x1") is not None:
+                img_dir = EVIDENCE_BASE / str(paper_id)
+                img_path = img_dir / f"ev_{rec.id}.png"
+                thumb_path = img_dir / f"thumb_{rec.id}.png"
+                if save_evidence_crop(paper.file_path, page_num, bbox, img_path, thumb_path):
+                    rec.evidence_image_path = str(img_path)
+                    rec.evidence_thumbnail_path = str(thumb_path)
 
         def _get_ing(name: str, func_class: str, source: str) -> ExtIngredient:
             ing = db.query(ExtIngredient).filter(
@@ -953,18 +1103,21 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
         exp_count = meas_count = 0
 
         for exp_dict in experiments_data:
-            meat_matrix = exp_dict.get("meat_matrix") or ""
-            treatment   = exp_dict.get("treatment") or ""
-            if not meat_matrix or not treatment:
+            cheese_product = exp_dict.get("cheese_product") or ""
+            treatment      = exp_dict.get("treatment") or ""
+            if not cheese_product or not treatment:
                 continue
 
             exp_row = ExtExperiment(
                 project_id=project_id, paper_id=paper_id, job_id=job_id,
-                meat_matrix=meat_matrix, treatment=treatment,
+                cheese_product=cheese_product, treatment=treatment,
             )
             db.add(exp_row)
             db.flush()
             exp_count += 1
+
+            for ev in exp_dict.get("experiment_evidence", []):
+                _save_evidence("experiment", {"experiment_id": exp_row.id}, None, ev)
 
             for ing_dict in exp_dict.get("ingredients", []):
                 name = ing_dict.get("ingredient_name") or ""
@@ -988,6 +1141,13 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
                         concentration_unit=ing_dict.get("concentration_unit") or "",
                     ))
                     db.flush()
+
+                for ev in ing_dict.get("evidence", []):
+                    _save_evidence(
+                        "ingredient_link",
+                        {"experiment_id": exp_row.id, "ingredient_id": ing_row.id},
+                        None, ev,
+                    )
 
             for meas_dict in exp_dict.get("measurements", []):
                 day      = meas_dict.get("day")
@@ -1013,15 +1173,67 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
                     db.flush()
                     meas_count += 1
 
-        job.status = "completed"
-        job.progress = 100
+                    for ev in meas_dict.get("evidence", []):
+                        _save_evidence(
+                            "measurement",
+                            {"experiment_id": exp_row.id, "day": int(day), "indicator_id": ind_row.id},
+                            "indicator_value", ev,
+                        )
+
+        # ── Promote to canonical + surface reported-vs-stored mismatches ───────
+        # Never silently show 0: reported/stored counts are always both recorded.
+        # A complete drop (LLM reported data but none of it survived) fails the
+        # job loudly; a partial drop stays "completed" with a warning attached.
+        warnings: list[str] = []
+        promotion: dict = {}
+        failed_reason: Optional[str] = None
+
+        if experiments_reported > 0 and exp_count == 0:
+            failed_reason = (
+                f"LLM reported {experiments_reported} experiment(s) but none were "
+                "stored — likely a parsing error (missing cheese product/treatment)."
+            )
+        elif measurements_reported > 0 and meas_count == 0:
+            failed_reason = (
+                f"LLM reported {measurements_reported} measurement(s) but none were "
+                "stored — likely a parsing error (missing day/value/indicator)."
+            )
+        else:
+            if 0 < exp_count < experiments_reported:
+                warnings.append(
+                    f"{experiments_reported - exp_count} of {experiments_reported} "
+                    "reported experiment(s) were not stored."
+                )
+            if 0 < meas_count < measurements_reported:
+                warnings.append(
+                    f"{measurements_reported - meas_count} of {measurements_reported} "
+                    "reported measurement(s) were not stored."
+                )
+            try:
+                promotion = promote_ext_paper_to_canonical(paper_id, project_id, db)
+            except Exception as promo_exc:
+                logger.error("Canonical promotion failed for paper %d: %s",
+                             paper_id, promo_exc, exc_info=True)
+                failed_reason = f"Extraction succeeded but promotion to the database failed: {promo_exc}"
+
+        if failed_reason:
+            job.status = "failed"
+            job.error_message = failed_reason[:500]
+        else:
+            job.status = "completed"
+            job.progress = 100
+
         job.current_step = f"Done — {exp_count} experiments, {meas_count} measurements"
         job.completed_at = datetime.utcnow()
         job.result_json = json.dumps({
-            "experiments": exp_count,
-            "measurements": meas_count,
+            "experiments_reported": experiments_reported,
+            "experiments_stored": exp_count,
+            "measurements_reported": measurements_reported,
+            "measurements_stored": meas_count,
             "reasoning": result.get("reasoning_summary", ""),
             "low_confidence_count": result.get("low_confidence_count", 0),
+            "warnings": warnings,
+            "promotion": promotion,
         })
         db.commit()
 

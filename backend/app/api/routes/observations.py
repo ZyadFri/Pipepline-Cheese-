@@ -10,7 +10,8 @@ from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.db.models import AuditEvent, Observation, TreatmentArm, User
 from app.schemas.canonical import (
-    ObservationBulkCreate, ObservationCreate, ObservationOut, ObservationUpdate,
+    ObservationBulkApprove, ObservationBulkCreate, ObservationCreate,
+    ObservationOut, ObservationUpdate,
 )
 
 router = APIRouter(prefix="/observations", tags=["observations"])
@@ -144,6 +145,28 @@ def approve_observation(
     db.commit()
     db.refresh(obs)
     return obs
+
+
+@router.post("/bulk-approve", response_model=list[ObservationOut])
+def bulk_approve_observations(
+    payload: ObservationBulkApprove,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Approve all verified/high-confidence: the frontend decides which ids qualify
+    (by confidence threshold), this just applies it."""
+    if not payload.observation_ids:
+        return []
+    obs_list = db.query(Observation).filter(Observation.id.in_(payload.observation_ids)).all()
+    for obs in obs_list:
+        obs.review_status = "approved"
+        obs.updated_by = current_user.id
+        obs.version += 1
+        _audit(db, current_user, obs.id, "approve", None, {"review_status": "approved"})
+    db.commit()
+    for obs in obs_list:
+        db.refresh(obs)
+    return obs_list
 
 
 @router.delete("/{obs_id}", status_code=status.HTTP_204_NO_CONTENT)

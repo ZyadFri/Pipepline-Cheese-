@@ -5,7 +5,7 @@ import type {
   Job, ProjectMember, NormalizationMapping, Trajectory,
   ImputationProposal, Threshold, DatasetSnapshot,
   ExportRun, AuditEvent, ValidationIssue, ProvenanceRecord,
-  ExperimentMicroorganism, ProjectStats,
+  ExperimentMicroorganism, ProjectStats, ReviewObservation,
 } from '../types'
 
 const api = axios.create({
@@ -74,28 +74,6 @@ export const papersApi = {
   },
   delete: (projectId: number, paperId: number) =>
     api.delete(`/projects/${projectId}/papers/${paperId}`),
-}
-
-// ── Extraction (legacy + new) ─────────────────────────────────────────────
-
-export const extractionApi = {
-  extractOne: (projectId: number, paperId: number) =>
-    api.post(`/projects/${projectId}/extract/${paperId}`).then((r) => r.data),
-  extractAll: (projectId: number) =>
-    api.post(`/projects/${projectId}/extract`).then((r) => r.data),
-}
-
-// ── Review (legacy) ───────────────────────────────────────────────────────
-
-export const reviewApi = {
-  list: (projectId: number, params?: { status?: string; paper_id?: number; skip?: number; limit?: number }) =>
-    api.get(`/projects/${projectId}/rows`, { params }).then((r) => r.data),
-  update: (projectId: number, rowId: number, data: { data?: Record<string, unknown>; status?: string; reviewer_note?: string }) =>
-    api.patch(`/projects/${projectId}/rows/${rowId}`, data).then((r) => r.data),
-  bulkStatus: (projectId: number, row_ids: number[], status: string) =>
-    api.post(`/projects/${projectId}/rows/bulk-status`, { row_ids, status }).then((r) => r.data),
-  delete: (projectId: number, rowId: number) =>
-    api.delete(`/projects/${projectId}/rows/${rowId}`),
 }
 
 // ── Analytics ─────────────────────────────────────────────────────────────
@@ -207,6 +185,29 @@ export const observationsApi = {
   approve: (id: number): Promise<Observation> =>
     api.post(`/observations/${id}/approve`).then((r) => r.data),
   delete: (id: number) => api.delete(`/observations/${id}`),
+  bulkApprove: (observation_ids: number[]): Promise<Observation[]> =>
+    api.post('/observations/bulk-approve', { observation_ids }).then((r) => r.data),
+}
+
+// ── Review queue (canonical, joined — backs Review & Database pages) ────────
+
+export const reviewQueueApi = {
+  list: (projectId: number, params?: {
+    paper_id?: number
+    review_status?: string
+    skip?: number
+    limit?: number
+  }): Promise<ReviewObservation[]> =>
+    api.get(`/projects/${projectId}/observations`, { params }).then((r) => r.data),
+
+  // Reads ProvenanceRecord's own copy of the evidence crop path, which survives
+  // re-extraction (unlike ExtEvidence, wiped and rebuilt every run) — this is the
+  // stable, canonical-data-backed image URL Review.tsx should use.
+  provenanceImageUrl: (projectId: number, provenanceId: number) =>
+    `${api.defaults.baseURL}/projects/${projectId}/provenance/${provenanceId}/image`,
+
+  provenanceThumbnailUrl: (projectId: number, provenanceId: number) =>
+    `${api.defaults.baseURL}/projects/${projectId}/provenance/${provenanceId}/thumbnail`,
 }
 
 // ── Microorganisms ────────────────────────────────────────────────────────
@@ -366,6 +367,15 @@ export const workspaceApi = {
 
   csvUrl: (projectId: number, paperId: number, assetId: number) =>
     `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/assets/${assetId}/csv`,
+
+  // Serves the freshly-extracted ExtEvidence crop, valid only until the next
+  // re-extraction (ExtEvidence is staging data, wiped and rebuilt each run) —
+  // use inside the Extraction Workspace/Evidence Review flow, not Review.tsx.
+  evidenceImageUrl: (projectId: number, paperId: number, evidenceId: number) =>
+    `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/evidence/${evidenceId}/image`,
+
+  evidenceThumbnailUrl: (projectId: number, paperId: number, evidenceId: number) =>
+    `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/evidence/${evidenceId}/thumbnail`,
 
   getEvidencePackages: (projectId: number, paperId: number) =>
     api.get(`/projects/${projectId}/papers/${paperId}/evidence-packages`).then((r) => r.data),
