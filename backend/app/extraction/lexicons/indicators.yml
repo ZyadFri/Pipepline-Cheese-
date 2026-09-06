@@ -82,6 +82,42 @@ storage_time_days:
   aliases: ["storage time (day)", "storage time", "storage day"]
   canonical_type: other
   common_units: ["days"]
+coagulation_temperature:
+  aliases: ["coagulation temperature", "coagulation temp"]
+  canonical_type: other
+  common_units: ["°C"]
+smoking_time:
+  aliases: ["smoking time"]
+  canonical_type: other
+  common_units: ["h"]
+pressing_time:
+  aliases: ["pressing time"]
+  canonical_type: other
+  common_units: ["h"]
+brining_time:
+  aliases: ["brining time", "brine time"]
+  canonical_type: other
+  common_units: ["h"]
+ripening_temperature:
+  aliases: ["ripening temperature"]
+  canonical_type: other
+  common_units: ["°C"]
+pasteurization_temperature:
+  aliases: ["pasteurization temperature", "pasteurisation temperature"]
+  canonical_type: other
+  common_units: ["°C"]
+hardness_texture:
+  aliases: ["hardness (g)", "hardness"]
+  canonical_type: texture
+  common_units: ["g"]
+total_yeasts_and_molds:
+  aliases: ["total yeasts and molds", "yeasts and molds (log.cfu/g)"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g"]
+tmab_count:
+  aliases: ["tmab", "total mesophilic aerobic bacteria"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g"]
 weight_loss:
   aliases: ["weight loss"]
   canonical_type: weight_loss

@@ -115,15 +115,40 @@ def find_generic_numeric_facts(text: str) -> list[NumericMatch]:
     """A looser fallback pass for 'noun phrase + number + unit' patterns that
     don't match any of the specific scientific patterns above (spec §7/§24) —
     e.g. 'springiness was 0.72', 'cohesiveness of 0.61'. Feeds UnmappedFact
-    generation, not canonical fields."""
+    generation, not canonical fields.
+
+    Deliberately conservative: an earlier, looser version of this scanned raw
+    narrative sentences unconditionally and produced real garbage on real
+    papers — "examined at a working distance" = 5.86, "mm and an accelerating
+    voltage" = 30.0 kV — because it had no sense of clause boundaries (grabbing
+    mid-word fragments) and no idea that "working distance"/"accelerating
+    voltage" are SEM operating parameters, not cheese science. Three guards
+    fix that: (1) the phrase must start at a real clause boundary, not an
+    arbitrary character offset; (2) a phrase led by a narrative verb
+    ("examined", "measured", "performed", ...) is rejected — those describe an
+    action in a Methods sentence, not a property with a value; (3) a fixed
+    denylist of analytical-instrument vocabulary (SEM/GC-MS/HPLC calibration
+    terms) voids the match outright, since virtually every paper's Methods
+    section contains some of these and none of them are cheese-science facts.
+    """
     if not text:
         return []
+
     pattern = re.compile(
-        r"([A-Za-z][A-Za-z\s\-]{2,30}?)\s+(?:was|were|of|=|is|are)\s*[:]?\s*" + NUMBER + r"\s*([A-Za-z%/°]*)",
+        r"(?:^|[.;,]\s*|\band\s+)([A-Za-z][A-Za-z\s\-]{2,40}?)\s+(?:was|were|of|=|is|are)\s*[:]?\s*"
+        + NUMBER + r"\s*(" + "|".join(_UNIT_WHITELIST) + r")?(?=\s|$|[,.;)])",
     )
     results = []
     for m in pattern.finditer(text):
         label = m.group(1).strip()
+        label_lower = label.lower()
+
+        if any(term in label_lower for term in _INSTRUMENT_DENYLIST):
+            continue
+        first_word = label_lower.split()[0] if label_lower.split() else ""
+        if first_word in _LEADING_VERB_DENYLIST:
+            continue
+
         try:
             value = float(m.group(2).replace(",", "."))
         except ValueError:
@@ -131,9 +156,44 @@ def find_generic_numeric_facts(text: str) -> list[NumericMatch]:
         unit = (m.group(3) or "").strip()
         results.append(NumericMatch(
             kind="generic", raw_text=m.group(0).strip(), value=value, unit=unit,
-            span=m.span(), predicate=label.lower(),
+            span=m.span(), predicate=label_lower,
         ))
     return results
+
+
+# Real unit tokens only — the previous "any trailing letters" capture happily
+# grabbed the first word of the NEXT clause as a "unit" ("springiness was 0.72
+# and cohesiveness..." -> unit="and"). Longer tokens first so e.g. "kg" isn't
+# cut short by a "g" alternative matching first.
+_UNIT_WHITELIST = [
+    "degC", "kPa", "MPa", "CFU", "log", "ppm", "N/m2", "mmHg",
+    "mg", "kg", "mL", "cm", "mm", "min",
+    "g", "h", "s", "N", "%",
+]
+
+# Analytical-instrument / methodology vocabulary — never a cheese-science fact,
+# regardless of what number sits next to it. Broad on purpose: any paper using
+# SEM, GC-MS, HPLC, or a spectrophotometer will describe calibration settings
+# in almost identical language, so this isn't specific to one paper.
+_INSTRUMENT_DENYLIST = {
+    "working distance", "accelerating voltage", "water vapor pressure",
+    "magnification", "wavelength", "flow rate", "scan rate", "resolution",
+    "sputter", "coated with gold", "vacuum", "detector", "excitation",
+    "emission", "chromatogram", "retention time", "column temperature",
+    "injection volume", "carrier gas", "mobile phase",
+}
+
+# Narrative-methods verbs — a phrase led by one of these describes an ACTION
+# ("examined at...", "performed using...", "expressed as...") rather than a
+# measured property, so it's a methods-section aside, not a fact with a value.
+_LEADING_VERB_DENYLIST = {
+    "examined", "measured", "performed", "conducted", "carried", "obtained",
+    "expressed", "reported", "used", "based", "shown", "determined",
+    "calculated", "analyzed", "prepared", "collected", "recorded", "operated",
+    "run", "set", "adjusted", "maintained", "kept", "placed", "stored",
+    "heated", "cooled", "mixed", "added", "dissolved", "diluted", "filtered",
+    "centrifuged", "incubated", "sterilized", "sealed", "labeled", "coded",
+}
 
 
 __all__ = ["NumericMatch", "find_numeric_facts", "find_generic_numeric_facts", "_nearest_noun_phrase"]

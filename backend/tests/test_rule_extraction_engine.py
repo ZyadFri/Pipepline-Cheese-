@@ -126,6 +126,42 @@ def test_day_header_number_then_word():
     assert _parse_day_header("14 days") == 14
 
 
+# ── Regression: instrumentation noise, found live on a real paper ──────────
+# The generic "noun phrase + number" fallback previously scanned Methods-
+# section SEM/GC-MS calibration sentences unconditionally and produced real
+# garbage: "examined at a working distance" = 5.86, "mm and an accelerating
+# voltage" = 30.0 kV. Neither is cheese science — both are microscope/
+# instrument settings that happened to sit near a number.
+
+def test_instrument_calibration_sentences_produce_no_facts():
+    sentences = [
+        "Images were examined at a working distance of 5.86 mm and an accelerating voltage of 30.0 kV.",
+        "Samples were analyzed in freeze-dried mode at a water vapor pressure of 7.25 Torr.",
+        "The GC-MS was operated with a scan rate of 2.5 and a column temperature of 250.",
+    ]
+    for s in sentences:
+        assert find_generic_numeric_facts(s) == [], f"expected no facts in: {s!r}"
+
+
+def test_real_cheese_facts_still_captured_alongside_denylist():
+    facts = find_generic_numeric_facts("Springiness was 0.72 and cohesiveness was 0.61.")
+    by_predicate = {f.predicate: f.value for f in facts}
+    assert by_predicate.get("springiness") == 0.72
+    assert by_predicate.get("cohesiveness") == 0.61
+
+
+def test_unit_capture_does_not_swallow_the_next_word():
+    # Previously "0.72 and cohesiveness" mis-captured "and" as the unit.
+    facts = find_generic_numeric_facts("Springiness was 0.72 and cohesiveness was 0.61.")
+    assert all(f.unit != "and" for f in facts)
+
+
+def test_percentage_unit_still_captured():
+    facts = find_generic_numeric_facts("The moisture content was 42.3% and the salt content was 1.6%.")
+    by_predicate = {f.predicate: (f.value, f.unit) for f in facts}
+    assert by_predicate.get("the moisture content") == (42.3, "%")
+
+
 def test_day_header_zero_time_and_bare_number():
     assert _parse_day_header("Zero time") == 0
     assert _parse_day_header("0") == 0
