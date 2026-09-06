@@ -10,6 +10,7 @@ from app.extraction.rules.regexes import find_numeric_facts, find_generic_numeri
 from app.extraction.rules.relations import (
     detect_application_method, is_control_arm, link_concentrations_to_ingredients,
 )
+from app.extraction.rules.tables import _parse_day_header
 from app.extraction.rules.text_facts import extract_text_facts, find_unmapped_numeric_facts
 
 
@@ -107,6 +108,27 @@ def test_unknown_fact_is_preserved_as_unmapped():
 
     unmapped = find_unmapped_numeric_facts(text)
     assert any(u.value == 0.72 for u in unmapped)
+
+
+# ── Regression: table day-header parsing, both digit orders ────────────────
+# A real cheese-preservation paper's table used "7 days"/"14 days" (number
+# before the word) headers — the original regex only matched "Day 7"/"D7"
+# (word before the number) and silently produced zero observations for that
+# table. Found via live testing, not a synthetic case.
+
+def test_day_header_word_then_number():
+    assert _parse_day_header("Day 15") == 15
+    assert _parse_day_header("D15") == 15
+
+
+def test_day_header_number_then_word():
+    assert _parse_day_header("7 days") == 7
+    assert _parse_day_header("14 days") == 14
+
+
+def test_day_header_zero_time_and_bare_number():
+    assert _parse_day_header("Zero time") == 0
+    assert _parse_day_header("0") == 0
 
 
 def test_known_predicate_not_double_counted_as_unmapped():

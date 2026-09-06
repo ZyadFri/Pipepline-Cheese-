@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { papersApi, workspaceApi, extractionEnginesApi, type ExtractionEngineName } from '../../services/api'
+import { papersApi, workspaceApi, extractionEnginesApi, type ExtractionEngineName, type UnmappedFact } from '../../services/api'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,12 +68,13 @@ interface LlmJob {
   current_step: string
   error_message?: string | null
   result?: {
-    experiments_reported: number
+    experiments_reported?: number
     experiments_stored: number
-    measurements_reported: number
+    measurements_reported?: number
     measurements_stored: number
+    unmapped_facts_stored?: number
     reasoning: string
-    low_confidence_count: number
+    low_confidence_count?: number
     warnings: string[]
   } | null
   completed_at?: string | null
@@ -374,7 +375,22 @@ export default function ValidationPage() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [job, setJob] = useState<LlmJob | null>(null)
+  const [unmappedFacts, setUnmappedFacts] = useState<UnmappedFact[]>([])
+  const [showUnmapped, setShowUnmapped] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Whenever a job finishes with additional facts captured, fetch them so the
+  // "N additional facts preserved" line has something real to expand into —
+  // this is the only place those facts are visible right now, since nothing
+  // was ever discarded, just not always structured into an experiment.
+  useEffect(() => {
+    if (job?.status === 'completed' && (job.result?.unmapped_facts_stored ?? 0) > 0 && paperId) {
+      extractionEnginesApi.unmappedFacts(pid, paperId).then(setUnmappedFacts).catch(() => setUnmappedFacts([]))
+    } else if (job?.status !== 'completed') {
+      setUnmappedFacts([])
+      setShowUnmapped(false)
+    }
+  }, [job?.status, job?.job_id, pid, paperId])
 
   // ── Load papers ──────────────────────────────────────────────────────────────
 
@@ -536,22 +552,25 @@ export default function ValidationPage() {
                   nothing needs a second look, amber when it finished but has
                   low-confidence values or unstored items, red on failure. */}
               {job && (() => {
-                const needsReview = job.status === 'completed' && (
+                const nothingStructured = job.status === 'completed' &&
+                  (job.result?.experiments_stored ?? 0) === 0 &&
+                  (job.result?.measurements_stored ?? 0) === 0
+                const needsReview = job.status === 'completed' && !nothingStructured && (
                   (job.result?.low_confidence_count ?? 0) > 0 ||
                   (job.result?.warnings?.length ?? 0) > 0
                 )
-                const isClean = job.status === 'completed' && !needsReview
+                const isClean = job.status === 'completed' && !needsReview && !nothingStructured
                 return (
                 <div className={clsx(
                   'rounded-xl p-4 border flex items-start gap-3',
                   isClean     ? 'bg-green-50 border-green-200' :
-                  needsReview ? 'bg-amber-50 border-amber-200' :
+                  (needsReview || nothingStructured) ? 'bg-amber-50 border-amber-200' :
                   job.status === 'failed' ? 'bg-red-50 border-red-200' :
                   'bg-[#fdf3f5] border-[#e8c6d0]'
                 )}>
                   {isClean ? (
                     <CheckCircle2 size={18} className="text-green-600 mt-0.5 shrink-0" />
-                  ) : needsReview ? (
+                  ) : (needsReview || nothingStructured) ? (
                     <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
                   ) : job.status === 'failed' ? (
                     <XCircle size={18} className="text-red-600 mt-0.5 shrink-0" />
@@ -562,11 +581,12 @@ export default function ValidationPage() {
                     <p className={clsx(
                       'text-sm font-semibold',
                       isClean     ? 'text-green-800' :
-                      needsReview ? 'text-amber-800' :
+                      (needsReview || nothingStructured) ? 'text-amber-800' :
                       job.status === 'failed' ? 'text-red-800' :
                       'text-[#661523]'
                     )}>
                       {isClean     ? 'Extraction complete' :
+                       nothingStructured ? "No structured experiments recognized" :
                        needsReview ? 'Extraction finished — review required' :
                        job.status === 'failed' ? 'Extraction failed' :
                        'Extracting structured data…'}
@@ -588,7 +608,7 @@ export default function ValidationPage() {
                         <span className={clsx('text-xs font-medium', isClean ? 'text-green-700' : 'text-amber-700')}>
                           {job.result.measurements_stored} measurement(s)
                         </span>
-                        {job.result.low_confidence_count > 0 && (
+                        {(job.result.low_confidence_count ?? 0) > 0 && (
                           <span className="text-xs text-amber-600">
                             {job.result.low_confidence_count} need review
                           </span>
@@ -598,12 +618,39 @@ export default function ValidationPage() {
                             {job.result.warnings.length} warning(s)
                           </span>
                         )}
+                        {job.result.experiments_stored > 0 && (
+                          <button
+                            onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
+                            className="text-xs text-[#7A1B2E] font-semibold hover:underline"
+                          >
+                            Review results →
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {(job.result?.unmapped_facts_stored ?? 0) > 0 && (
+                      <div className="mt-2">
                         <button
-                          onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
-                          className="text-xs text-[#7A1B2E] font-semibold hover:underline"
+                          onClick={() => setShowUnmapped((v) => !v)}
+                          className="text-xs font-semibold text-[#7A1B2E] hover:underline"
                         >
-                          Review results →
+                          {job.result!.unmapped_facts_stored} additional value{job.result!.unmapped_facts_stored === 1 ? '' : 's'} found but not matched to a known indicator {showUnmapped ? '▲' : '▼'}
                         </button>
+                        {showUnmapped && (
+                          <div className="mt-2 rounded-lg border border-amber-200 bg-white divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                            {unmappedFacts.length === 0 ? (
+                              <p className="text-xs text-slate-400 p-3">Loading…</p>
+                            ) : unmappedFacts.map((f) => (
+                              <div key={f.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                                <div className="min-w-0">
+                                  <span className="font-medium text-slate-700">{f.predicate}</span>
+                                  {f.subject && <span className="text-slate-400"> · {f.subject}</span>}
+                                </div>
+                                <span className="text-slate-600 shrink-0">{f.value_raw}{f.unit_raw ? ` ${f.unit_raw}` : ''}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     {job.status === 'failed' && job.error_message && (

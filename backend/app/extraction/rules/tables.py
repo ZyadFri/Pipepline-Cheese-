@@ -30,15 +30,26 @@ from app.extraction.rules.context import resolve_context_for_asset
 from app.extraction.rules.lexicon_loader import indicator_lexicon, best_match
 from app.extraction.rules.relations import is_control_arm, link_concentrations_to_ingredients
 
-_DAY_HEADER = re.compile(r"day\s*(\d+)|d\s*(\d+)\b|\bt\s*(\d+)\b", re.IGNORECASE)
+# Two digit orders both appear in real papers: "Day 15"/"D15" (word-then-number)
+# and "15 days"/"15 d" (number-then-word) — a header missing either pattern
+# silently fails to parse as a time point, which is exactly what happened on a
+# real paper whose columns read "7 days", "14 days" (number-first only).
+_DAY_HEADER_WORD_FIRST = re.compile(r"\bday\s*(\d+)|\bd\s*(\d+)\b|\bt\s*(\d+)\b", re.IGNORECASE)
+_DAY_HEADER_NUMBER_FIRST = re.compile(r"(\d+)\s*(?:days?|d)\b", re.IGNORECASE)
+_ZERO_TIME = re.compile(r"\bzero\s*time\b|\binitial\b|\bday\s*0\b|\bbaseline\b", re.IGNORECASE)
 
 
 def _parse_day_header(header: str) -> int | None:
-    m = _DAY_HEADER.search(str(header))
+    text = str(header)
+    if _ZERO_TIME.search(text):
+        return 0
+    m = _DAY_HEADER_WORD_FIRST.search(text)
+    if not m:
+        m = _DAY_HEADER_NUMBER_FIRST.search(text)
     if not m:
         # A bare number column header ("0", "15", "30") is common too.
         try:
-            return int(float(str(header).strip()))
+            return int(float(text.strip()))
         except ValueError:
             return None
     for g in m.groups():
