@@ -1,0 +1,61 @@
+# Ingredient/treatment lexicon. `functional_class` matches ExtIngredient's
+# free-text convention (antimicrobial|antioxidant|preservative|coating_agent|
+# acidulant|texture_modifier|combined|other|unknown) — used as the default when
+# the rule engine can't infer a more specific class from context.
+thyme_essential_oil:
+  aliases: ["thyme essential oil", "thyme oil", "thymus vulgaris oil"]
+  functional_class: antimicrobial
+oregano_essential_oil:
+  aliases: ["oregano essential oil", "oregano oil"]
+  functional_class: antimicrobial
+rosemary_extract:
+  aliases: ["rosemary extract", "rosemary essential oil"]
+  functional_class: antioxidant
+chitosan:
+  aliases: ["chitosan"]
+  functional_class: coating_agent
+nisin:
+  aliases: ["nisin"]
+  functional_class: antimicrobial
+natamycin:
+  aliases: ["natamycin", "pimaricin"]
+  functional_class: antimicrobial
+lactoperoxidase_system:
+  aliases: ["lactoperoxidase system", "lpo system", "lactoperoxidase"]
+  functional_class: antimicrobial
+lysozyme:
+  aliases: ["lysozyme"]
+  functional_class: antimicrobial
+bacteriocin:
+  aliases: ["bacteriocin", "bacteriocins"]
+  functional_class: antimicrobial
+essential_oil_generic:
+  aliases: ["essential oil", "eo"]
+  functional_class: antimicrobial
+sodium_benzoate:
+  aliases: ["sodium benzoate"]
+  functional_class: preservative
+potassium_sorbate:
+  aliases: ["potassium sorbate"]
+  functional_class: preservative
+citric_acid:
+  aliases: ["citric acid"]
+  functional_class: acidulant
+lactic_acid:
+  aliases: ["lactic acid"]
+  functional_class: acidulant
+alginate:
+  aliases: ["alginate", "sodium alginate"]
+  functional_class: coating_agent
+whey_protein_coating:
+  aliases: ["whey protein coating", "whey protein isolate coating"]
+  functional_class: coating_agent
+gelatin_coating:
+  aliases: ["gelatin coating", "gelatine coating"]
+  functional_class: coating_agent
+starter_culture:
+  aliases: ["starter culture", "starter cultures"]
+  functional_class: other
+adjunct_culture:
+  aliases: ["adjunct culture", "adjunct cultures"]
+  functional_class: other

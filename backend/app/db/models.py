@@ -431,6 +431,13 @@ class Observation(Base):
 
     quality_score           = Column(Float)    # 0-1
     review_status           = Column(String, default="extracted")
+    # Which extraction engine most recently produced/updated this observation —
+    # llm|rules|ml. Dedup key (treatment_arm_id, measurement_type, measurement_subtype,
+    # time_days) stays engine-unqualified: canonical is one slot with one current
+    # answer, not three parallel datasets — promoting a second engine's value for an
+    # already-filled slot overwrites it (subject to the approved-review-status guard)
+    # and re-stamps this column.
+    extraction_engine       = Column(String, nullable=False, default="llm", server_default="llm")
     version                 = Column(Integer, default=1)
     created_at              = Column(DateTime, default=datetime.utcnow)
     updated_at              = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -1015,6 +1022,11 @@ class ExtExperiment(Base):
     cheese_product      = Column(String, nullable=False)
     treatment           = Column(String, nullable=False)
     created_at          = Column(DateTime, default=datetime.utcnow)
+    # Which extraction engine produced this row — llm|rules|ml. Lets multiple engines'
+    # staging data coexist for the same paper (each engine only wipes/rebuilds its own
+    # rows) so results can be compared instead of the last run silently overwriting
+    # the others.
+    engine              = Column(String, nullable=False, default="llm", server_default="llm")
     # Promotion tracking — set once this row has been copied to canonical Experiment.
     promoted_experiment_id = Column(Integer, ForeignKey("experiments.id"), nullable=True)
     promoted_at         = Column(DateTime, nullable=True)
@@ -1086,6 +1098,42 @@ class ExtEvidence(Base):
     # Docling provenance anchor — set by the new extraction pipeline
     docling_item_ref    = Column(String, nullable=True)    # e.g. "#/tables/0", "#/texts/5"
     is_chart_derived    = Column(Boolean, default=False)   # True when value came from chart CSV
+    # Which extraction engine produced this evidence row — llm|rules|ml. ExtEvidence has
+    # no FK back to ext_experiments (its entity_key can reference ingredients/indicators
+    # too), so unlike ExtMeasurement/ExtExperimentIngredient it can't inherit engine
+    # scoping transitively and needs its own column.
+    engine              = Column(String, nullable=False, default="llm", server_default="llm")
+
+
+class ExtUnmappedFact(Base):
+    """
+    A scientifically meaningful fact an extraction engine detected but could not map to
+    a canonical field — preserved instead of discarded, per the project's maximum-
+    information principle. Reviewable/promotable to a canonical indicator later.
+    """
+    __tablename__ = "ext_unmapped_facts"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    project_id          = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    paper_id            = Column(Integer, ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
+    engine              = Column(String, nullable=False)    # llm|rules|ml
+    subject             = Column(String, nullable=True)     # e.g. "Gouda, EO 0.5%" — nearest experiment context
+    predicate           = Column(String, nullable=False)    # e.g. "springiness"
+    value_raw            = Column(String, nullable=True)     # raw text of the value, e.g. "0.72"
+    value_normalized     = Column(Float, nullable=True)
+    unit_raw             = Column(String, nullable=True)
+    unit_normalized      = Column(String, nullable=True)
+    category            = Column(String, nullable=False, default="unknown")  # composition|storage|processing|microbiology|sensory|physical|chemical|statistical|unknown
+    confidence          = Column(Float, nullable=True)
+    confidence_reason    = Column(Text, nullable=True)
+    raw_text             = Column(Text, nullable=True)       # full sentence/cell the fact came from
+    context              = Column(Text, nullable=True)       # nearby experiment context, free text
+    page_number          = Column(Integer, nullable=True)
+    docling_item_ref      = Column(String, nullable=True)
+    source_type          = Column(String, nullable=True)     # text|table|chart|figure|caption
+    review_status        = Column(String, nullable=False, default="needs_review")  # needs_review|approved|rejected|promoted
+    promoted_to_indicator_id = Column(Integer, ForeignKey("ext_indicators.id"), nullable=True)
+    created_at           = Column(DateTime, default=datetime.utcnow)
 
 
 # ─── Docling extraction cache ──────────────────────────────────────────────────

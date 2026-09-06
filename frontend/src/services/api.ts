@@ -387,6 +387,46 @@ export const workspaceApi = {
     api.get(`/projects/${projectId}/papers/${paperId}/llm-job/${jobId}`).then((r) => r.data),
 }
 
+// ── Multi-engine extraction (LLM / Rules — ML not implemented yet) ────────
+
+export type ExtractionEngineName = 'llm' | 'rules'
+
+export interface EngineSummary {
+  engine: ExtractionEngineName
+  experiments: number
+  measurements: number
+  unmapped_facts: number
+  last_job: { id: number; status: string; current_step: string; completed_at: string | null } | null
+}
+
+export interface UnmappedFact {
+  id: number
+  engine: string
+  subject: string | null
+  predicate: string
+  value_raw: string | null
+  value_normalized: number | null
+  unit_raw: string | null
+  unit_normalized: string | null
+  category: string
+  confidence: number | null
+  confidence_reason: string | null
+  raw_text: string | null
+  page_number: number | null
+  review_status: string
+}
+
+export const extractionEnginesApi = {
+  run: (projectId: number, paperId: number, engine: ExtractionEngineName) =>
+    api.post(`/projects/${projectId}/papers/${paperId}/extract`, null, { params: { engine } }).then((r) => r.data),
+
+  list: (projectId: number, paperId: number): Promise<{ paper_id: number; engines: EngineSummary[] }> =>
+    api.get(`/projects/${projectId}/papers/${paperId}/extractions`).then((r) => r.data),
+
+  unmappedFacts: (projectId: number, paperId: number, engine?: ExtractionEngineName): Promise<UnmappedFact[]> =>
+    api.get(`/projects/${projectId}/papers/${paperId}/unmapped-facts`, { params: engine ? { engine } : undefined }).then((r) => r.data),
+}
+
 // ── Snapshots & Exports ───────────────────────────────────────────────────
 
 export const snapshotsApi = {

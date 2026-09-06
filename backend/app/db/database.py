@@ -46,6 +46,11 @@ def apply_column_migrations() -> None:
         # ExtEvidence — Docling provenance anchor (added in Docling pipeline)
         "ALTER TABLE ext_evidence ADD COLUMN docling_item_ref VARCHAR",
         "ALTER TABLE ext_evidence ADD COLUMN is_chart_derived BOOLEAN DEFAULT 0",
+        # Multi-engine extraction (llm|rules|ml) — see alembic/versions/
+        # 3f1a9c2d5b7e_add_engine_columns_and_unmapped_facts.py for the full rationale.
+        "ALTER TABLE ext_experiments ADD COLUMN engine VARCHAR DEFAULT 'llm'",
+        "ALTER TABLE ext_evidence ADD COLUMN engine VARCHAR DEFAULT 'llm'",
+        "ALTER TABLE observations ADD COLUMN extraction_engine VARCHAR DEFAULT 'llm'",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

@@ -298,7 +298,8 @@ def promote_paper_to_canonical(paper_id: int, project_id: int, db: Session) -> d
     return created
 
 
-def promote_ext_paper_to_canonical(paper_id: int, project_id: int, db: Session) -> dict:
+def promote_ext_paper_to_canonical(paper_id: int, project_id: int, db: Session,
+                                    engine: str = "llm") -> dict:
     """
     Convert not-yet-promoted ExtExperiment/ExtMeasurement/ExtEvidence rows for a paper
     (the active Ext* staging schema written by extraction_workspace.py) into canonical
@@ -310,6 +311,14 @@ def promote_ext_paper_to_canonical(paper_id: int, project_id: int, db: Session) 
     what extraction reported. Ingredients beyond the first fold into the arm's
     combination_treatments_json.
 
+    `engine` (llm|rules|ml) selects which extraction engine's staging rows to promote
+    — multiple engines' Ext* rows can coexist for the same paper (see
+    app/extraction/common/persist.py), and only one is promoted per call. Canonical
+    stays a single deliberate dataset, not three parallel ones: the Observation dedup
+    key below is intentionally NOT engine-qualified, so promoting a second engine's
+    value for an already-filled (treatment_arm, type, subtype, day) slot overwrites
+    it and re-stamps extraction_engine, exactly like re-running the same engine would.
+
     Idempotent: ExtExperiment.promoted_experiment_id makes Experiment creation
     idempotent across retries; Observations are matched by
     (treatment_arm_id, measurement_type, measurement_subtype, time_days) and an
@@ -319,7 +328,10 @@ def promote_ext_paper_to_canonical(paper_id: int, project_id: int, db: Session) 
     if not paper:
         return {"error": "paper not found"}
 
-    ext_experiments = db.query(ExtExperiment).filter(ExtExperiment.paper_id == paper_id).all()
+    ext_experiments = db.query(ExtExperiment).filter(
+        ExtExperiment.paper_id == paper_id,
+        ExtExperiment.engine == engine,
+    ).all()
 
     counts = {
         "experiments_created": 0, "experiments_updated": 0, "arms_created": 0,
@@ -511,6 +523,7 @@ def promote_ext_paper_to_canonical(paper_id: int, project_id: int, db: Session) 
                 existing_obs.unit_normalized = ind.indicator_unit
                 existing_obs.value_origin = value_origin
                 existing_obs.quality_score = quality_score
+                existing_obs.extraction_engine = engine
                 existing_obs.version = (existing_obs.version or 1) + 1
                 obs = existing_obs
                 counts["observations_updated"] += 1
@@ -528,6 +541,7 @@ def promote_ext_paper_to_canonical(paper_id: int, project_id: int, db: Session) 
                     unit_normalized=ind.indicator_unit,
                     value_origin=value_origin,
                     quality_score=quality_score,
+                    extraction_engine=engine,
                     review_status="needs_review",
                     is_imputed=False,
                     is_derived=False,

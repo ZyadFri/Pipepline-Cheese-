@@ -31,26 +31,23 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.config import UPLOAD_PATH
 from app.db.database import SessionLocal, get_db
 from app.db.models import (
-    AssetContextLink, ExtractionAsset, ExtEvidence, ExtExperiment,
-    ExtExperimentIngredient, ExtIngredient, ExtIndicator, ExtMeasurement,
+    AssetContextLink, ExtractionAsset, ExtEvidence,
     Job, Paper, Project, User,
 )
+from app.extraction.common.adapters import llm_dict_to_ir
+from app.extraction.common.persist import persist_paper_extraction
 from app.services.asset_classifier import _is_decorative, classify_figure, score_relevance
 from app.services.canonical_promoter import promote_ext_paper_to_canonical
 from app.services.chart_converter import convert_charts
 from app.services.context_linker import build_context_links
 from app.services.docling_extractor import extract_pdf
-from app.services.evidence_capture import save_evidence_crop
 from app.services.evidence_package import EvidenceItem, EvidencePackage
 from app.services.food_extractor import extract_food_data
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["extraction-workspace"])
-
-EVIDENCE_BASE = UPLOAD_PATH / "evidence"
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -982,203 +979,19 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
         job.current_step = f"Persisting {experiments_reported} experiment(s) to database"
         db.commit()
 
-        # Clear stale staging rows for this paper before writing fresh ones, so a
-        # re-run never leaves orphaned/duplicate Ext* data behind (and, critically,
-        # never lets a freshly re-created ExtExperiment silently inherit a prior
-        # run's leftover ExtMeasurement/ExtExperimentIngredient rows if SQLite
-        # reuses the freed id). Only paper-scoped rows are touched —
-        # ExtIngredient/ExtIndicator are project-level reusable catalogs shared
-        # across papers and must never be deleted here. Children are deleted
-        # explicitly rather than relied on to cascade from ExtExperiment: cascade
-        # requires SQLite's PRAGMA foreign_keys=ON on the connection actually in
-        # use, which the production engine sets but isn't guaranteed everywhere
-        # (e.g. a test/alternate engine) — explicit deletes work regardless of that
-        # setting or database backend. Safe unconditionally: nothing in the Ext*
-        # staging schema carries review state — already-approved canonical
-        # Observations are protected separately, in promote_ext_paper_to_canonical.
-        stale_exp_ids = [
-            row.id for row in
-            db.query(ExtExperiment.id).filter(ExtExperiment.paper_id == paper_id).all()
-        ]
-        if stale_exp_ids:
-            db.query(ExtMeasurement).filter(
-                ExtMeasurement.experiment_id.in_(stale_exp_ids)
-            ).delete(synchronize_session=False)
-            db.query(ExtExperimentIngredient).filter(
-                ExtExperimentIngredient.experiment_id.in_(stale_exp_ids)
-            ).delete(synchronize_session=False)
-        db.query(ExtEvidence).filter(ExtEvidence.paper_id == paper_id).delete(synchronize_session=False)
-        db.query(ExtExperiment).filter(ExtExperiment.paper_id == paper_id).delete(synchronize_session=False)
-        db.flush()
-
-        # Bbox lookup for evidence crops, built from the assets actually used in this
-        # extraction (ExtractionAsset.bbox_json is the same {x1,y1,x2,y2} fractional
-        # convention food_extraction.py's fresh-Docling-based version used).
-        ref_to_bbox: dict = {}
-        for a in selected:
-            if a.docling_item_ref and a.bbox_json:
-                try:
-                    ref_to_bbox[a.docling_item_ref] = json.loads(a.bbox_json)
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    pass
-
-        # ── Helpers (local, same logic as food_extraction.py) ─────────────────
-
-        def _save_evidence(entity_type: str, entity_key: dict,
-                            field_name: Optional[str], ev: dict) -> None:
-            """Persist one evidence_object from the LLM response as an ExtEvidence
-            row, with an image crop when a bbox is resolvable. Ported from the
-            (now-retired) food_extraction.py, which already solved this — the
-            active pipeline had never been wired to save evidence at all."""
-            item_ref = ev.get("docling_item_ref")
-            bbox = ref_to_bbox.get(item_ref) or {} if item_ref else {}
-            is_chart = (
-                ev.get("source_type") == "chart_csv"
-                or bool(ev.get("value_is_approximate", False))
-            )
-            rec = ExtEvidence(
-                paper_id=paper_id,
-                entity_type=entity_type,
-                entity_key=json.dumps(entity_key),
-                field_name=field_name,
-                page_number=ev.get("page_number"),
-                source_type=ev.get("source_type", "text"),
-                source_label=ev.get("source_label"),
-                exact_text=ev.get("exact_text"),
-                bbox_x1=bbox.get("x1"), bbox_y1=bbox.get("y1"),
-                bbox_x2=bbox.get("x2"), bbox_y2=bbox.get("y2"),
-                confidence=ev.get("confidence"),
-                figure_series=ev.get("figure_series"),
-                x_axis_value=ev.get("x_axis_value"),
-                y_axis_value=ev.get("y_axis_value"),
-                value_is_approximate=bool(ev.get("value_is_approximate", False)),
-                docling_item_ref=item_ref,
-                is_chart_derived=is_chart,
-            )
-            db.add(rec)
-            db.flush()
-
-            page_num = ev.get("page_number")
-            if page_num and bbox.get("x1") is not None:
-                img_dir = EVIDENCE_BASE / str(paper_id)
-                img_path = img_dir / f"ev_{rec.id}.png"
-                thumb_path = img_dir / f"thumb_{rec.id}.png"
-                if save_evidence_crop(paper.file_path, page_num, bbox, img_path, thumb_path):
-                    rec.evidence_image_path = str(img_path)
-                    rec.evidence_thumbnail_path = str(thumb_path)
-
-        def _get_ing(name: str, func_class: str, source: str) -> ExtIngredient:
-            ing = db.query(ExtIngredient).filter(
-                ExtIngredient.project_id == project_id,
-                ExtIngredient.ingredient_name == name,
-            ).first()
-            if not ing:
-                ing = ExtIngredient(
-                    project_id=project_id, ingredient_name=name,
-                    functional_class=func_class, source=source,
-                )
-                db.add(ing)
-                db.flush()
-            return ing
-
-        def _get_ind(ind_type: str, ind_unit: str, threshold: Optional[float]) -> ExtIndicator:
-            ind = db.query(ExtIndicator).filter(
-                ExtIndicator.project_id == project_id,
-                ExtIndicator.indicator_type == ind_type,
-                ExtIndicator.indicator_unit == ind_unit,
-            ).first()
-            if not ind:
-                ind = ExtIndicator(
-                    project_id=project_id, indicator_type=ind_type,
-                    indicator_unit=ind_unit, indicator_threshold=threshold,
-                )
-                db.add(ind)
-                db.flush()
-            elif threshold is not None and ind.indicator_threshold is None:
-                ind.indicator_threshold = threshold
-            return ind
-
-        # ── Persist results ───────────────────────────────────────────────────
-
-        exp_count = meas_count = 0
-
-        for exp_dict in experiments_data:
-            cheese_product = exp_dict.get("cheese_product") or ""
-            treatment      = exp_dict.get("treatment") or ""
-            if not cheese_product or not treatment:
-                continue
-
-            exp_row = ExtExperiment(
-                project_id=project_id, paper_id=paper_id, job_id=job_id,
-                cheese_product=cheese_product, treatment=treatment,
-            )
-            db.add(exp_row)
-            db.flush()
-            exp_count += 1
-
-            for ev in exp_dict.get("experiment_evidence", []):
-                _save_evidence("experiment", {"experiment_id": exp_row.id}, None, ev)
-
-            for ing_dict in exp_dict.get("ingredients", []):
-                name = ing_dict.get("ingredient_name") or ""
-                conc = ing_dict.get("concentration")
-                if not name or conc is None:
-                    continue
-                ing_row = _get_ing(
-                    name=name,
-                    func_class=ing_dict.get("functional_class", "unknown"),
-                    source=ing_dict.get("source", ""),
-                )
-                junction = db.query(ExtExperimentIngredient).filter(
-                    ExtExperimentIngredient.experiment_id == exp_row.id,
-                    ExtExperimentIngredient.ingredient_id == ing_row.id,
-                ).first()
-                if not junction:
-                    db.add(ExtExperimentIngredient(
-                        experiment_id=exp_row.id,
-                        ingredient_id=ing_row.id,
-                        concentration=float(conc),
-                        concentration_unit=ing_dict.get("concentration_unit") or "",
-                    ))
-                    db.flush()
-
-                for ev in ing_dict.get("evidence", []):
-                    _save_evidence(
-                        "ingredient_link",
-                        {"experiment_id": exp_row.id, "ingredient_id": ing_row.id},
-                        None, ev,
-                    )
-
-            for meas_dict in exp_dict.get("measurements", []):
-                day      = meas_dict.get("day")
-                val      = meas_dict.get("indicator_value")
-                ind_type = meas_dict.get("indicator_type") or ""
-                ind_unit = meas_dict.get("indicator_unit") or ""
-                if day is None or val is None or not ind_type:
-                    continue
-                ind_row = _get_ind(ind_type, ind_unit, meas_dict.get("indicator_threshold"))
-                exists = db.query(ExtMeasurement).filter(
-                    ExtMeasurement.experiment_id == exp_row.id,
-                    ExtMeasurement.day == int(day),
-                    ExtMeasurement.indicator_id == ind_row.id,
-                ).first()
-                if not exists:
-                    db.add(ExtMeasurement(
-                        experiment_id=exp_row.id,
-                        day=int(day),
-                        indicator_id=ind_row.id,
-                        indicator_value=float(val),
-                        value_is_approximate=bool(meas_dict.get("value_is_approximate", False)),
-                    ))
-                    db.flush()
-                    meas_count += 1
-
-                    for ev in meas_dict.get("evidence", []):
-                        _save_evidence(
-                            "measurement",
-                            {"experiment_id": exp_row.id, "day": int(day), "indicator_id": ind_row.id},
-                            "indicator_value", ev,
-                        )
+        # Convert the LLM's raw dict into the shared intermediate representation
+        # and persist it through the ONE writer every extraction engine uses
+        # (app/extraction/common/persist.py) — this replaces what used to be a
+        # bespoke persist loop duplicated here. persist_paper_extraction() wipes
+        # only this paper's engine="llm" rows before writing fresh ones (Ext*
+        # ingredient/indicator catalogs stay project-level and shared, never
+        # wiped), so a rule- or ML-engine run on the same paper is untouched.
+        ir = llm_dict_to_ir(result, paper_id, project_id)
+        persist_counts = persist_paper_extraction(
+            ir, paper=paper, project_id=project_id, job_id=job_id, engine="llm", db=db,
+        )
+        exp_count = persist_counts["experiments_stored"]
+        meas_count = persist_counts["measurements_stored"]
 
         # ── Promote to canonical + surface reported-vs-stored mismatches ───────
         # Never silently show 0: reported/stored counts are always both recorded.
@@ -1210,7 +1023,7 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
                     "reported measurement(s) were not stored."
                 )
             try:
-                promotion = promote_ext_paper_to_canonical(paper_id, project_id, db)
+                promotion = promote_ext_paper_to_canonical(paper_id, project_id, db, engine="llm")
             except Exception as promo_exc:
                 logger.error("Canonical promotion failed for paper %d: %s",
                              paper_id, promo_exc, exc_info=True)

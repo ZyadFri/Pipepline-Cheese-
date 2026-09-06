@@ -1,0 +1,38 @@
+# Cheese product lexicon for the rule-based extraction engine.
+# Each top-level key is the canonical name; `aliases` are the surface forms the
+# regex/fuzzy matcher looks for (case-insensitive). Add new cheeses here rather
+# than hardcoding them in Python — this file is meant to grow.
+gouda:
+  aliases: ["gouda", "gouda cheese", "gouda-type cheese"]
+cheddar:
+  aliases: ["cheddar", "cheddar cheese"]
+brie:
+  aliases: ["brie", "brie cheese"]
+camembert:
+  aliases: ["camembert", "camembert cheese"]
+mozzarella:
+  aliases: ["mozzarella", "mozzarella cheese", "low-moisture mozzarella"]
+feta:
+  aliases: ["feta", "feta cheese"]
+edam:
+  aliases: ["edam", "edam cheese"]
+parmesan:
+  aliases: ["parmesan", "parmigiano", "parmigiano-reggiano", "parmesan cheese"]
+ricotta:
+  aliases: ["ricotta", "ricotta cheese"]
+queso_fresco:
+  aliases: ["queso fresco"]
+emmental:
+  aliases: ["emmental", "emmentaler", "swiss cheese"]
+halloumi:
+  aliases: ["halloumi"]
+blue_cheese:
+  aliases: ["blue cheese", "roquefort", "gorgonzola", "stilton"]
+cottage_cheese:
+  aliases: ["cottage cheese"]
+provolone:
+  aliases: ["provolone"]
+white_cheese:
+  aliases: ["white cheese", "white brined cheese"]
+processed_cheese:
+  aliases: ["processed cheese", "cheese spread", "cheese analogue", "cheese analog"]

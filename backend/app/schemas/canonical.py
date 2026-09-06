@@ -512,6 +512,7 @@ class ObservationOut(BaseModel):
     significance_letter: Optional[str]
     quality_score: Optional[float]
     review_status: str
+    extraction_engine: str = "llm"
     version: int
     created_at: datetime
     updated_at: datetime

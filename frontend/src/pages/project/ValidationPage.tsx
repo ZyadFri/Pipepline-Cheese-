@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { papersApi, workspaceApi } from '../../services/api'
+import { papersApi, workspaceApi, extractionEnginesApi, type ExtractionEngineName } from '../../services/api'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -447,19 +447,21 @@ export default function ValidationPage() {
     }, 2000)
   }
 
-  // ── Send to LLM ─────────────────────────────────────────────────────────────
+  // ── Extract (LLM or Rules) ───────────────────────────────────────────────────
+
+  const [engine, setEngine] = useState<ExtractionEngineName>('llm')
 
   const handleSend = async () => {
     if (!paperId) return
     setSending(true)
     try {
-      const resp = await workspaceApi.sendToLlm(pid, paperId)
+      const resp = await extractionEnginesApi.run(pid, paperId, engine)
       setJob({ job_id: resp.job_id, status: 'queued', progress: 0, current_step: 'Queued' })
-      toast.success('Extraction started…')
+      toast.success(`${engine === 'llm' ? 'LLM' : 'Rule-based'} extraction started…`)
       startPolling(paperId, resp.job_id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      toast.error(msg || 'Failed to start LLM extraction')
+      toast.error(msg || 'Failed to start extraction')
     } finally {
       setSending(false)
     }
@@ -767,6 +769,29 @@ export default function ValidationPage() {
                   evidence. Results are saved automatically and appear in Review.
                 </p>
 
+                {!isRunning && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Extraction method</p>
+                    <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-slate-100 p-1">
+                      {([
+                        ['llm', 'LLM-based'],
+                        ['rules', 'Rule-based'],
+                      ] as [ExtractionEngineName, string][]).map(([value, label]) => (
+                        <button
+                          key={value}
+                          onClick={() => setEngine(value)}
+                          className={clsx(
+                            'py-1.5 rounded-md text-xs font-semibold transition-colors',
+                            engine === value ? 'bg-white text-[#7A1B2E] shadow-sm' : 'text-slate-500 hover:text-slate-700',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {isRunning ? (
                   <div className="space-y-2">
                     <div className="h-2 bg-[#f3dde2] rounded-full overflow-hidden">
@@ -794,7 +819,7 @@ export default function ValidationPage() {
                     ) : (
                       <Brain size={15} />
                     )}
-                    {sending ? 'Starting…' : 'Extract Structured Data'}
+                    {sending ? 'Starting…' : `Extract with ${engine === 'llm' ? 'LLM' : 'Rules'}`}
                     {!sending && <Send size={13} />}
                   </button>
                 )}

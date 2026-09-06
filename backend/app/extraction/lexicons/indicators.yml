@@ -1,0 +1,88 @@
+# Measured-indicator lexicon. `canonical_type` maps to canonical_promoter.py's
+# _infer_measurement_type() categories (microbial_count|ph|water_activity|
+# moisture|TBARS|TVB_N|texture|sensory|weight_loss|other) so rule-extracted
+# indicators land in the same buckets the LLM pipeline already uses.
+total_viable_count:
+  aliases: ["total viable count", "tvc", "aerobic plate count", "apc", "total aerobic count"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g", "CFU/g", "log10 CFU/g"]
+yeasts_and_molds:
+  aliases: ["yeasts and molds", "yeast and mold", "yeast and mould", "ym"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g", "CFU/g"]
+coliforms:
+  aliases: ["coliform", "coliforms", "total coliforms"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g", "CFU/g"]
+lactic_acid_bacteria:
+  aliases: ["lactic acid bacteria", "lab count"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g"]
+listeria:
+  aliases: ["listeria", "listeria monocytogenes"]
+  canonical_type: microbial_count
+  common_units: ["log CFU/g"]
+ph:
+  aliases: ["ph"]
+  canonical_type: ph
+  common_units: [""]
+water_activity:
+  aliases: ["water activity", "aw"]
+  canonical_type: water_activity
+  common_units: [""]
+moisture_content:
+  aliases: ["moisture content", "moisture"]
+  canonical_type: moisture
+  common_units: ["%"]
+tbars:
+  aliases: ["tbars", "thiobarbituric acid reactive substances", "tba"]
+  canonical_type: TBARS
+  common_units: ["mg MDA/kg"]
+tvb_n:
+  aliases: ["tvb-n", "total volatile basic nitrogen", "tvb_n"]
+  canonical_type: TVB_N
+  common_units: ["mg N/100g"]
+peroxide_value:
+  aliases: ["peroxide value", "pv"]
+  canonical_type: other
+  common_units: ["meq O2/kg"]
+free_fatty_acids:
+  aliases: ["free fatty acids", "ffa"]
+  canonical_type: other
+  common_units: ["%"]
+texture_firmness:
+  aliases: ["firmness", "hardness"]
+  canonical_type: texture
+  common_units: ["N"]
+color_l:
+  aliases: ["lightness", "l*", "l value"]
+  canonical_type: other
+  common_units: [""]
+sensory_score:
+  aliases: ["sensory score", "overall acceptability", "overall acceptance", "overall acceptance (from 9)"]
+  canonical_type: sensory
+  common_units: [""]
+sensory_odor:
+  aliases: ["odor", "odour"]
+  canonical_type: sensory
+  common_units: [""]
+sensory_color:
+  aliases: ["color", "colour"]
+  canonical_type: sensory
+  common_units: [""]
+sensory_taste:
+  aliases: ["taste", "flavor", "flavour"]
+  canonical_type: sensory
+  common_units: [""]
+sensory_texture:
+  aliases: ["texture score", "sensory texture"]
+  canonical_type: sensory
+  common_units: [""]
+storage_time_days:
+  aliases: ["storage time (day)", "storage time", "storage day"]
+  canonical_type: other
+  common_units: ["days"]
+weight_loss:
+  aliases: ["weight loss"]
+  canonical_type: weight_loss
+  common_units: ["%"]
