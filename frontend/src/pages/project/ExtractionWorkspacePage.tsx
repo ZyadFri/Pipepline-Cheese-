@@ -9,6 +9,7 @@ import {
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import { workspaceApi } from '../../services/api'
+import AuthImage from '../../components/AuthImage'
 import AssetCard from '../../components/AssetCard'
 import AssetDetailPanel from '../../components/AssetDetailPanel'
 import type { ExtractionAsset, WorkspaceStatus } from '../../types/workspace'
@@ -312,7 +313,7 @@ export default function ExtractionWorkspacePage() {
             </div>
             <div className="flex-1 overflow-auto flex items-start justify-center p-6">
               {previewUrl ? (
-                <img
+                <AuthImage
                   src={previewUrl}
                   alt="Page preview"
                   className="max-w-full rounded-xl border border-slate-300 shadow-lg bg-white"

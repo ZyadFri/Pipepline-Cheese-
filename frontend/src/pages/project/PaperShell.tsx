@@ -109,6 +109,19 @@ export default function PaperShell() {
     ]).finally(() => setWsLoaded(true))
   }, [pid, paperIdNum])
 
+  // Remember the last-active paper for this project so the project-level
+  // sidebar (e.g. "Validation Queue") can return to it instead of an
+  // arbitrary "first" paper.
+  useEffect(() => {
+    if (!Number.isNaN(pid) && !Number.isNaN(paperIdNum)) {
+      try {
+        localStorage.setItem(`lastPaperId:${pid}`, String(paperIdNum))
+      } catch {
+        // ignore storage errors (private browsing, quota, etc.)
+      }
+    }
+  }, [pid, paperIdNum])
+
   // Extract document hash from stored filename (12-char uid prefix before first underscore)
   const docHash = paper?.filename ? paper.filename.split('_')[0] : null
 

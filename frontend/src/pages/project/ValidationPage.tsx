@@ -413,6 +413,11 @@ export default function ValidationPage() {
   const loadPackages = useCallback(async (pId: number) => {
     setLoading(true)
     setPkgData(null)
+    setJob(null)
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
     try {
       const data: EvidencePackages = await workspaceApi.getEvidencePackages(pid, pId)
       setPkgData(data)

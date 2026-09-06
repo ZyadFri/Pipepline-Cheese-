@@ -64,6 +64,13 @@ export default function ProjectSidebar() {
   const navigate = useNavigate()
   const base = `/projects/${projectId}`
 
+  let lastPaperId: string | null = null
+  try {
+    lastPaperId = projectId ? localStorage.getItem(`lastPaperId:${projectId}`) : null
+  } catch {
+    lastPaperId = null
+  }
+
   return (
     <aside
       className="w-60 shrink-0 h-full flex flex-col overflow-hidden border-r"
@@ -92,15 +99,21 @@ export default function ProjectSidebar() {
       <nav className="flex-1 overflow-y-auto px-3 py-2 scrollbar-none">
         <SectionLabel label="Project" />
         <div className="space-y-0.5">
-          {PROJECT_NAV.map(({ to, end, label, Icon }) => (
-            <NavItem
-              key={label}
-              to={end ? base : `${base}/${to}`}
-              label={label}
-              Icon={Icon}
-              end={end}
-            />
-          ))}
+          {PROJECT_NAV.map(({ to, end, label, Icon }) => {
+            let href = end ? base : `${base}/${to}`
+            if (to === 'validation' && lastPaperId) {
+              href += `?paperId=${lastPaperId}`
+            }
+            return (
+              <NavItem
+                key={label}
+                to={href}
+                label={label}
+                Icon={Icon}
+                end={end}
+              />
+            )
+          })}
         </div>
       </nav>
 

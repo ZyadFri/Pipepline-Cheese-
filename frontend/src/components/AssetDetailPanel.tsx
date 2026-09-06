@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { X, ExternalLink, FileSpreadsheet, CheckCircle, Star, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
-import { workspaceApi } from '../services/api'
+import api, { workspaceApi } from '../services/api'
 import type { ExtractionAsset, AssetDetail, ContextLink } from '../types/workspace'
+import AuthImage from './AuthImage'
 
 const LINK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   caption:                   { label: 'Caption',           color: 'bg-blue-50 text-blue-700' },
@@ -199,17 +200,23 @@ export default function AssetDetailPanel({ asset, projectId, paperId, onClose, o
                         Full page
                       </button>
                     )}
-                    <a
-                      href={imgUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = api.defaults.baseURL ?? ''
+                        const path = imgUrl.startsWith(base) ? imgUrl.slice(base.length) : imgUrl
+                        api.get(path, { responseType: 'blob' }).then((res) => {
+                          const objectUrl = URL.createObjectURL(res.data)
+                          window.open(objectUrl, '_blank', 'noopener,noreferrer')
+                        }).catch(() => {})
+                      }}
                       className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       <ExternalLink size={11} /> Open
-                    </a>
+                    </button>
                   </div>
                   {!imgError ? (
-                    <img
+                    <AuthImage
                       key={imgUrl}
                       src={imgUrl}
                       alt={asset.caption ?? ''}

@@ -8,6 +8,7 @@ import {
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import { workspaceApi } from '../../services/api'
+import AuthImage from '../../components/AuthImage'
 import type { ExtractionAsset, AssetDetail, ContextLink } from '../../types/workspace'
 
 // ─── Status badge helpers ─────────────────────────────────────────────────────
@@ -180,7 +181,7 @@ function FigureListItem({
       {/* Thumbnail */}
       <div className="w-14 h-14 shrink-0 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200">
         {imgUrl && !imgErr ? (
-          <img
+          <AuthImage
             src={imgUrl}
             alt=""
             className="w-full h-full object-contain"
@@ -434,14 +435,14 @@ export default function PPChart2TablePage() {
               {activeTab === 'figure' && (
                 <div className="flex flex-col items-center gap-4">
                   {figureUrl && !imgErr ? (
-                    <img
+                    <AuthImage
                       src={figureUrl}
                       alt={selected.caption ?? ''}
                       className="max-w-full rounded-xl border border-slate-200 shadow-sm object-contain bg-slate-50"
                       onError={() => setImgErr(true)}
                     />
                   ) : pageUrl ? (
-                    <img
+                    <AuthImage
                       src={pageUrl}
                       alt="Page preview"
                       className="max-w-full rounded-xl border border-slate-200 shadow-sm object-contain bg-slate-50"

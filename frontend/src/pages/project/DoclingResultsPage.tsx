@@ -7,6 +7,7 @@ import {
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import { workspaceApi } from '../../services/api'
+import AuthImage from '../../components/AuthImage'
 import type { ExtractionAsset } from '../../types/workspace'
 import AssetDetailPanel from '../../components/AssetDetailPanel'
 
@@ -72,7 +73,7 @@ function AssetRow({ asset, pid, paperIdNum, onToggle, onClick }: AssetRowProps) 
       {/* Thumbnail / icon */}
       <div className="w-14 h-14 rounded-md bg-slate-100 shrink-0 overflow-hidden flex items-center justify-center">
         {asset.asset_type === 'figure' && asset.has_image && !imgError ? (
-          <img
+          <AuthImage
             src={imgUrl}
             alt={asset.caption ?? 'Figure'}
             className="w-full h-full object-contain"

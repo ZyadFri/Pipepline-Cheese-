@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import clsx from 'clsx'
 import { reviewQueueApi, observationsApi, projectsApi } from '../services/api'
 import type { Project, ReviewObservation } from '../types'
+import AuthImage from '../components/AuthImage'
 
 type StatusFilter = 'all' | 'needs_review' | 'approved' | 'rejected'
 
@@ -184,19 +185,16 @@ function MeasurementRow({
               {obs.evidence.map((ev) => (
                 <div key={ev.id} className="flex items-start gap-3 text-xs">
                   {ev.has_image ? (
-                    <a
-                      href={reviewQueueApi.provenanceImageUrl(projectId, ev.id)}
-                      target="_blank" rel="noreferrer"
+                    <div
                       className="w-16 h-16 shrink-0 rounded-md border border-slate-200 overflow-hidden bg-white block"
-                      title="Open full evidence image"
+                      title="Evidence crop"
                     >
-                      <img
+                      <AuthImage
                         src={reviewQueueApi.provenanceThumbnailUrl(projectId, ev.id)}
                         alt="Evidence crop"
                         className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
-                    </a>
+                    </div>
                   ) : (
                     <div className="w-16 h-16 shrink-0 rounded-md border border-slate-200 overflow-hidden bg-white flex items-center justify-center">
                       <ImageIcon size={16} className="text-slate-300" />

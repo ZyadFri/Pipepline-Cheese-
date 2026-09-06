@@ -3,6 +3,7 @@ import { FileSpreadsheet, Image, Table2, BarChart2, Camera, Layers, HelpCircle, 
 import clsx from 'clsx'
 import type { ExtractionAsset } from '../types/workspace'
 import { workspaceApi } from '../services/api'
+import AuthImage from './AuthImage'
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   chart:               <BarChart2 size={11} />,
@@ -78,7 +79,7 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
       {/* Thumbnail area */}
       <div className="relative h-44 bg-slate-50 flex items-center justify-center overflow-hidden">
         {asset.has_image && !imgError ? (
-          <img
+          <AuthImage
             src={imgUrl}
             alt={asset.caption ?? `${typeLabel} p.${asset.page_number}`}
             className="w-full h-full object-contain"
