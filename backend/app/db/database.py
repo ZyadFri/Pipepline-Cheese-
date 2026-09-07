@@ -51,6 +51,14 @@ def apply_column_migrations() -> None:
         "ALTER TABLE ext_experiments ADD COLUMN engine VARCHAR DEFAULT 'llm'",
         "ALTER TABLE ext_evidence ADD COLUMN engine VARCHAR DEFAULT 'llm'",
         "ALTER TABLE observations ADD COLUMN extraction_engine VARCHAR DEFAULT 'llm'",
+        # Progressive extraction — real per-page progress + partial-failure + cancel.
+        # job_events itself needs no ALTER: create_all() creates brand-new tables.
+        "ALTER TABLE jobs ADD COLUMN total_pages INTEGER DEFAULT 0",
+        "ALTER TABLE jobs ADD COLUMN pages_done INTEGER DEFAULT 0",
+        "ALTER TABLE jobs ADD COLUMN tables_found INTEGER DEFAULT 0",
+        "ALTER TABLE jobs ADD COLUMN figures_found INTEGER DEFAULT 0",
+        "ALTER TABLE jobs ADD COLUMN warnings_json TEXT DEFAULT '[]'",
+        "ALTER TABLE jobs ADD COLUMN cancel_requested BOOLEAN DEFAULT 0",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

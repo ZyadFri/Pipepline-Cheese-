@@ -145,16 +145,57 @@ class Job(Base):
     result_json     = Column(Text, default="{}")
     idempotency_key = Column(String, unique=True, index=True, nullable=True)
     celery_task_id  = Column(String, index=True, nullable=True)
+    total_pages     = Column(Integer, default=0)   # real progress denominator (progressive Docling)
+    pages_done      = Column(Integer, default=0)   # real progress numerator
+    tables_found    = Column(Integer, default=0)
+    figures_found   = Column(Integer, default=0)
+    warnings_json   = Column(Text, default="[]")   # non-fatal per-asset failures (partial_success)
+    cancel_requested = Column(Boolean, default=False)  # separate from status - worker observes this
     created_by      = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     started_at      = Column(DateTime, nullable=True)
     completed_at    = Column(DateTime, nullable=True)
 
     extraction_run  = relationship("ExtractionRun", back_populates="job", uselist=False)
+    events          = relationship("JobEvent", back_populates="job", cascade="all, delete-orphan")
 
     @property
     def result(self):
         return json.loads(self.result_json) if self.result_json else {}
+
+    @property
+    def warnings(self):
+        return json.loads(self.warnings_json) if self.warnings_json else []
+
+
+class JobEvent(Base):
+    """One entry in a job's live progress timeline (progressive extraction).
+
+    Persisted (not just pushed over SSE) so processing state survives a
+    browser refresh: a client reconnecting with `since_seq` replays exactly
+    what it missed instead of the job restarting or the UI going blank.
+    """
+    __tablename__ = "job_events"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    job_id      = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    seq         = Column(Integer, nullable=False)   # monotonic per job - the client's resume cursor
+    event_type  = Column(String, nullable=False)
+    # job_started|page_images_ready|chunk_started|chunk_done|asset_added|
+    # asset_failed|chunk_failed|chart_read|step|job_completed|job_failed|job_cancelled
+    message     = Column(String, nullable=True)
+    payload_json = Column(Text, default="{}")
+    created_at  = Column(DateTime, default=datetime.utcnow, index=True)
+
+    job = relationship("Job", back_populates="events")
+
+    __table_args__ = (
+        UniqueConstraint("job_id", "seq", name="uq_job_event_seq"),
+    )
+
+    @property
+    def payload(self):
+        return json.loads(self.payload_json) if self.payload_json else {}
 
 
 class ExtractionRun(Base):
