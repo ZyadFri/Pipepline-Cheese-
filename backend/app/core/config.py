@@ -59,7 +59,10 @@ class Settings(BaseSettings):
     DOCLING_CACHE_DIR: str = "uploads/docling_cache"
     CHART_CACHE_DIR: str = "uploads/chart_cache"
     # Bump DOCLING_CACHE_VERSION to invalidate all cached extractions
-    DOCLING_CACHE_VERSION: str = "1"
+    DOCLING_CACHE_VERSION: str = "2"
+    # Pages per chunked Docling conversion call (progressive extraction).
+    # 0 disables chunking and falls back to one whole-document call.
+    DOCLING_CHUNK_SIZE: int = 6
 
     class Config:
         env_file = ".env"
