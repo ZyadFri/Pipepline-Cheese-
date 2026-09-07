@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { X, ExternalLink, FileSpreadsheet, CheckCircle, Star, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ExternalLink, FileSpreadsheet, CheckCircle, Star, AlertTriangle, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
-import api, { workspaceApi } from '../services/api'
+import toast from 'react-hot-toast'
+import { workspaceApi } from '../services/api'
+import { fetchAuthenticatedBlob, fetchAuthenticatedText, downloadAuthenticated } from '../services/download'
 import type { ExtractionAsset, AssetDetail, ContextLink } from '../types/workspace'
 import AuthImage from './AuthImage'
 
@@ -21,8 +23,7 @@ function CsvPreview({ projectId, paperId, assetId }: CsvPreviewProps) {
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    fetch(workspaceApi.csvUrl(projectId, paperId, assetId))
-      .then((r) => r.text())
+    fetchAuthenticatedText(workspaceApi.csvUrl(projectId, paperId, assetId))
       .then((txt) => {
         const lines = txt.trim().split('\n').slice(0, 12)
         setRows(lines.map((l) => l.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))))
@@ -54,6 +55,79 @@ function CsvPreview({ projectId, paperId, assetId }: CsvPreviewProps) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+interface ExtractRowsProps { projectId: number; paperId: number; assetId: number }
+
+interface ExtractedRow {
+  cheese_product: string
+  treatment: string
+  day: number | null
+  indicator_type: string
+  indicator_unit: string
+  indicator_value: number
+  confidence: number | null
+}
+
+/** Instant, deterministic table -> rows preview — no LLM call, nothing
+ * persisted. Reuses the exact same rule-based parser a whole-paper Rules
+ * extraction run uses, just scoped to this one table. */
+function ExtractRowsAction({ projectId, paperId, assetId }: ExtractRowsProps) {
+  const [loading, setLoading] = useState(false)
+  const [rows, setRows] = useState<ExtractedRow[] | null>(null)
+
+  const run = async () => {
+    setLoading(true)
+    try {
+      const res = await workspaceApi.extractRows(projectId, paperId, assetId)
+      setRows(res.rows)
+      if (res.row_count === 0) toast('No structured rows could be extracted from this table', { icon: 'ℹ️' })
+    } catch {
+      toast.error('Row extraction failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={run}
+        disabled={loading}
+        className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+      >
+        {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+        Extract rows
+      </button>
+      {rows && rows.length > 0 && (
+        <div className="mt-2 overflow-x-auto rounded-lg border border-emerald-100">
+          <table className="text-[10.5px] w-full">
+            <thead>
+              <tr className="bg-emerald-50/60 border-b border-emerald-100">
+                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Treatment</th>
+                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Day</th>
+                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Indicator</th>
+                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Value</th>
+                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <td className="px-2 py-1 text-slate-700">{r.treatment}</td>
+                  <td className="px-2 py-1 text-slate-700">{r.day ?? '—'}</td>
+                  <td className="px-2 py-1 text-slate-700">{r.indicator_type}</td>
+                  <td className="px-2 py-1 text-slate-700">{r.indicator_value} {r.indicator_unit}</td>
+                  <td className="px-2 py-1 text-slate-500">{r.confidence != null ? r.confidence.toFixed(2) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -203,12 +277,9 @@ export default function AssetDetailPanel({ asset, projectId, paperId, onClose, o
                     <button
                       type="button"
                       onClick={() => {
-                        const base = api.defaults.baseURL ?? ''
-                        const path = imgUrl.startsWith(base) ? imgUrl.slice(base.length) : imgUrl
-                        api.get(path, { responseType: 'blob' }).then((res) => {
-                          const objectUrl = URL.createObjectURL(res.data)
-                          window.open(objectUrl, '_blank', 'noopener,noreferrer')
-                        }).catch(() => {})
+                        fetchAuthenticatedBlob(imgUrl)
+                          .then((blob) => window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer'))
+                          .catch(() => toast.error('Could not open image'))
                       }}
                       className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
                     >
@@ -240,13 +311,15 @@ export default function AssetDetailPanel({ asset, projectId, paperId, onClose, o
                     <span className="text-[10px] text-slate-400">
                       {asset.csv_rows}r × {asset.csv_cols}c
                     </span>
-                    <a
-                      href={workspaceApi.csvUrl(projectId, paperId, asset.id)}
-                      download
+                    <button
+                      type="button"
+                      onClick={() => downloadAuthenticated(
+                        workspaceApi.csvUrl(projectId, paperId, asset.id), `chart_${asset.id}.csv`,
+                      )}
                       className="ml-auto text-xs text-blue-500 hover:text-blue-700"
                     >
                       Download
-                    </a>
+                    </button>
                   </div>
                   <CsvPreview projectId={projectId} paperId={paperId} assetId={asset.id} />
                 </div>
@@ -255,18 +328,32 @@ export default function AssetDetailPanel({ asset, projectId, paperId, onClose, o
               {/* Native table CSV */}
               {asset.asset_type === 'native_table' && asset.has_csv && (
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <FileSpreadsheet size={13} className="text-blue-600" />
                     <span className="text-xs font-semibold text-slate-700">Table Data</span>
-                    <a
-                      href={workspaceApi.csvUrl(projectId, paperId, asset.id)}
-                      download
-                      className="ml-auto text-xs text-blue-500 hover:text-blue-700"
-                    >
-                      Download CSV
-                    </a>
+                    <div className="ml-auto flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => downloadAuthenticated(
+                          workspaceApi.csvUrl(projectId, paperId, asset.id), `table_${asset.id}.csv`,
+                        )}
+                        className="text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => downloadAuthenticated(
+                          workspaceApi.exportAssetUrl(projectId, paperId, asset.id, 'xlsx'), `table_${asset.id}.xlsx`,
+                        )}
+                        className="text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        Excel
+                      </button>
+                    </div>
                   </div>
                   <CsvPreview projectId={projectId} paperId={paperId} assetId={asset.id} />
+                  <ExtractRowsAction projectId={projectId} paperId={paperId} assetId={asset.id} />
                 </div>
               )}
 

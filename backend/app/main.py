@@ -7,7 +7,7 @@ from app.db.database import Base, engine, apply_column_migrations
 from app.api.routes import (
     auth, projects, papers, review_queue,
     analytics, export, schema,
-    extraction_workspace, extraction_engines,
+    extraction_workspace, extraction_engines, asset_actions,
 )
 from app.api.routes import (
     studies, experiments, observations, microorganisms,
@@ -74,6 +74,9 @@ app.include_router(extraction_workspace.router, prefix="/api")
 
 # ── Multi-engine extraction (LLM / Rules / ML) ──────────────────────────────────
 app.include_router(extraction_engines.router, prefix="/api")
+
+# ── Instant single-asset actions (table -> rows, per-asset export) ─────────────
+app.include_router(asset_actions.router, prefix="/api")
 
 
 @app.get("/api/health")

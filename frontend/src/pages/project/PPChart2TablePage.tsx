@@ -8,6 +8,7 @@ import {
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import { workspaceApi } from '../../services/api'
+import { fetchAuthenticatedText, downloadAuthenticated } from '../../services/download'
 import AuthImage from '../../components/AuthImage'
 import type { ExtractionAsset, AssetDetail, ContextLink } from '../../types/workspace'
 
@@ -52,11 +53,7 @@ function CsvTable({ projectId, paperId, assetId }: { projectId: number; paperId:
   useEffect(() => {
     setLoading(true)
     setErr(false)
-    fetch(workspaceApi.csvUrl(projectId, paperId, assetId))
-      .then((r) => {
-        if (!r.ok) throw new Error('failed')
-        return r.text()
-      })
+    fetchAuthenticatedText(workspaceApi.csvUrl(projectId, paperId, assetId))
       .then((txt) => {
         const lines = txt.trim().split('\n').slice(0, 15)
         setRows(lines.map((l) => l.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))))
@@ -574,14 +571,16 @@ export default function PPChart2TablePage() {
               <h3 className="text-sm font-bold text-slate-700">Extracted Data</h3>
             </div>
             {selected?.has_csv && (
-              <a
-                href={workspaceApi.csvUrl(pid, paperIdNum, selected.id)}
-                download={`figure_${selected.id}.csv`}
+              <button
+                type="button"
+                onClick={() => downloadAuthenticated(
+                  workspaceApi.csvUrl(pid, paperIdNum, selected.id), `figure_${selected.id}.csv`,
+                )}
                 className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-medium"
               >
                 <Download size={11} />
                 Download CSV
-              </a>
+              </button>
             )}
           </div>
 

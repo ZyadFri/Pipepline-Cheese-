@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/auth'
+import { downloadAuthenticated } from './download'
 import type {
   Study, Experiment, TreatmentArm, Observation, Microorganism,
   Job, ProjectMember, NormalizationMapping, Trajectory,
@@ -86,16 +87,7 @@ export const analyticsApi = {
 
 export const exportApi = {
   excel: (projectId: number) =>
-    api.get(`/projects/${projectId}/export/excel`, { responseType: 'blob' }).then((r) => {
-      const url = URL.createObjectURL(r.data)
-      const a = document.createElement('a')
-      const cd = r.headers['content-disposition'] || ''
-      const match = cd.match(/filename="?([^"]+)"?/)
-      a.download = match ? match[1] : 'export.xlsx'
-      a.href = url
-      a.click()
-      URL.revokeObjectURL(url)
-    }),
+    downloadAuthenticated(`${api.defaults.baseURL}/projects/${projectId}/export/excel`, 'export.xlsx'),
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────
@@ -371,6 +363,14 @@ export const workspaceApi = {
   streamUrl: (projectId: number, paperId: number, sinceSeq: number) =>
     `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/workspace/stream?since_seq=${sinceSeq}`,
 
+  // Instant, single-table row extraction — no LLM call, no whole-paper job.
+  extractRows: (projectId: number, paperId: number, assetId: number) =>
+    api.post(`/projects/${projectId}/papers/${paperId}/assets/${assetId}/extract-rows`)
+      .then((r) => r.data),
+
+  exportAssetUrl: (projectId: number, paperId: number, assetId: number, format: 'csv' | 'xlsx' | 'json') =>
+    `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/assets/${assetId}/export?format=${format}`,
+
   // Serves the freshly-extracted ExtEvidence crop, valid only until the next
   // re-extraction (ExtEvidence is staging data, wiped and rebuilt each run) —
   // use inside the Extraction Workspace/Evidence Review flow, not Review.tsx.
@@ -449,14 +449,5 @@ export const snapshotsApi = {
   getExportRun: (runId: number): Promise<ExportRun> =>
     api.get(`/snapshots/exports/${runId}`).then((r) => r.data),
   downloadExport: (runId: number) =>
-    api.get(`/snapshots/exports/${runId}/download`, { responseType: 'blob' }).then((r) => {
-      const url = URL.createObjectURL(r.data)
-      const a = document.createElement('a')
-      const cd = r.headers['content-disposition'] || ''
-      const match = cd.match(/filename="?([^"]+)"?/)
-      a.download = match ? match[1] : `export_${runId}`
-      a.href = url
-      a.click()
-      URL.revokeObjectURL(url)
-    }),
+    downloadAuthenticated(`${api.defaults.baseURL}/snapshots/exports/${runId}/download`, `export_${runId}`),
 }

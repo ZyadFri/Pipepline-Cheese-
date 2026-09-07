@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '../services/api'
+import { fetchAuthenticatedBlob } from '../services/download'
 
 /**
  * Drop-in replacement for <img> when `src` points at one of this app's own
@@ -29,16 +29,11 @@ export default function AuthImage({
     setObjectUrl(null)
 
     if (!src) return
-    // `src` is built as `${api.defaults.baseURL}/...` — strip that prefix so
-    // this request goes through the same axios instance (and its auth
-    // interceptor) rather than a second, header-less fetch.
-    const base = api.defaults.baseURL ?? ''
-    const path = src.startsWith(base) ? src.slice(base.length) : src
 
-    api.get(path, { responseType: 'blob' })
-      .then((res) => {
+    fetchAuthenticatedBlob(src)
+      .then((blob) => {
         if (cancelled) return
-        currentUrl = URL.createObjectURL(res.data)
+        currentUrl = URL.createObjectURL(blob)
         setObjectUrl(currentUrl)
         onLoad?.()
       })
