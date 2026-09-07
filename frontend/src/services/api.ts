@@ -368,6 +368,9 @@ export const workspaceApi = {
   csvUrl: (projectId: number, paperId: number, assetId: number) =>
     `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/assets/${assetId}/csv`,
 
+  streamUrl: (projectId: number, paperId: number, sinceSeq: number) =>
+    `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/workspace/stream?since_seq=${sinceSeq}`,
+
   // Serves the freshly-extracted ExtEvidence crop, valid only until the next
   // re-extraction (ExtEvidence is staging data, wiped and rebuilt each run) —
   // use inside the Extraction Workspace/Evidence Review flow, not Review.tsx.

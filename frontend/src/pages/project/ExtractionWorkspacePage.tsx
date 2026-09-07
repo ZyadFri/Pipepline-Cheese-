@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, CheckCircle2, Circle, Loader2, AlertCircle,
+  ArrowLeft, CheckCircle2, Loader2, AlertCircle,
   BarChart3, Table2, Image, Layers, Filter, RefreshCw,
   FileText, Star, ChevronRight, FileType2, LayoutGrid,
   BarChart2, AlignLeft,
@@ -12,29 +12,9 @@ import { workspaceApi } from '../../services/api'
 import AuthImage from '../../components/AuthImage'
 import AssetCard from '../../components/AssetCard'
 import AssetDetailPanel from '../../components/AssetDetailPanel'
+import ExtractionTimeline from '../../components/ExtractionTimeline'
+import { useExtractionStream } from '../../hooks/useExtractionStream'
 import type { ExtractionAsset, WorkspaceStatus } from '../../types/workspace'
-
-// ─── Pipeline stages ───────────────────────────────────────────────────────────
-
-const PIPELINE_STAGES = [
-  { id: 'ingest',   label: 'PDF Ingestion',           minProgress: 0,  doneAt: 5 },
-  { id: 'ocr',      label: 'OCR',                     minProgress: 5,  doneAt: 10 },
-  { id: 'layout',   label: 'Layout Analysis',         minProgress: 10, doneAt: 15 },
-  { id: 'sections', label: 'Section Parsing',         minProgress: 15, doneAt: 25 },
-  { id: 'tables',   label: 'Native Table Extraction', minProgress: 25, doneAt: 35 },
-  { id: 'figures',  label: 'Figure Extraction',       minProgress: 35, doneAt: 50 },
-  { id: 'captions', label: 'Caption Linking',         minProgress: 50, doneAt: 65 },
-  { id: 'coords',   label: 'Page Coordinates',        minProgress: 65, doneAt: 85 },
-  { id: 'export',   label: 'Artifact Export',         minProgress: 85, doneAt: 100 },
-]
-
-type StageState = 'done' | 'active' | 'pending'
-
-function stageState(progress: number, stage: typeof PIPELINE_STAGES[0]): StageState {
-  if (progress >= stage.doneAt) return 'done'
-  if (progress >= stage.minProgress) return 'active'
-  return 'pending'
-}
 
 // ─── Filter tabs ───────────────────────────────────────────────────────────────
 
@@ -78,8 +58,8 @@ export default function ExtractionWorkspacePage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const isRunning = status?.status === 'running' || status?.status === 'queued'
-  const isDone    = status?.status === 'completed'
-  const isFailed  = status?.status === 'failed'
+  const isDone    = status?.status === 'completed' || status?.status === 'partial_success'
+  const isFailed  = status?.status === 'failed' || status?.status === 'cancelled'
 
   // ── Fetch assets ────────────────────────────────────────────────────────────
   const fetchAssets = useCallback(async () => {
@@ -99,15 +79,25 @@ export default function ExtractionWorkspacePage() {
       const s: WorkspaceStatus = await workspaceApi.status(pid, paperIdNum)
       setStatus(s)
       if (s.status === 'running' || s.status === 'queued') fetchAssets()
-      else if (s.status === 'completed') {
+      else if (s.status === 'completed' || s.status === 'partial_success') {
         fetchAssets()
         if (pollRef.current) clearInterval(pollRef.current)
-      } else if (s.status === 'failed') {
+        if (s.status === 'partial_success' && s.warnings?.length) {
+          toast(`Extraction completed with ${s.warnings.length} warning(s)`, { icon: '⚠️' })
+        }
+      } else if (s.status === 'failed' || s.status === 'cancelled') {
         if (pollRef.current) clearInterval(pollRef.current)
-        toast.error('Extraction failed: ' + (s.error ?? 'unknown error'))
+        if (s.status === 'failed') toast.error('Extraction failed: ' + (s.error ?? 'unknown error'))
       }
     } catch { /* silent */ }
   }, [pid, paperIdNum, fetchAssets])
+
+  // ── Live progress stream (real backend events; falls back to the polling
+  // above if SSE isn't available) ─────────────────────────────────────────────
+  const stream = useExtractionStream(pid, paperIdNum, {
+    enabled: status?.status === 'running' || status?.status === 'queued',
+    onAssetEvent: fetchAssets,
+  })
 
   // ── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -229,53 +219,40 @@ export default function ExtractionWorkspacePage() {
           </div>
         </div>
 
-        {/* Stage track */}
-        <div className="flex items-center gap-0 px-5 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0 overflow-x-auto">
-          {PIPELINE_STAGES.map((stage, i) => {
-            const state = stageState(progress, stage)
-            return (
-              <div key={stage.id} className="flex items-center shrink-0">
-                <div className={clsx(
-                  'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all',
-                  state === 'done'   ? 'bg-emerald-50 text-emerald-700' :
-                  state === 'active' ? 'text-white' :
-                                       'bg-white text-slate-300 border border-slate-100',
-                )} style={state === 'active' ? { background: 'var(--primary)' } : undefined}>
-                  {state === 'done'   ? <CheckCircle2 size={10} className="text-emerald-500" /> :
-                   state === 'active' ? <Loader2 size={10} className="animate-spin text-white" /> :
-                                        <Circle size={10} className="text-slate-200" />}
-                  {stage.label}
-                </div>
-                {i < PIPELINE_STAGES.length - 1 && <ChevronRight size={10} className="text-slate-200 mx-0.5" />}
-              </div>
-            )
-          })}
-        </div>
+        {/* Real page-parsing progress — pagesDone/totalPages come straight from
+            the backend's chunked Docling loop, not an inferred client-side stage */}
+        {stream.totalPages > 0 && (
+          <div className="flex items-center gap-3 px-5 py-2 border-b border-slate-100 bg-slate-50 shrink-0">
+            <span className="text-[10.5px] font-medium text-slate-500 shrink-0">
+              Pages {stream.pagesDone} / {stream.totalPages}
+            </span>
+            <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden max-w-xs">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${Math.min(100, (stream.pagesDone / stream.totalPages) * 100)}%` }}
+              />
+            </div>
+            {stream.tablesFound > 0 && (
+              <span className="text-[10.5px] text-slate-400 shrink-0">{stream.tablesFound} table(s)</span>
+            )}
+            {stream.figuresFound > 0 && (
+              <span className="text-[10.5px] text-slate-400 shrink-0">{stream.figuresFound} figure(s)</span>
+            )}
+            {stream.connection !== 'live' && (
+              <span className="text-[10px] text-slate-300 shrink-0 ml-auto">
+                {stream.connection === 'connecting' ? 'Connecting…' : 'Live updates unavailable — polling'}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* 3-column body */}
         <div className="flex flex-1 overflow-hidden">
 
-          {/* Left: steps + counts */}
+          {/* Left: live timeline + counts */}
           <div className="w-56 shrink-0 border-r border-slate-200 flex flex-col overflow-y-auto">
             <div className="px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Pipeline Steps</p>
-              <div className="space-y-2">
-                {PIPELINE_STAGES.map((stage) => {
-                  const state = stageState(progress, stage)
-                  return (
-                    <div key={stage.id} className="flex items-center gap-2">
-                      {state === 'done'   ? <CheckCircle2 size={13} className="text-emerald-500 shrink-0" /> :
-                       state === 'active' ? <Loader2 size={13} className="animate-spin shrink-0" style={{ color: 'var(--primary)' }} /> :
-                                            <Circle size={13} className="text-slate-200 shrink-0" />}
-                      <span className={clsx('text-[11px] leading-snug',
-                        state === 'done'   ? 'text-slate-600' :
-                        state === 'active' ? 'font-semibold' :
-                                             'text-slate-300',
-                      )} style={state === 'active' ? { color: 'var(--primary)' } : undefined}>{stage.label}</span>
-                    </div>
-                  )
-                })}
-              </div>
+              <ExtractionTimeline events={stream.events} live={stream.connection === 'live'} />
             </div>
 
             {assets.length > 0 && (
@@ -376,8 +353,12 @@ export default function ExtractionWorkspacePage() {
           <AlertCircle size={24} className="text-red-400" />
         </div>
         <div className="text-center">
-          <h2 className="text-base font-bold text-slate-700">Extraction failed</h2>
-          <p className="text-sm text-red-500 mt-1 max-w-md">{status?.error ?? 'Unknown error'}</p>
+          <h2 className="text-base font-bold text-slate-700">
+            {status?.status === 'cancelled' ? 'Extraction cancelled' : 'Extraction failed'}
+          </h2>
+          {status?.status !== 'cancelled' && (
+            <p className="text-sm text-red-500 mt-1 max-w-md">{status?.error ?? 'Unknown error'}</p>
+          )}
         </div>
         <div className="flex gap-3">
           <Link to={`/projects/${pid}/upload`} className="btn-secondary text-sm">
@@ -414,9 +395,15 @@ export default function ExtractionWorkspacePage() {
         <div className="flex-1 min-w-0">
           <h1 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             Extraction Workspace
-            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-              Complete
-            </span>
+            {status?.status === 'partial_success' ? (
+              <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                Complete — review required
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                Complete
+              </span>
+            )}
           </h1>
           {status?.result && (
             <p className="text-[11px] text-slate-400 mt-0.5">
@@ -455,17 +442,16 @@ export default function ExtractionWorkspacePage() {
         )}
       </div>
 
-      {/* Completed stage track */}
-      <div className="flex items-center gap-0 px-5 py-2 border-b border-slate-100 bg-slate-50 shrink-0 overflow-x-auto">
-        {PIPELINE_STAGES.map((stage, i) => (
-          <div key={stage.id} className="flex items-center shrink-0">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-600">
-              <CheckCircle2 size={9} /> {stage.label}
-            </div>
-            {i < PIPELINE_STAGES.length - 1 && <ChevronRight size={9} className="text-slate-300 mx-0.5" />}
+      {/* Warnings — shown only when something genuinely failed, never fabricated */}
+      {(status?.warnings?.length ?? 0) > 0 && (
+        <div className="flex items-start gap-2 px-5 py-2 border-b border-amber-100 bg-amber-50 shrink-0">
+          <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
+          <div className="text-[11px] text-amber-700 leading-snug">
+            {status!.warnings!.length} item{status!.warnings!.length !== 1 ? 's' : ''} could not be processed:{' '}
+            {status!.warnings!.join(' · ')}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex items-center gap-1 px-5 py-2 border-b border-slate-100 shrink-0 overflow-x-auto">

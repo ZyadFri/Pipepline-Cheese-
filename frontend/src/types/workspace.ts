@@ -54,7 +54,7 @@ export interface AssetDetail extends ExtractionAsset {
 }
 
 export interface WorkspaceStatus {
-  status: 'not_started' | 'queued' | 'running' | 'completed' | 'failed'
+  status: 'not_started' | 'queued' | 'running' | 'completed' | 'partial_success' | 'failed' | 'cancelled'
   progress: number
   current_step: string
   asset_count: number
@@ -72,5 +72,25 @@ export interface WorkspaceStatus {
     chart_conversion_available?: boolean
     skipped_charts?: number
     decorative_excluded?: number
+    warnings?: string[]
   } | null
+  total_pages?: number
+  pages_done?: number
+  tables_found?: number
+  figures_found?: number
+  warnings?: string[]
+  cancel_requested?: boolean
+}
+
+export type JobEventType =
+  | 'job_started' | 'page_images_ready' | 'chunk_started' | 'chunk_done'
+  | 'asset_added' | 'asset_failed' | 'chunk_failed' | 'chart_read'
+  | 'step' | 'job_completed' | 'job_failed' | 'job_cancelled'
+
+export interface StreamEvent {
+  seq: number
+  type: JobEventType
+  message: string | null
+  payload: Record<string, unknown>
+  created_at: string | null
 }
