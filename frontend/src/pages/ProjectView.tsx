@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { projectsApi, papersApi, exportApi } from '../services/api'
+import { projectsApi, papersApi } from '../services/api'
 import type { Project } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -249,7 +249,24 @@ function PrimaryAction({ paper, pid }: { paper: PaperPipeline; pid: number }) {
   }
 
   return (
-    <button className={cls} onClick={() => toast('Promotion coming soon')}>
+    <button
+      className={cls}
+      onClick={async () => {
+        try {
+          const result = await projectsApi.promoteCanonical(pid)
+          const created = (result.ext_pipeline?.observations_created ?? 0)
+            + (result.ext_pipeline?.observations_updated ?? 0)
+          toast.success(
+            created > 0
+              ? `Promoted ${created} observation(s) to the database`
+              : 'Nothing new to promote — already up to date',
+          )
+          navigate(`/projects/${pid}/dataset`)
+        } catch {
+          toast.error('Promotion failed')
+        }
+      }}
+    >
       {label} <ChevronRight size={10} />
     </button>
   )
@@ -471,12 +488,9 @@ export default function ProjectView() {
               <Link to={`/projects/${pid}/review`} className="btn-secondary text-xs py-1.5">
                 <Eye size={13} /> Review
               </Link>
-              <Link to={`/projects/${pid}/analytics`} className="btn-secondary text-xs py-1.5">
-                <BarChart2 size={13} /> Analytics
-              </Link>
-              <button onClick={async () => { try { await exportApi.excel(pid); toast.success('Exported') } catch { toast.error('Export failed') } }} className="btn-secondary text-xs py-1.5">
+              <Link to={`/projects/${pid}/export`} className="btn-secondary text-xs py-1.5">
                 <Download size={13} /> Export
-              </button>
+              </Link>
               <button onClick={load} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Refresh">
                 <RefreshCw size={14} />
               </button>

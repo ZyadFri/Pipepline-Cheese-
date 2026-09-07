@@ -26,9 +26,19 @@ export default function ExportPage() {
   const [requesting, setRequesting] = useState(false)
 
   const loadRuns = async () => {
-    // We don't have a list endpoint for exports directly; use snapshot exports
-    // This page will show pending/completed exports from the ExportRun model
+    if (!projectId) return
+    setLoading(true)
+    try {
+      const data = await snapshotsApi.listExports(Number(projectId))
+      setRuns(data)
+    } catch {
+      toast.error('Failed to load recent exports')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => { loadRuns() }, [projectId])
 
   const handleExport = async (format: string) => {
     if (!projectId) return
@@ -97,9 +107,10 @@ export default function ExportPage() {
         ))}
       </div>
 
-      {runs.length > 0 && (
+      {(runs.length > 0 || loading) && (
         <div>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Recent exports</h2>
+          {loading && runs.length === 0 && <p className="text-sm text-gray-400">Loading…</p>}
           <div className="space-y-2">
             {runs.map((run) => (
               <div key={run.id} className="surface p-3 flex items-center gap-3">

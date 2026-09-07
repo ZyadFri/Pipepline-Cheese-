@@ -3,8 +3,8 @@ import { useAuthStore } from '../store/auth'
 import { downloadAuthenticated } from './download'
 import type {
   Study, Experiment, TreatmentArm, Observation, Microorganism,
-  Job, ProjectMember, NormalizationMapping, Trajectory,
-  ImputationProposal, Threshold, DatasetSnapshot,
+  Job, ProjectMember, NormalizationMapping,
+  Threshold, DatasetSnapshot,
   ExportRun, AuditEvent, ValidationIssue, ProvenanceRecord,
   ExperimentMicroorganism, ProjectStats, ReviewObservation,
 } from '../types'
@@ -81,13 +81,6 @@ export const papersApi = {
 
 export const analyticsApi = {
   get: (projectId: number) => api.get(`/projects/${projectId}/analytics`).then((r) => r.data),
-}
-
-// ── Export (legacy) ───────────────────────────────────────────────────────
-
-export const exportApi = {
-  excel: (projectId: number) =>
-    downloadAuthenticated(`${api.defaults.baseURL}/projects/${projectId}/export/excel`, 'export.xlsx'),
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────
@@ -267,41 +260,6 @@ export const normalizationApi = {
     api.post(`/normalization/apply/${projectId}`).then((r) => r.data),
 }
 
-// ── Trajectories ──────────────────────────────────────────────────────────
-
-export const trajectoriesApi = {
-  list: (params?: {
-    project_id?: number
-    experiment_id?: number
-    treatment_arm_id?: number
-    measurement_type?: string
-    process_class?: string
-    data_sufficient?: boolean
-  }): Promise<Trajectory[]> =>
-    api.get('/trajectories', { params }).then((r) => r.data),
-  get: (id: number): Promise<Trajectory> =>
-    api.get(`/trajectories/${id}`).then((r) => r.data),
-  create: (data: Record<string, unknown>): Promise<Trajectory> =>
-    api.post('/trajectories', data).then((r) => r.data),
-  delete: (id: number) => api.delete(`/trajectories/${id}`),
-}
-
-// ── Imputations ───────────────────────────────────────────────────────────
-
-export const imputationsApi = {
-  list: (params?: {
-    project_id?: number
-    trajectory_id?: number
-    reviewer_decision?: string
-    applicability_status?: string
-  }): Promise<ImputationProposal[]> =>
-    api.get('/imputations', { params }).then((r) => r.data),
-  get: (id: number): Promise<ImputationProposal> =>
-    api.get(`/imputations/${id}`).then((r) => r.data),
-  review: (id: number, decision: 'accepted' | 'rejected', note?: string): Promise<ImputationProposal> =>
-    api.post(`/imputations/${id}/review`, { decision, note }).then((r) => r.data),
-}
-
 // ── Thresholds ────────────────────────────────────────────────────────────
 
 export const thresholdsApi = {
@@ -446,6 +404,8 @@ export const snapshotsApi = {
     filters?: Record<string, unknown>
   }): Promise<ExportRun> =>
     api.post('/snapshots/export', data).then((r) => r.data),
+  listExports: (projectId: number): Promise<ExportRun[]> =>
+    api.get('/snapshots/exports', { params: { project_id: projectId } }).then((r) => r.data),
   getExportRun: (runId: number): Promise<ExportRun> =>
     api.get(`/snapshots/exports/${runId}`).then((r) => r.data),
   downloadExport: (runId: number) =>

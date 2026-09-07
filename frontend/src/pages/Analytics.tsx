@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import toast from 'react-hot-toast'
-import { analyticsApi, exportApi } from '../services/api'
+import { analyticsApi } from '../services/api'
 import { Analytics as AnalyticsType } from '../types'
 
 const COLORS = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2']
@@ -90,12 +90,9 @@ export default function Analytics() {
             <p className="muted">Data quality & distribution overview</p>
           </div>
         </div>
-        <button
-          onClick={() => exportApi.excel(pid)}
-          className="btn-primary"
-        >
-          <Download size={14} /> Export Excel
-        </button>
+        <Link to={`/projects/${pid}/export`} className="btn-primary">
+          <Download size={14} /> Export
+        </Link>
       </div>
 
       {/* Summary stats */}

@@ -10,7 +10,6 @@ export default function ThresholdShelfLifePage() {
   const [thresholds, setThresholds] = useState<Threshold[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [crossings, setCrossings] = useState<Record<number, unknown[]>>({})
   const [form, setForm] = useState({
     name: '', measurement_type: 'microbial_count', threshold_value: 6,
     threshold_unit: 'log CFU/g', comparison_operator: '<=',
@@ -41,13 +40,6 @@ export default function ThresholdShelfLifePage() {
     await thresholdsApi.delete(id)
     toast.success('Deleted')
     load()
-  }
-
-  const handleAnalyze = async (id: number) => {
-    if (!projectId) return
-    const data = await thresholdsApi.getCrossings(id, Number(projectId))
-    setCrossings((prev) => ({ ...prev, [id]: data }))
-    toast.success(`Found ${data.length} trajectories analyzed`)
   }
 
   return (
@@ -125,42 +117,11 @@ export default function ThresholdShelfLifePage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleAnalyze(t.id)} className="text-sm bg-[#7A1B2E] text-white px-3 py-1 rounded hover:bg-[#661523]">
-                    Analyze
-                  </button>
                   <button onClick={() => handleDelete(t.id)} className="text-red-400 hover:text-red-600 p-1">
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-
-              {crossings[t.id] && (
-                <div className="mt-3 border-t border-gray-100 pt-3">
-                  <h3 className="text-xs font-semibold text-gray-600 mb-2">Threshold crossings</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-500">
-                          <th className="text-left px-2 py-1">Trajectory</th>
-                          <th className="text-left px-2 py-1">Crossed?</th>
-                          <th className="text-left px-2 py-1">Crossing day</th>
-                          <th className="text-left px-2 py-1">Source</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(crossings[t.id] as Array<Record<string, unknown>>).map((c, i) => (
-                          <tr key={i} className="border-t border-gray-50">
-                            <td className="px-2 py-1">{String(c.trajectory_label ?? `#${c.trajectory_id}`)}</td>
-                            <td className="px-2 py-1">{c.threshold_crossed ? '✓' : '✗'}</td>
-                            <td className="px-2 py-1">{c.crossing_day != null ? `${c.crossing_day} d` : '—'}</td>
-                            <td className="px-2 py-1 text-gray-400">{String(c.source ?? '')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </div>
           ))}
         </div>

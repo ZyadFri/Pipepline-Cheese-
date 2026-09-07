@@ -26,8 +26,6 @@ import ExperimentsPage from './pages/project/ExperimentsPage'
 import DatasetPage from './pages/project/DatasetPage'
 import NormalizationPage from './pages/project/NormalizationPage'
 import MissingDataPage from './pages/project/MissingDataPage'
-import TrajectoriesPage from './pages/project/TrajectoriesPage'
-import ImputationsPage from './pages/project/ImputationsPage'
 import TreatmentsPage from './pages/project/TreatmentsPage'
 import ThresholdShelfLifePage from './pages/project/ThresholdShelfLifePage'
 import PipelineJobsPage from './pages/project/PipelineJobsPage'
@@ -91,8 +89,6 @@ export default function App() {
         <Route path="missing" element={<MissingDataPage />} />
 
         {/* Analysis */}
-        <Route path="trajectories" element={<TrajectoriesPage />} />
-        <Route path="imputations" element={<ImputationsPage />} />
         <Route path="treatments" element={<TreatmentsPage />} />
         <Route path="thresholds" element={<ThresholdShelfLifePage />} />
 

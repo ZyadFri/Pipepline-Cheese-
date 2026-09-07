@@ -6,13 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import Base, engine, apply_column_migrations
 from app.api.routes import (
     auth, projects, papers, review_queue,
-    analytics, export, schema,
+    analytics, schema,
     extraction_workspace, extraction_engines, asset_actions,
 )
 from app.api.routes import (
     studies, experiments, observations, microorganisms,
     treatment_arms, jobs, members, audit, normalization,
-    trajectories, imputations, thresholds, snapshots,
+    thresholds, snapshots,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -43,7 +43,6 @@ app.include_router(projects.router, prefix="/api")
 app.include_router(papers.router, prefix="/api")
 app.include_router(review_queue.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
-app.include_router(export.router, prefix="/api")
 app.include_router(schema.router, prefix="/api")
 
 # ── Canonical scientific model ────────────────────────────────────────────
@@ -61,8 +60,6 @@ app.include_router(audit.router, prefix="/api")
 app.include_router(normalization.router, prefix="/api")
 
 # ── Analysis ──────────────────────────────────────────────────────────────
-app.include_router(trajectories.router, prefix="/api")
-app.include_router(imputations.router, prefix="/api")
 app.include_router(thresholds.router, prefix="/api")
 
 # ── Infrastructure ────────────────────────────────────────────────────────

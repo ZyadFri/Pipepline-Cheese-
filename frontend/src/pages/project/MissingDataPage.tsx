@@ -27,7 +27,7 @@ export default function MissingDataPage() {
     if (!projectId) return
     setLoading(true)
     // Fetch observations where missing_reason is set or value is null
-    observationsApi.list({ limit: 500 }).then((obs: Observation[]) => {
+    observationsApi.list({ project_id: Number(projectId), limit: 500 }).then((obs: Observation[]) => {
       setObservations(obs.filter((o) => o.missing_reason || o.numeric_value_normalized == null))
     }).finally(() => setLoading(false))
   }, [projectId])
