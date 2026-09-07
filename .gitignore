@@ -28,6 +28,9 @@ backend/.coverage
 # ── Uploads (user research PDFs — never commit) ───────────────────
 backend/uploads/
 
+# ── Generated exports (regeneratable dataset/report output) ────────
+backend/exports/
+
 # ── Node / Frontend ────────────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
