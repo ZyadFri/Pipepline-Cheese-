@@ -22,19 +22,20 @@ Routes:
 """
 import json
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, project_scope
 from app.db.database import SessionLocal, get_db
 from app.db.models import (
     AssetContextLink, ExtractionAsset, ExtEvidence,
-    Job, Paper, Project, User,
+    Job, JobEvent, Paper, Project, User,
 )
 from app.extraction.common.adapters import llm_dict_to_ir
 from app.extraction.common.persist import persist_paper_extraction
@@ -639,6 +640,107 @@ def workspace_status(
         "warnings": job.warnings,
         "cancel_requested": bool(job.cancel_requested),
     }
+
+
+_TERMINAL_JOB_STATUSES = ("completed", "partial_success", "failed", "cancelled")
+
+
+@router.get("/projects/{project_id}/papers/{paper_id}/workspace/stream")
+def stream_workspace_events(
+    project_id: int,
+    paper_id: int,
+    since_seq: int = 0,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Server-Sent Events stream of a paper's live extraction progress.
+
+    Reads the JobEvent table on a ~1s poll rather than an in-process queue,
+    since BackgroundTasks runs the worker in a threadpool (not on the event
+    loop) and the events must be persisted anyway for refresh-survival, so a
+    queue would be a second source of truth for no benefit.
+
+    Native EventSource can't send an Authorization header (the same
+    limitation AuthImage.tsx works around for images), so the frontend is
+    expected to read this via fetch()+ReadableStream with a normal Bearer
+    header rather than the EventSource API — the wire format is plain SSE
+    either way.
+
+    `since_seq` lets a reconnecting client (including a cold page load,
+    since_seq=0) replay exactly the history it's missing instead of the job
+    appearing to restart or the UI going blank on a refresh.
+    """
+    _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
+
+    job = (
+        db.query(Job)
+        .filter(Job.paper_id == paper_id, Job.job_type == "workspace_extraction")
+        .order_by(Job.id.desc())
+        .first()
+    )
+    job_id = job.id if job else None
+
+    def gen():
+        if job_id is None:
+            yield "event: no_job\ndata: {}\n\n"
+            return
+
+        # A dedicated short-lived session, not the request-scoped one — that
+        # session closes when the handler function returns, which happens
+        # before this generator (consumed afterward by StreamingResponse)
+        # finishes.
+        stream_db = SessionLocal()
+        last_seq = since_seq
+        idle_since = time.monotonic()
+        hard_deadline = time.monotonic() + 30 * 60  # client reconnects with its own since_seq
+        try:
+            while time.monotonic() < hard_deadline:
+                rows = (
+                    stream_db.query(JobEvent)
+                    .filter(JobEvent.job_id == job_id, JobEvent.seq > last_seq)
+                    .order_by(JobEvent.seq)
+                    .limit(200)
+                    .all()
+                )
+                if rows:
+                    for row in rows:
+                        data = json.dumps({
+                            "seq": row.seq,
+                            "type": row.event_type,
+                            "message": row.message,
+                            "payload": row.payload,
+                            "created_at": row.created_at.isoformat() if row.created_at else None,
+                        })
+                        yield f"id: {row.seq}\nevent: {row.event_type}\ndata: {data}\n\n"
+                        last_seq = row.seq
+                    idle_since = time.monotonic()
+                    continue  # check for more before sleeping
+
+                stream_db.expire_all()
+                current = stream_db.query(Job.status).filter(Job.id == job_id).first()
+                if current and current[0] in _TERMINAL_JOB_STATUSES:
+                    yield "event: end\ndata: {}\n\n"
+                    return
+
+                if time.monotonic() - idle_since > 15:
+                    yield ": keepalive\n\n"
+                    idle_since = time.monotonic()
+
+                time.sleep(1.0)
+        finally:
+            stream_db.close()
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/projects/{project_id}/papers/{paper_id}/assets")
