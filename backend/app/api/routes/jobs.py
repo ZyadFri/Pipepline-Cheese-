@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import accessible_project_ids, get_current_user, project_scope
 from app.db.database import get_db
 from app.db.models import Job, User
 from app.schemas.canonical import JobOut
@@ -24,9 +24,11 @@ def list_jobs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(Job)
     if project_id:
-        q = q.filter(Job.project_id == project_id)
+        project_scope(project_id, current_user, db)
+        q = db.query(Job).filter(Job.project_id == project_id)
+    else:
+        q = db.query(Job).filter(Job.project_id.in_(accessible_project_ids(current_user, db)))
     if paper_id:
         q = q.filter(Job.paper_id == paper_id)
     if job_type:
@@ -36,16 +38,23 @@ def list_jobs(
     return q.order_by(Job.created_at.desc()).offset(skip).limit(limit).all()
 
 
+def _get_job_or_404(job_id: int, user: User, db: Session) -> Job:
+    job = db.query(Job).filter(
+        Job.id == job_id,
+        Job.project_id.in_(accessible_project_ids(user, db)),
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
 @router.get("/{job_id}", response_model=JobOut)
 def get_job(
     job_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    return _get_job_or_404(job_id, current_user, db)
 
 
 @router.post("/{job_id}/cancel", response_model=JobOut)
@@ -54,12 +63,12 @@ def cancel_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if job.status in ("completed", "failed", "cancelled"):
+    job = _get_job_or_404(job_id, current_user, db)
+    if job.status in ("completed", "failed", "cancelled", "partial_success"):
         raise HTTPException(status_code=400, detail=f"Cannot cancel job with status '{job.status}'")
-    job.status = "cancelled"
+    job.cancel_requested = True
+    if job.status == "queued":
+        job.status = "cancelled"
     db.commit()
     db.refresh(job)
     return job

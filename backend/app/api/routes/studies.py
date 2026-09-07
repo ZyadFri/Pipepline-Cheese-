@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import accessible_project_ids, get_current_user, project_scope
 from app.db.database import get_db
 from app.db.models import AuditEvent, Study, User
 from app.schemas.canonical import (
@@ -16,8 +16,12 @@ from app.schemas.canonical import (
 router = APIRouter(prefix="/studies", tags=["studies"])
 
 
-def _get_study_or_404(study_id: int, db: Session) -> Study:
-    s = db.query(Study).filter(Study.id == study_id).first()
+def _get_study_or_404(study_id: int, user: User, db: Session) -> Study:
+    s = (
+        db.query(Study)
+        .filter(Study.id == study_id, Study.project_id.in_(accessible_project_ids(user, db)))
+        .first()
+    )
     if not s:
         raise HTTPException(status_code=404, detail="Study not found")
     return s
@@ -52,6 +56,7 @@ def list_studies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    project_scope(project_id, current_user, db)
     q = db.query(Study).filter(Study.project_id == project_id)
     if review_status:
         q = q.filter(Study.review_status == review_status)
@@ -64,6 +69,7 @@ def create_study(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    project_scope(payload.project_id, current_user, db)
     study = Study(
         **{k: v for k, v in payload.model_dump(exclude={"authors"}).items()},
         authors_json=json.dumps(payload.authors),
@@ -84,7 +90,7 @@ def get_study(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    s = _get_study_or_404(study_id, db)
+    s = _get_study_or_404(study_id, current_user, db)
     return s
 
 
@@ -96,7 +102,7 @@ def update_study(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    s = _get_study_or_404(study_id, db)
+    s = _get_study_or_404(study_id, current_user, db)
     before = {"review_status": s.review_status, "title": s.title}
     data = payload.model_dump(exclude_none=True)
     if "authors" in data:
@@ -119,7 +125,7 @@ def approve_study(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    s = _get_study_or_404(study_id, db)
+    s = _get_study_or_404(study_id, current_user, db)
     before_status = s.review_status
     s.review_status = "approved"
     s.updated_by = current_user.id
@@ -139,7 +145,7 @@ def reject_study(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    s = _get_study_or_404(study_id, db)
+    s = _get_study_or_404(study_id, current_user, db)
     before_status = s.review_status
     s.review_status = "rejected"
     s.updated_by = current_user.id
@@ -158,7 +164,7 @@ def delete_study(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    s = _get_study_or_404(study_id, db)
+    s = _get_study_or_404(study_id, current_user, db)
     _record_audit(db, current_user, study_id, "delete",
                   {"review_status": s.review_status, "title": s.title}, None)
     db.delete(s)

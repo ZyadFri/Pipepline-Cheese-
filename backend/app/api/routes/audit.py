@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import accessible_project_ids, get_current_user, project_scope
 from app.db.database import get_db
 from app.db.models import AuditEvent, User
 from app.schemas.canonical import AuditEventOut
@@ -26,9 +26,13 @@ def list_audit_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(AuditEvent)
     if project_id:
-        q = q.filter(AuditEvent.project_id == project_id)
+        project_scope(project_id, current_user, db)
+        q = db.query(AuditEvent).filter(AuditEvent.project_id == project_id)
+    else:
+        q = db.query(AuditEvent).filter(
+            AuditEvent.project_id.in_(accessible_project_ids(current_user, db))
+        )
     if entity_type:
         q = q.filter(AuditEvent.entity_type == entity_type)
     if entity_id:

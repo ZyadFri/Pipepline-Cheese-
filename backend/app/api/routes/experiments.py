@@ -6,9 +6,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import accessible_project_ids, get_current_user, project_scope
 from app.db.database import get_db
-from app.db.models import AuditEvent, Experiment, ExperimentMicroorganism, User
+from app.db.models import AuditEvent, Experiment, ExperimentMicroorganism, Study, User
 from app.schemas.canonical import (
     ExperimentCreate, ExperimentDetail, ExperimentOut, ExperimentUpdate,
     ExperimentMicroorganismCreate, ExperimentMicroorganismOut,
@@ -18,8 +18,16 @@ from app.schemas.canonical import (
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
 
-def _get_or_404(experiment_id: int, db: Session) -> Experiment:
-    e = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+def _get_or_404(experiment_id: int, user: User, db: Session) -> Experiment:
+    e = (
+        db.query(Experiment)
+        .join(Study, Experiment.study_id == Study.id)
+        .filter(
+            Experiment.id == experiment_id,
+            Study.project_id.in_(accessible_project_ids(user, db)),
+        )
+        .first()
+    )
     if not e:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return e
@@ -47,12 +55,17 @@ def list_experiments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(Experiment)
+    if project_id:
+        project_scope(project_id, current_user, db)
+        q = db.query(Experiment).join(Study).filter(Study.project_id == project_id)
+    else:
+        q = (
+            db.query(Experiment)
+            .join(Study, Experiment.study_id == Study.id)
+            .filter(Study.project_id.in_(accessible_project_ids(current_user, db)))
+        )
     if study_id:
         q = q.filter(Experiment.study_id == study_id)
-    if project_id:
-        from app.db.models import Study
-        q = q.join(Study).filter(Study.project_id == project_id)
     return q.order_by(Experiment.created_at).offset(skip).limit(limit).all()
 
 
@@ -62,6 +75,12 @@ def create_experiment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    study = db.query(Study).filter(
+        Study.id == payload.study_id,
+        Study.project_id.in_(accessible_project_ids(current_user, db)),
+    ).first()
+    if not study:
+        raise HTTPException(status_code=404, detail="Study not found")
     data = payload.model_dump(exclude={"gas_composition", "extra_conditions"})
     exp = Experiment(
         **data,
@@ -84,7 +103,7 @@ def get_experiment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return _get_or_404(experiment_id, db)
+    return _get_or_404(experiment_id, current_user, db)
 
 
 @router.patch("/{experiment_id}", response_model=ExperimentOut)
@@ -95,7 +114,7 @@ def update_experiment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    exp = _get_or_404(experiment_id, db)
+    exp = _get_or_404(experiment_id, current_user, db)
     data = payload.model_dump(exclude_none=True)
     if "gas_composition" in data:
         exp.gas_composition_json = json.dumps(data.pop("gas_composition"))
@@ -118,7 +137,7 @@ def delete_experiment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    exp = _get_or_404(experiment_id, db)
+    exp = _get_or_404(experiment_id, current_user, db)
     _audit(db, current_user, experiment_id, "delete", {"product": exp.product_name_normalized}, None)
     db.delete(exp)
     db.commit()
@@ -135,7 +154,7 @@ def assign_microorganism(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_or_404(experiment_id, db)
+    _get_or_404(experiment_id, current_user, db)
     link = ExperimentMicroorganism(
         experiment_id=experiment_id,
         microorganism_id=payload.microorganism_id,
@@ -157,6 +176,7 @@ def remove_microorganism(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _get_or_404(experiment_id, current_user, db)
     link = (db.query(ExperimentMicroorganism)
             .filter_by(experiment_id=experiment_id, microorganism_id=micro_id)
             .first())

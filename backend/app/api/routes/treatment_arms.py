@@ -6,16 +6,25 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import accessible_project_ids, get_current_user
 from app.db.database import get_db
-from app.db.models import AuditEvent, TreatmentArm, User
+from app.db.models import AuditEvent, Experiment, Study, TreatmentArm, User
 from app.schemas.canonical import TreatmentArmCreate, TreatmentArmOut, TreatmentArmUpdate
 
 router = APIRouter(prefix="/treatment-arms", tags=["treatment_arms"])
 
 
-def _get_or_404(arm_id: int, db: Session) -> TreatmentArm:
-    a = db.query(TreatmentArm).filter(TreatmentArm.id == arm_id).first()
+def _get_or_404(arm_id: int, user: User, db: Session) -> TreatmentArm:
+    a = (
+        db.query(TreatmentArm)
+        .join(Experiment, TreatmentArm.experiment_id == Experiment.id)
+        .join(Study, Experiment.study_id == Study.id)
+        .filter(
+            TreatmentArm.id == arm_id,
+            Study.project_id.in_(accessible_project_ids(user, db)),
+        )
+        .first()
+    )
     if not a:
         raise HTTPException(status_code=404, detail="Treatment arm not found")
     return a
@@ -24,14 +33,22 @@ def _get_or_404(arm_id: int, db: Session) -> TreatmentArm:
 @router.get("", response_model=list[TreatmentArmOut])
 def list_arms(
     experiment_id: Optional[int] = Query(None),
+    project_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(200, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(TreatmentArm)
+    q = (
+        db.query(TreatmentArm)
+        .join(Experiment, TreatmentArm.experiment_id == Experiment.id)
+        .join(Study, Experiment.study_id == Study.id)
+        .filter(Study.project_id.in_(accessible_project_ids(current_user, db)))
+    )
     if experiment_id:
         q = q.filter(TreatmentArm.experiment_id == experiment_id)
+    if project_id:
+        q = q.filter(Study.project_id == project_id)
     return q.order_by(TreatmentArm.id).offset(skip).limit(limit).all()
 
 
@@ -41,6 +58,17 @@ def create_arm(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    exp = (
+        db.query(Experiment)
+        .join(Study, Experiment.study_id == Study.id)
+        .filter(
+            Experiment.id == payload.experiment_id,
+            Study.project_id.in_(accessible_project_ids(current_user, db)),
+        )
+        .first()
+    )
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
     data = payload.model_dump(exclude={"combination_treatments", "extra_treatment"})
     arm = TreatmentArm(
         **data,
@@ -64,7 +92,7 @@ def get_arm(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return _get_or_404(arm_id, db)
+    return _get_or_404(arm_id, current_user, db)
 
 
 @router.patch("/{arm_id}", response_model=TreatmentArmOut)
@@ -74,7 +102,7 @@ def update_arm(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    arm = _get_or_404(arm_id, db)
+    arm = _get_or_404(arm_id, current_user, db)
     data = payload.model_dump(exclude_none=True)
     if "combination_treatments" in data:
         arm.combination_treatments_json = json.dumps(data.pop("combination_treatments"))
@@ -98,7 +126,7 @@ def delete_arm(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    arm = _get_or_404(arm_id, db)
+    arm = _get_or_404(arm_id, current_user, db)
     db.add(AuditEvent(actor_id=current_user.id, entity_type="treatment_arm",
                       entity_id=arm_id, action="delete", source="user"))
     db.delete(arm)

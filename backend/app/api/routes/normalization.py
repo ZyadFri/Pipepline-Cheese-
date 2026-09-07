@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import accessible_project_ids, get_current_user, project_scope
 from app.db.database import get_db
 from app.db.models import NormalizationMapping, User
 from app.schemas.canonical import NormalizationMappingCreate, NormalizationMappingOut
@@ -25,9 +25,15 @@ def list_mappings(
 ):
     query = db.query(NormalizationMapping)
     if project_id is not None:
+        project_scope(project_id, current_user, db)
         query = query.filter(
             (NormalizationMapping.project_id == project_id) |
             (NormalizationMapping.project_id == None)
+        )
+    else:
+        query = query.filter(
+            NormalizationMapping.project_id.in_(accessible_project_ids(current_user, db))
+            | (NormalizationMapping.project_id == None)
         )
     if mapping_type:
         query = query.filter(NormalizationMapping.mapping_type == mapping_type)
@@ -43,6 +49,8 @@ def create_mapping(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if payload.project_id is not None:
+        project_scope(payload.project_id, current_user, db)
     existing = (db.query(NormalizationMapping)
                   .filter_by(project_id=payload.project_id,
                               mapping_type=payload.mapping_type,
@@ -66,6 +74,8 @@ def delete_mapping(
     m = db.query(NormalizationMapping).filter(NormalizationMapping.id == mapping_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Mapping not found")
+    if m.project_id is not None and m.project_id not in accessible_project_ids(current_user, db):
+        raise HTTPException(status_code=404, detail="Mapping not found")
     db.delete(m)
     db.commit()
 
@@ -77,6 +87,7 @@ def apply_normalization(
     current_user: User = Depends(get_current_user),
 ):
     """Trigger normalization service to apply all mappings to unapplied entities."""
+    project_scope(project_id, current_user, db)
     from app.services.normalization import run_normalization
     result = run_normalization(project_id, db)
     return {"applied": result}

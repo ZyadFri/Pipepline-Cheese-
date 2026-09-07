@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, project_scope
 from app.db.database import get_db
 from app.db.models import (
     Experiment, Observation, Paper, Project, ProvenanceRecord, Study,
@@ -26,12 +26,7 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["review-queue"])
 
 
 def _require_project(project_id: int, user: User, db: Session) -> Project:
-    project = db.query(Project).filter(
-        Project.id == project_id, Project.owner_id == user.id,
-    ).first()
-    if not project:
-        raise HTTPException(404, "Project not found")
-    return project
+    return project_scope(project_id, user, db)
 
 
 @router.get("/observations", response_model=list[ObservationReviewOut])

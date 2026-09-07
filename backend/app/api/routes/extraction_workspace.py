@@ -30,7 +30,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, project_scope
 from app.db.database import SessionLocal, get_db
 from app.db.models import (
     AssetContextLink, ExtractionAsset, ExtEvidence,
@@ -53,13 +53,7 @@ router = APIRouter(tags=["extraction-workspace"])
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _require_project(project_id: int, user: User, db: Session) -> Project:
-    proj = db.query(Project).filter(
-        Project.id == project_id,
-        Project.owner_id == user.id,
-    ).first()
-    if not proj:
-        raise HTTPException(404, "Project not found")
-    return proj
+    return project_scope(project_id, user, db)
 
 
 def _get_paper(project_id: int, paper_id: int, db: Session) -> Paper:
@@ -616,6 +610,7 @@ def list_project_assets(
     user: User = Depends(get_current_user),
 ):
     """List all extraction assets across all papers in a project."""
+    _require_project(project_id, user, db)
     q = db.query(ExtractionAsset).filter(ExtractionAsset.project_id == project_id)
     if asset_type:
         q = q.filter(ExtractionAsset.asset_type == asset_type)
@@ -726,6 +721,7 @@ def update_asset(
 ):
     """Update asset classification, LLM selection flag, or user note."""
     _require_project(project_id, user, db)
+    _get_paper(project_id, paper_id, db)
     asset = db.query(ExtractionAsset).filter(
         ExtractionAsset.id == asset_id,
         ExtractionAsset.paper_id == paper_id,
