@@ -166,10 +166,20 @@ def _build_excel(project_id: int, run_id: int, db: "Session") -> Path:
     path = out_dir / f"export_{project_id}_{run_id}.xlsx"
 
     with pd.ExcelWriter(str(path), engine="openpyxl") as writer:
+        wrote_any = False
         for sheet_name, df in dfs.items():
             if not df.empty:
                 # Truncate sheet name to Excel's 31-char limit
                 df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                wrote_any = True
+        if not wrote_any:
+            # A workbook needs at least one visible sheet or openpyxl raises
+            # "At least one sheet must be visible" — an empty project (nothing
+            # promoted to canonical yet) hit exactly this. An honest note
+            # beats a failed export run for a project that's just new.
+            pd.DataFrame({"note": ["No data available for this project yet."]}).to_excel(
+                writer, sheet_name="Info", index=False,
+            )
 
     return path
 

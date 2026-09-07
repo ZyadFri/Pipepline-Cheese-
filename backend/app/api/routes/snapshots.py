@@ -64,21 +64,6 @@ def create_snapshot(
     return snap
 
 
-@router.get("/{snapshot_id}", response_model=SnapshotOut)
-def get_snapshot(
-    snapshot_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    snap = db.query(DatasetSnapshot).filter(
-        DatasetSnapshot.id == snapshot_id,
-        DatasetSnapshot.project_id.in_(accessible_project_ids(current_user, db)),
-    ).first()
-    if not snap:
-        raise HTTPException(status_code=404, detail="Snapshot not found")
-    return snap
-
-
 @router.post("/export", response_model=ExportRunOut, status_code=status.HTTP_202_ACCEPTED)
 def create_export(
     payload: ExportRequest,
@@ -175,3 +160,18 @@ def download_export(
         media_type=media_types.get(run.format, "application/octet-stream"),
         filename=os.path.basename(run.file_path),
     )
+
+
+@router.get("/{snapshot_id}", response_model=SnapshotOut)
+def get_snapshot(
+    snapshot_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    snap = db.query(DatasetSnapshot).filter(
+        DatasetSnapshot.id == snapshot_id,
+        DatasetSnapshot.project_id.in_(accessible_project_ids(current_user, db)),
+    ).first()
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return snap
