@@ -42,9 +42,12 @@ from app.services.asset_classifier import _is_decorative, classify_figure, score
 from app.services.canonical_promoter import promote_ext_paper_to_canonical
 from app.services.chart_converter import convert_charts
 from app.services.context_linker import build_context_links
-from app.services.docling_extractor import extract_pdf
+from app.services.docling_extractor import (
+    DoclingResult, cache_dir_for, extract_pdf, extract_pdf_progressive,
+)
 from app.services.evidence_package import EvidenceItem, EvidencePackage
 from app.services.food_extractor import extract_food_data
+from app.services.job_events import emit
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["extraction-workspace"])
@@ -157,18 +160,53 @@ def _write_manifest(cache_dir: Path, assets: list) -> None:
         logger.warning("Manifest write failed: %s", exc)
 
 
+def _is_cancelled(db: Session, job_id: int) -> bool:
+    """The worker holds a long-lived session with the Job row already in its
+    identity map, so a plain re-query would return the cached object and a
+    cancel request would never be observed. expire_all() forces a fresh read."""
+    db.expire_all()
+    row = db.query(Job.cancel_requested, Job.status).filter(Job.id == job_id).first()
+    return bool(row and (row[0] or row[1] == "cancelled"))
+
+
+def _apply_chart_result(asset: ExtractionAsset, cr) -> None:
+    """Map one chart_converter.ChartResult onto an asset's conversion fields.
+    Shared by the main extraction loop and the single-asset retry endpoint so
+    the two can't drift apart."""
+    if cr.status == "valid":
+        asset.conversion_status = "complete"
+        asset.csv_path = cr.csv_path
+        asset.csv_rows = cr.row_count
+        asset.csv_cols = cr.col_count
+    elif cr.status == "rejected":
+        asset.conversion_status = "not_a_chart"
+    elif cr.status == "error":
+        asset.conversion_status = "failed"
+        asset.conversion_error = cr.reject_reason
+    else:
+        asset.conversion_status = "skipped"
+
+
 # ─── Background extraction task ───────────────────────────────────────────────
 
 def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> None:
     """
-    Full workspace extraction pipeline:
-      1. Docling PDF → texts / tables / figures
-      2. Page image generation
-      3. Save all assets to DB
-      4. Deterministic context linking
-      5. PP-Chart2Table chart conversion (if available)
-      6. Relevance scoring
-      7. Write item_manifest.jsonl
+    Progressive workspace extraction pipeline:
+      1. Page images (fast, Docling-independent — gives the Live Gallery
+         something to show in the first second)
+      2. Docling PDF → texts / tables / figures, streamed as page-range
+         chunks so assets are persisted and visible as each chunk completes
+         instead of only after the whole document finishes
+      3. Deterministic context linking (needs the whole accumulated document)
+      4. PP-Chart2Table chart conversion (if available)
+      5. Relevance scoring
+      6. Write item_manifest.jsonl
+
+    One failed page-range chunk or one failed asset never fails the whole
+    job — final status is 'partial_success' with warnings recorded rather
+    than a silent success or an all-or-nothing failure. A cancellation
+    request is honored between chunks (not mid-conversion, which is one
+    blocking call that can't be interrupted).
     """
     db = SessionLocal()
     try:
@@ -177,119 +215,175 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         if not paper or not job:
             return
 
+        warnings: list = []
+
+        def _cancelled() -> bool:
+            return _is_cancelled(db, job_id)
+
+        def _finish_cancelled() -> None:
+            job.status = "cancelled"
+            job.completed_at = datetime.utcnow()
+            job.current_step = "Cancelled"
+            job.warnings_json = json.dumps(warnings)
+            paper.status = "uploaded"
+            db.commit()
+            emit(db, job_id, "job_cancelled", "Extraction cancelled")
+
         paper.status  = "extracting"
         job.status    = "running"
         job.started_at = datetime.utcnow()
-        # Docling parses the whole document in one call — there's no per-page hook
-        # to report progress during this step, unlike the asset/chart steps below
-        # which now commit incrementally. Set expectations instead of going quiet.
-        page_note = f" ({paper.page_count} pages — this can take a minute or two)" if paper.page_count else ""
-        job.current_step = f"Parsing document structure with Docling{page_note}"
-        job.progress  = 5
+        job.progress  = 2
+        job.current_step = "Starting extraction"
         db.commit()
+        emit(db, job_id, "job_started", "Extraction started")
 
-        # ── Step 1: Docling extraction ────────────────────────────────────────
-        try:
-            docling_result = extract_pdf(paper.file_path)
-        except ImportError as exc:
-            job.status        = "failed"
-            job.error_message = f"Docling not installed: {exc}"
-            paper.status      = "failed"
-            paper.error_message = str(exc)
-            db.commit()
-            return
-        except Exception as exc:
-            job.status        = "failed"
-            job.error_message = str(exc)
-            paper.status      = "failed"
-            paper.error_message = str(exc)
-            db.commit()
-            return
-
-        paper.page_count = docling_result.page_count
-        job.progress  = 25
-        job.current_step = (
-            f"Generating page images for {docling_result.page_count} pages"
-        )
-        db.commit()
-
-        # ── Step 2: Page images ───────────────────────────────────────────────
-        cache_dir  = Path(docling_result.cache_dir)
-        pages_dir  = cache_dir / "pages"
+        # ── Step 1: Page images (fast, no Docling dependency) ─────────────────
+        cache_dir = cache_dir_for(paper.file_path)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        pages_dir = cache_dir / "pages"
         pages_dir.mkdir(exist_ok=True)
-        page_image_paths = _generate_page_images(paper.file_path, pages_dir)
 
-        job.progress  = 35
-        job.current_step = (
-            f"Saving {len(docling_result.figures)} figures, "
-            f"{len(docling_result.tables)} tables to workspace"
-        )
+        job.progress = 5
+        job.current_step = "Rendering page images"
         db.commit()
+        page_image_paths = _generate_page_images(paper.file_path, pages_dir)
+        emit(db, job_id, "page_images_ready", f"{len(page_image_paths)} page image(s) ready",
+             page_count=len(page_image_paths))
 
-        # ── Step 3: Save assets to DB (delete stale first) ───────────────────
+        if _cancelled():
+            _finish_cancelled()
+            return
+
+        # ── Step 2: Delete stale assets, then stream Docling chunks ───────────
         db.query(ExtractionAsset).filter(
             ExtractionAsset.paper_id == paper_id
         ).delete(synchronize_session=False)
         db.commit()
 
-        asset_map: dict = {}  # item_ref → asset_id
+        asset_map: dict = {}          # item_ref → asset_id
+        acc_texts: list = []
+        acc_tables: list = []
+        acc_figures: list = []
+        tables_found = 0
+        figures_found = 0
 
-        for i, fig in enumerate(docling_result.figures):
-            page_img = page_image_paths.get(fig.page_number)
-            asset = ExtractionAsset(
-                paper_id         = paper_id,
-                project_id       = project_id,
-                job_id           = job_id,
-                docling_item_ref = fig.item_ref,
-                asset_type       = "figure",
-                page_number      = fig.page_number,
-                bbox_json        = json.dumps(fig.bbox) if fig.bbox else None,
-                caption          = fig.caption,
-                image_path       = fig.image_path or None,
-                page_image_path  = page_img,
-                classification   = "unknown",
-                conversion_status = "pending" if fig.image_path else "skipped",
-                relevance_score  = 0.0,
-                selected_for_llm = False,
+        def _persist_asset(kind: str, item) -> None:
+            nonlocal tables_found, figures_found
+            page_img = page_image_paths.get(item.page_number)
+            try:
+                if kind == "figure":
+                    asset = ExtractionAsset(
+                        paper_id=paper_id, project_id=project_id, job_id=job_id,
+                        docling_item_ref=item.item_ref, asset_type="figure",
+                        page_number=item.page_number,
+                        bbox_json=json.dumps(item.bbox) if item.bbox else None,
+                        caption=item.caption, image_path=item.image_path or None,
+                        page_image_path=page_img, classification="unknown",
+                        conversion_status="pending" if item.image_path else "skipped",
+                        relevance_score=0.0, selected_for_llm=False,
+                    )
+                else:
+                    asset = ExtractionAsset(
+                        paper_id=paper_id, project_id=project_id, job_id=job_id,
+                        docling_item_ref=item.item_ref, asset_type="native_table",
+                        page_number=item.page_number,
+                        bbox_json=json.dumps(item.bbox) if item.bbox else None,
+                        caption=item.caption, csv_path=item.csv_path,
+                        page_image_path=page_img, classification="native_table",
+                        conversion_status="not_applicable",
+                        csv_rows=_count_csv_rows(item.csv_path),
+                        csv_cols=_count_csv_cols(item.csv_path),
+                        relevance_score=0.0, selected_for_llm=False,
+                    )
+                db.add(asset)
+                # Commit per asset (not batched at the end) — this is what makes
+                # elements actually appear in the Live Gallery as they're found.
+                db.commit()
+            except Exception as exc:
+                db.rollback()   # required — a failed commit leaves the session
+                                 # unusable for every subsequent asset otherwise
+                kind_label = "Figure" if kind == "figure" else "Table"
+                warnings.append(f"{kind_label} on page {item.page_number} could not be saved: {exc}")
+                emit(db, job_id, "asset_failed", str(exc)[:300],
+                     asset_type=kind, page_number=item.page_number, item_ref=item.item_ref)
+                return
+            asset_map[item.item_ref] = asset.id
+            if kind == "figure":
+                figures_found += 1
+            else:
+                tables_found += 1
+            emit(db, job_id, "asset_added", None, asset_id=asset.id, asset_type=kind,
+                 page=item.page_number, caption=item.caption)
+
+        any_chunk_failed = False
+        for chunk in extract_pdf_progressive(paper.file_path, cancel_check=_cancelled):
+            if _cancelled():
+                _finish_cancelled()
+                return
+
+            if chunk.status == "failed":
+                any_chunk_failed = True
+                warnings.append(
+                    f"Pages {chunk.page_start}-{chunk.page_end} could not be processed: {chunk.error}"
+                )
+                emit(db, job_id, "chunk_failed", chunk.error,
+                     page_start=chunk.page_start, page_end=chunk.page_end)
+                continue
+
+            for fig in chunk.figures:
+                _persist_asset("figure", fig)
+            for tbl in chunk.tables:
+                _persist_asset("table", tbl)
+
+            acc_texts.extend(chunk.texts)
+            acc_tables.extend(chunk.tables)
+            acc_figures.extend(chunk.figures)
+
+            paper.page_count = chunk.total_pages
+            job.total_pages  = chunk.total_pages
+            job.pages_done   = chunk.page_end
+            job.tables_found = tables_found
+            job.figures_found = figures_found
+            job.progress = 5 + int(55 * chunk.page_end / max(1, chunk.total_pages))
+            job.current_step = (
+                f"Parsed pages {chunk.page_start}-{chunk.page_end} of {chunk.total_pages} "
+                f"({tables_found} tables, {figures_found} figures so far)"
             )
-            db.add(asset)
-            # Commit per asset (not batched at the end of the loop) — the frontend
-            # polls /assets every 2.5s, so this is what makes elements actually
-            # appear in the Live Gallery as they're extracted, instead of all at once.
             db.commit()
-            asset_map[fig.item_ref] = asset.id
+            emit(db, job_id, "chunk_done", job.current_step,
+                 page_start=chunk.page_start, page_end=chunk.page_end,
+                 total_pages=chunk.total_pages,
+                 tables_found=tables_found, figures_found=figures_found)
 
-        for i, tbl in enumerate(docling_result.tables):
-            page_img  = page_image_paths.get(tbl.page_number)
-            csv_rows  = _count_csv_rows(tbl.csv_path)
-            csv_cols  = _count_csv_cols(tbl.csv_path)
-            asset = ExtractionAsset(
-                paper_id         = paper_id,
-                project_id       = project_id,
-                job_id           = job_id,
-                docling_item_ref = tbl.item_ref,
-                asset_type       = "native_table",
-                page_number      = tbl.page_number,
-                bbox_json        = json.dumps(tbl.bbox) if tbl.bbox else None,
-                caption          = tbl.caption,
-                csv_path         = tbl.csv_path,
-                page_image_path  = page_img,
-                classification   = "native_table",
-                conversion_status = "not_applicable",
-                csv_rows         = csv_rows,
-                csv_cols         = csv_cols,
-                relevance_score  = 0.0,
-                selected_for_llm = False,
-            )
-            db.add(asset)
+        if any_chunk_failed and not acc_texts and not acc_tables and not acc_figures:
+            job.status = "failed"
+            job.error_message = "Docling extraction failed for every page range"
+            job.warnings_json = json.dumps(warnings)
+            job.completed_at = datetime.utcnow()
+            paper.status = "failed"
+            paper.error_message = job.error_message
             db.commit()
-            asset_map[tbl.item_ref] = asset.id
+            emit(db, job_id, "job_failed", job.error_message)
+            return
 
-        job.progress  = 50
+        # One accumulated result for context linking, which needs
+        # whole-document ordering — unchanged from the pre-chunking
+        # behavior, just fed from the accumulated chunks instead of one call.
+        docling_result = DoclingResult(
+            file_hash="", cache_dir=str(cache_dir), markdown_path=str(cache_dir / "content.md"),
+            texts=acc_texts, tables=acc_tables, figures=acc_figures,
+            page_count=paper.page_count or 0,
+        )
+
+        if _cancelled():
+            _finish_cancelled()
+            return
+
+        job.progress  = 62
         job.current_step = "Linking context to visual elements"
         db.commit()
 
-        # ── Step 4: Context linking ───────────────────────────────────────────
+        # ── Step 3: Context linking ───────────────────────────────────────────
         for i, fig in enumerate(docling_result.figures):
             aid = asset_map.get(fig.item_ref)
             if not aid:
@@ -331,7 +425,7 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             )
             db.commit()
 
-        # ── Step 5: Chart figure -> data table (vision LLM) ────────────────────
+        # ── Step 4: Chart figure -> data table (vision LLM) ────────────────────
         # Decorative figures never go to the API — classify them immediately.
         candidate_refs = {fig.item_ref for fig in chart_candidates}
         for fig in docling_result.figures:
@@ -349,24 +443,23 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         # so the Live Gallery updates per-figure instead of going quiet until the
         # slowest step in the whole pipeline finishes.
         n_read = 0
-        for cr in convert_charts(chart_candidates, docling_result.cache_dir):
+        for cr in convert_charts(chart_candidates, str(cache_dir)):
+            if _cancelled():
+                _finish_cancelled()
+                return
+
             aid = asset_map.get(cr.item_ref)
             asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first() if aid else None
             if not asset:
                 continue
 
-            if cr.status == "valid":
-                asset.conversion_status = "complete"
-                asset.csv_path  = cr.csv_path
-                asset.csv_rows  = cr.row_count
-                asset.csv_cols  = cr.col_count
-            elif cr.status == "rejected":
-                asset.conversion_status = "not_a_chart"
-            elif cr.status == "error":
-                asset.conversion_status = "failed"
-                asset.conversion_error  = cr.reject_reason
-            else:
-                asset.conversion_status = "skipped"
+            _apply_chart_result(asset, cr)
+            if cr.status == "error":
+                warnings.append(
+                    f"Chart on page {asset.page_number} could not be digitized: {cr.reject_reason}"
+                )
+                emit(db, job_id, "asset_failed", cr.reject_reason,
+                     asset_id=asset.id, asset_type="figure", page_number=asset.page_number)
 
             _classify_and_commit(asset)
 
@@ -374,12 +467,13 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             job.progress = 65 + min(20, int(20 * n_read / max(1, len(chart_candidates))))
             job.current_step = f"Read {n_read}/{len(chart_candidates)} chart figures"
             db.commit()
+            emit(db, job_id, "chart_read", job.current_step, asset_id=asset.id, status=cr.status)
 
         job.progress  = 85
         job.current_step = "Scoring scientific relevance"
         db.commit()
 
-        # ── Step 6: Relevance scoring ─────────────────────────────────────────
+        # ── Step 5: Relevance scoring ─────────────────────────────────────────
         all_assets = db.query(ExtractionAsset).filter(
             ExtractionAsset.paper_id == paper_id
         ).all()
@@ -395,7 +489,7 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
 
         db.commit()
 
-        # ── Step 7: Write manifest ────────────────────────────────────────────
+        # ── Step 6: Write manifest ────────────────────────────────────────────
         _write_manifest(cache_dir, all_assets)
 
         n_fig = sum(1 for a in all_assets if a.asset_type == "figure")
@@ -412,12 +506,15 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         )
         if n_logos:
             step_summary += f" · {n_logos} decorative/logo assets excluded"
+        if warnings:
+            step_summary += f" · {len(warnings)} warning(s)"
 
         paper.status  = "extracted"
-        job.status    = "completed"
+        job.status    = "partial_success" if warnings else "completed"
         job.progress  = 100
         job.current_step = step_summary
         job.completed_at = datetime.utcnow()
+        job.warnings_json = json.dumps(warnings)
         job.result_json  = json.dumps({
             "figures": n_fig,
             "charts": n_chart,
@@ -426,8 +523,10 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             "total_assets": len(all_assets),
             "page_count": docling_result.page_count,
             "decorative_excluded": n_logos,
+            "warnings": warnings,
         })
         db.commit()
+        emit(db, job_id, "job_completed", step_summary, status=job.status, warnings=warnings)
 
     except Exception as exc:
         logger.error(
@@ -443,6 +542,8 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
                 job.status = "failed"
                 job.error_message = str(exc)[:500]
             db.commit()
+            if job:
+                emit(db, job_id, "job_failed", str(exc)[:300])
         except Exception:
             pass
     finally:
@@ -531,6 +632,12 @@ def workspace_status(
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
         "error": job.error_message or None,
         "result": json.loads(job.result_json) if job.result_json and job.result_json != "{}" else None,
+        "total_pages": job.total_pages or 0,
+        "pages_done": job.pages_done or 0,
+        "tables_found": job.tables_found or 0,
+        "figures_found": job.figures_found or 0,
+        "warnings": job.warnings,
+        "cancel_requested": bool(job.cancel_requested),
     }
 
 

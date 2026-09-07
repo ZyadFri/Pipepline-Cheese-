@@ -49,6 +49,12 @@ class JobOut(BaseModel):
     error_message: str
     result: dict[str, Any]
     celery_task_id: Optional[str]
+    total_pages: int
+    pages_done: int
+    tables_found: int
+    figures_found: int
+    warnings: list[str]
+    cancel_requested: bool
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]

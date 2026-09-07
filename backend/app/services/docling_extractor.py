@@ -146,6 +146,13 @@ def _file_hash(pdf_path: str) -> str:
     return sha.hexdigest()
 
 
+def cache_dir_for(pdf_path: str) -> Path:
+    """The cache directory a call to extract_pdf/extract_pdf_progressive on
+    this file will use — computable up front (e.g. so page images can be
+    generated into the same directory before Docling itself has run)."""
+    return Path(settings.DOCLING_CACHE_DIR) / _file_hash(pdf_path)
+
+
 def _pdf_page_count(pdf_path: str) -> int:
     import fitz  # PyMuPDF — already a dependency, already used elsewhere in this app
     doc = fitz.open(pdf_path)
