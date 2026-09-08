@@ -36,7 +36,7 @@ export default function AuthShell({
 
       <div className="relative w-full max-w-[400px]">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2.5">
-          <img src="/mcgill.png" alt="McGill" className="h-8 w-auto" />
+          <img src="/mcgill.png" alt="McGill" className="h-14 w-auto" />
           <span className="font-display text-[19px] font-bold tracking-[-0.01em]" style={{ color: 'var(--primary)' }}>McGill</span>
         </Link>
 

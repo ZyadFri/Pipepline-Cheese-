@@ -108,8 +108,8 @@ function LandingHeader() {
         </div>
 
         <Link to="/" className="group flex shrink-0 items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eddde1] bg-white shadow-[0_10px_25px_-20px_rgba(122,27,46,.8)] transition group-hover:-translate-y-0.5">
-            <img src="/mcgill.png" alt="McGill University" className="h-7 w-auto" />
+          <span className="flex h-[60px] w-[60px] items-center justify-center rounded-[16px] border border-[#eddde1] bg-white shadow-[0_10px_25px_-20px_rgba(122,27,46,.8)] transition group-hover:-translate-y-0.5">
+            <img src="/mcgill.png" alt="McGill University" className="h-11 w-auto" />
           </span>
           <div className="hidden sm:block">
             <p className="font-display text-[22px] font-semibold leading-none text-[#76172b]">Cheese Database</p>
@@ -665,7 +665,7 @@ function Footer() {
   return (
     <footer className="border-t border-[#eadfe2] bg-white">
       <div className="mx-auto flex max-w-[1500px] flex-col gap-5 px-6 py-8 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
-        <div className="flex items-center gap-3"><img src="/mcgill.png" alt="McGill" className="h-7 w-auto" /><div><p className="text-[10px] font-semibold text-[#6f1c31]">Cheese Database</p><p className="mt-0.5 text-[8.5px] text-[#a09398]">Research paper intelligence platform · 2026</p></div></div>
+        <div className="flex items-center gap-3"><img src="/mcgill.png" alt="McGill" className="h-11 w-auto" /><div><p className="text-[10px] font-semibold text-[#6f1c31]">Cheese Database</p><p className="mt-0.5 text-[8.5px] text-[#a09398]">Research paper intelligence platform · 2026</p></div></div>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-[9px] font-medium text-[#81747a]"><a href="#demo" className="hover:text-[#7A1B2E]">Demo</a><a href="#research" className="hover:text-[#7A1B2E]">Research</a><a href="#team" className="hover:text-[#7A1B2E]">Team</a><a href="#faq" className="hover:text-[#7A1B2E]">FAQ</a></div>
         <p className="max-w-[420px] text-[8px] leading-relaxed text-[#aaa0a4]">Campus, laboratory and cheese imagery uses the same public sources selected for the cheese-shelf-Life-v7 landing page. Publication cards link to verified external records.</p>
       </div>

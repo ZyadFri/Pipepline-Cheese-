@@ -146,7 +146,7 @@ export default function TopNavbar() {
         </div>
 
         <NavLink to="/" className="relative z-10 flex min-w-0 shrink-0 items-center gap-3 rounded-xl py-1 transition-opacity hover:opacity-80">
-          <img src="/mcgill.png" alt="McGill" className="h-9 w-auto object-contain" />
+          <img src="/mcgill.png" alt="McGill" className="h-12 w-auto object-contain" />
           <span className="hidden h-8 w-px bg-[#eee0e4] sm:block" />
           <div className="hidden min-w-0 sm:block">
             <p className="font-display text-[16px] font-semibold leading-none text-[#7A1B2E]">Cheese Database</p>

@@ -106,8 +106,8 @@ export default function ProjectSidebar() {
     <aside className="w-60 shrink-0 h-full flex flex-col overflow-hidden border-r border-[#efe7e9] bg-[linear-gradient(180deg,#fff_0%,#fffdfd_56%,#fffafa_100%)]">
       <div className="shrink-0 border-b border-[#f1eaec] px-4 pb-4 pt-5">
         <NavLink to="/" className="mb-3.5 flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80" title="Back to all projects">
-          <div className="rounded-[9px] border border-[#ece6e8] bg-white p-1.5 shadow-sm">
-            <img src="/mcgill.png" alt="McGill" className="h-7 w-auto" />
+          <div className="rounded-[10px] border border-[#ece6e8] bg-white p-1.5 shadow-sm">
+            <img src="/mcgill.png" alt="McGill" className="h-10 w-auto" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-bold leading-tight text-[#182235]">McGill University</p>
