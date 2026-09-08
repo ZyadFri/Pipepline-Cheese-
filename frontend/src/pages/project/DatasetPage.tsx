@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import clsx from 'clsx'
-import { reviewQueueApi } from '../../services/api'
+import { reviewQueueApi, snapshotsApi } from '../../services/api'
 import type { ReviewObservation } from '../../types'
 import {
   RefreshCw, Download, Database, Search, CheckCircle2, Clock, XCircle,
-  Info,
+  Info, ChevronDown, FileSpreadsheet, Archive, Braces, Loader2,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import EvidenceModal from '../../components/EvidenceModal'
 
 interface RichReviewObservation extends ReviewObservation {
@@ -106,6 +107,8 @@ const COLUMNS: DynamicColumn[] = [
   { id: 'significance', label: 'Significance', value: (o) => o.significance_letter },
 ]
 
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
 export default function DatasetPage() {
   const { projectId, paperId } = useParams<{ projectId: string; paperId?: string }>()
   const pid = Number(projectId)
@@ -116,6 +119,8 @@ export default function DatasetPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [evidenceFor, setEvidenceFor] = useState<RichReviewObservation | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<string | null>(null)
 
   const counts = useMemo(() => {
     const c = { approved: 0, needs_review: 0, rejected: 0 }
@@ -151,9 +156,9 @@ export default function DatasetPage() {
 
   useEffect(() => { load() }, [pid, paperIdNum, statusFilter])
 
-  const handleCsvDownload = () => {
+  const downloadCurrentCsv = () => {
     const csvCols = [{ id: 'id', label: 'ID', value: (o: RichReviewObservation) => o.id }, ...visibleColumns]
-    const rows = observations.map((o) => csvCols.map((col) =>
+    const rows = filtered.map((o) => csvCols.map((col) =>
       `"${String(col.value(o) ?? '').replace(/"/g, '""')}"`,
     ).join(','))
     const blob = new Blob([csvCols.map((c) => c.label).join(',') + '\n' + rows.join('\n')], { type: 'text/csv' })
@@ -162,6 +167,35 @@ export default function DatasetPage() {
     a.download = `dataset_project_${projectId}${paperIdNum ? `_paper_${paperIdNum}` : ''}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
+    setShowExportMenu(false)
+  }
+
+  const exportProject = async (format: string, label: string) => {
+    if (!projectId || exportingFormat) return
+    setShowExportMenu(false)
+    setExportingFormat(format)
+    try {
+      const run = await snapshotsApi.requestExport({ project_id: pid, format })
+      toast.success(`${label} export is being prepared`)
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const updated = await snapshotsApi.getExportRun(run.id)
+        if (updated.status === 'completed') {
+          await snapshotsApi.downloadExport(run.id)
+          toast.success(`${label} downloaded`)
+          return
+        }
+        if (updated.status === 'failed') {
+          toast.error(updated.error_message || 'The export could not be created')
+          return
+        }
+        await wait(1500)
+      }
+      toast('The export is still being prepared. Please try again in a moment.')
+    } catch {
+      toast.error('The export could not be created. Please try again.')
+    } finally {
+      setExportingFormat(null)
+    }
   }
 
   return (
@@ -185,7 +219,43 @@ export default function DatasetPage() {
             <option value="needs_review">Needs review</option><option value="rejected">Rejected</option>
           </select>
           <button onClick={load} className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 px-2 py-1.5 border border-slate-200 rounded-lg"><RefreshCw size={14} /></button>
-          <button onClick={handleCsvDownload} disabled={!observations.length} className="btn-secondary text-sm py-1.5 disabled:opacity-40"><Download size={14} /> Export CSV</button>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              disabled={!!exportingFormat}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B1730] px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-[#741326] disabled:cursor-wait disabled:opacity-70"
+            >
+              {exportingFormat ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {exportingFormat ? 'Preparing…' : 'Export'}
+              {!exportingFormat && <ChevronDown size={13} />}
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-xl border border-[#eadde1] bg-white p-1.5 shadow-[0_18px_45px_-18px_rgba(47,24,31,.35)]">
+                <div className="px-3 pb-2 pt-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8B1730]">Export database</p>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">Download the current view or export the full project dataset.</p>
+                </div>
+                <button onClick={downloadCurrentCsv} disabled={!filtered.length} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-[#fff7f9] disabled:opacity-40">
+                  <Download size={15} className="text-[#8B1730]" />
+                  <div><p className="text-xs font-semibold text-slate-800">Current view CSV</p><p className="text-[10px] text-slate-400">Uses the current paper, status and search filters</p></div>
+                </button>
+                <div className="my-1 border-t border-slate-100" />
+                {[
+                  { format: 'excel', label: 'Excel workbook', note: 'Multi-sheet .xlsx with all entities', Icon: FileSpreadsheet },
+                  { format: 'csv_zip', label: 'CSV archive', note: 'One CSV file per scientific table', Icon: Archive },
+                  { format: 'json', label: 'JSON', note: 'Complete structured project dataset', Icon: Braces },
+                  { format: 'parquet', label: 'Parquet ZIP', note: 'Columnar format for pandas and ML', Icon: Database },
+                ].map(({ format, label, note, Icon }) => (
+                  <button key={format} onClick={() => exportProject(format, label)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-[#fff7f9]">
+                    <Icon size={15} className="text-[#8B1730]" />
+                    <div><p className="text-xs font-semibold text-slate-800">{label}</p><p className="text-[10px] text-slate-400">{note}</p></div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -233,7 +303,7 @@ export default function DatasetPage() {
               ))}
             </tbody>
           </table>
-          {filtered.length > 500 && <p className="text-xs text-slate-400 text-center py-2">Showing first 500 of {filtered.length}. Use Export CSV for the full dataset.</p>}
+          {filtered.length > 500 && <p className="text-xs text-slate-400 text-center py-2">Showing first 500 of {filtered.length}. Use Export for the complete dataset.</p>}
         </div>
       )}
 
