@@ -372,10 +372,14 @@ def get_paper_page_image(
     _get_project(project_id, user, db)
     paper = _get_paper(project_id, paper_id, db)
     image_path = _ensure_page_preview(paper, page_number)
+    # no-store: Paper.id is a plain SQLite INTEGER PRIMARY KEY (not AUTOINCREMENT),
+    # so a deleted paper's id can be reused by a later upload. A cached response
+    # here would then serve a previous, unrelated paper's page image for the
+    # same URL until the browser's cache entry expired.
     return FileResponse(
         path=str(image_path),
         media_type="image/png",
-        headers={"Cache-Control": "private, max-age=3600"},
+        headers={"Cache-Control": "no-store"},
     )
 
 

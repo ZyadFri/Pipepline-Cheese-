@@ -848,6 +848,11 @@ def list_project_assets(
     return {"total": total, "items": [_out(a) for a in assets]}
 
 
+# Every FileResponse below this point uses Cache-Control: no-store rather than
+# max-age. All of these ids (asset/paper/evidence) are plain SQLite INTEGER
+# PRIMARY KEYs, not AUTOINCREMENT, so a deleted row's id can be reused by a
+# later insert — a cached response would then serve a previous, unrelated
+# paper's image for the same URL until the cache entry expired.
 @router.get("/projects/{project_id}/papers/{paper_id}/assets/{asset_id}/image")
 def get_asset_image(
     project_id: int,
@@ -869,7 +874,7 @@ def get_asset_image(
     if not p.exists():
         raise HTTPException(404, "Image file missing from disk")
     return FileResponse(str(p), media_type="image/png",
-                        headers={"Cache-Control": "max-age=3600"})
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.get("/projects/{project_id}/papers/{paper_id}/assets/{asset_id}/page-image")
@@ -893,7 +898,7 @@ def get_page_image(
     if not p.exists():
         raise HTTPException(404, "Page image file missing from disk")
     return FileResponse(str(p), media_type="image/png",
-                        headers={"Cache-Control": "max-age=3600"})
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.get("/projects/{project_id}/papers/{paper_id}/assets/{asset_id}/csv")
@@ -972,7 +977,7 @@ def get_evidence_image(
     if not p.exists():
         raise HTTPException(404, "Evidence image file not found on disk")
     return FileResponse(str(p), media_type="image/png",
-                        headers={"Cache-Control": "max-age=3600"})
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.get("/projects/{project_id}/papers/{paper_id}/evidence/{evidence_id}/thumbnail")
@@ -994,7 +999,7 @@ def get_evidence_thumbnail(
     if not p.exists():
         raise HTTPException(404, "Evidence thumbnail file not found on disk")
     return FileResponse(str(p), media_type="image/png",
-                        headers={"Cache-Control": "max-age=3600"})
+                        headers={"Cache-Control": "no-store"})
 
 
 # ─── LLM Validation endpoints ─────────────────────────────────────────────────

@@ -153,7 +153,7 @@ def get_provenance_image(
     p = Path(prov.evidence_image_path)
     if not p.exists():
         raise HTTPException(404, "Evidence image file not found on disk")
-    return FileResponse(str(p), media_type="image/png", headers={"Cache-Control": "max-age=3600"})
+    return FileResponse(str(p), media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/provenance/{provenance_id}/thumbnail")
@@ -167,4 +167,4 @@ def get_provenance_thumbnail(
     p = Path(prov.evidence_thumbnail_path)
     if not p.exists():
         raise HTTPException(404, "Evidence thumbnail file not found on disk")
-    return FileResponse(str(p), media_type="image/png", headers={"Cache-Control": "max-age=3600"})
+    return FileResponse(str(p), media_type="image/png", headers={"Cache-Control": "no-store"})
