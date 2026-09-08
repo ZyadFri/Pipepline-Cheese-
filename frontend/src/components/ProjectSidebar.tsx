@@ -1,6 +1,6 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, ShieldCheck, LogOut, ChevronRight, Wand2,
+  LayoutDashboard, ShieldCheck, LogOut, ChevronRight,
   GitBranch, Database, Home,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -23,7 +23,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Research',
     items: [
       { to: 'research-structure', label: 'Research Structure', Icon: GitBranch },
-      { to: 'normalization',      label: 'Normalization',      Icon: Wand2 },
     ],
   },
 ]
