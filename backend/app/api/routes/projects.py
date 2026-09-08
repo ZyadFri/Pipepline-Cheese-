@@ -2,6 +2,7 @@ import json
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -101,11 +102,55 @@ def update_project(project_id: int, body: ProjectUpdate, db: Session = Depends(g
     return _project_out(project, db)
 
 
+def _ids(db: Session, sql: str, **params) -> list:
+    stmt = text(sql)
+    for key, value in params.items():
+        if isinstance(value, list):
+            stmt = stmt.bindparams(bindparam(key, expanding=True))
+    return [row[0] for row in db.execute(stmt, params)]
+
+
 @router.delete("/{project_id}", status_code=204)
 def delete_project(project_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     project = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
     if not project:
         raise HTTPException(404, "Project not found")
+
+    # The canonical Study -> Experiment -> TreatmentArm -> Observation tree cascades
+    # correctly through the ORM relationships declared on Project/Study/Experiment.
+    # But several side tables (audit/QA/staging) hold plain, non-cascading foreign
+    # keys straight into that tree (SQLite has no ALTER TABLE ADD CONSTRAINT, so
+    # adding ON DELETE CASCADE to them would require a full table rebuild). With
+    # PRAGMA foreign_keys=ON, any live row in one of those tables makes SQLite
+    # reject the cascade delete outright. Clear them explicitly, innermost first,
+    # before touching the project.
+    study_ids = _ids(db, "SELECT id FROM studies WHERE project_id = :pid", pid=project_id)
+    experiment_ids = _ids(db, "SELECT id FROM experiments WHERE study_id IN :ids", ids=study_ids) if study_ids else []
+    arm_ids = _ids(db, "SELECT id FROM treatment_arms WHERE experiment_id IN :ids", ids=experiment_ids) if experiment_ids else []
+    obs_ids = _ids(db, "SELECT id FROM observations WHERE treatment_arm_id IN :ids", ids=arm_ids) if arm_ids else []
+
+    if obs_ids:
+        db.execute(text("DELETE FROM validation_issues WHERE observation_id IN :ids").bindparams(bindparam("ids", expanding=True)), {"ids": obs_ids})
+        db.execute(text("DELETE FROM provenance_records WHERE observation_id IN :ids").bindparams(bindparam("ids", expanding=True)), {"ids": obs_ids})
+    if arm_ids or obs_ids:
+        db.execute(
+            text("DELETE FROM imputation_proposals WHERE target_arm_id IN :arm_ids OR target_observation_id IN :obs_ids")
+            .bindparams(bindparam("arm_ids", expanding=True), bindparam("obs_ids", expanding=True)),
+            {"arm_ids": arm_ids or [-1], "obs_ids": obs_ids or [-1]},
+        )
+    if experiment_ids or arm_ids:
+        db.execute(
+            text("DELETE FROM trajectory_definitions WHERE experiment_id IN :exp_ids OR treatment_arm_id IN :arm_ids")
+            .bindparams(bindparam("exp_ids", expanding=True), bindparam("arm_ids", expanding=True)),
+            {"exp_ids": experiment_ids or [-1], "arm_ids": arm_ids or [-1]},
+        )
+    if experiment_ids:
+        db.execute(text("UPDATE ext_experiments SET promoted_experiment_id = NULL WHERE promoted_experiment_id IN :ids").bindparams(bindparam("ids", expanding=True)), {"ids": experiment_ids})
+    if study_ids:
+        db.execute(text("DELETE FROM provenance_records WHERE study_id IN :ids").bindparams(bindparam("ids", expanding=True)), {"ids": study_ids})
+        db.execute(text("DELETE FROM review_assignments WHERE study_id IN :ids").bindparams(bindparam("ids", expanding=True)), {"ids": study_ids})
+        db.execute(text("UPDATE extracted_rows SET canonical_study_id = NULL WHERE canonical_study_id IN :ids").bindparams(bindparam("ids", expanding=True)), {"ids": study_ids})
+
     db.delete(project)
     db.commit()
 
