@@ -1,0 +1,678 @@
+/* Landing page polish for the three approved lower sections only.
+   This file intentionally targets the sections already rendered by Landing.tsx
+   so the rest of the landing page remains unchanged. */
+
+/* ================================================================
+   1) Research environment — editorial image cards
+   ================================================================ */
+#research + section {
+  position: relative;
+  overflow: hidden;
+  padding-top: 6.6rem !important;
+  padding-bottom: 6.8rem !important;
+  background:
+    radial-gradient(circle at 91% 18%, rgba(151, 38, 65, .055), transparent 28%),
+    radial-gradient(circle at 10% 80%, rgba(151, 38, 65, .035), transparent 34%),
+    linear-gradient(180deg, #fffdfd 0%, #fff9fa 100%) !important;
+}
+
+#research + section::before,
+#research + section::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(176, 91, 111, .13);
+  border-radius: 50%;
+}
+
+#research + section::before {
+  width: 620px;
+  height: 620px;
+  right: -420px;
+  top: -360px;
+}
+
+#research + section::after {
+  width: 760px;
+  height: 760px;
+  left: -610px;
+  bottom: -585px;
+}
+
+#research + section > div {
+  position: relative;
+  z-index: 1;
+  max-width: 1510px !important;
+}
+
+#research + section > div > div.grid {
+  grid-template-columns: minmax(330px, .62fr) minmax(0, 1.38fr) !important;
+  gap: clamp(2.2rem, 4.5vw, 5.4rem) !important;
+  align-items: center;
+}
+
+#research + section > div > div.grid > div:first-child {
+  max-width: 440px !important;
+  padding-left: 4px;
+}
+
+#research + section > div > div.grid > div:first-child > p:first-child {
+  font-size: 10px !important;
+  letter-spacing: .19em !important;
+  color: #a12644 !important;
+}
+
+#research + section > div > div.grid > div:first-child h2 {
+  margin-top: 1.4rem !important;
+  font-size: clamp(3.3rem, 4.5vw, 5.35rem) !important;
+  line-height: .98 !important;
+  letter-spacing: -.04em;
+  color: #281d21 !important;
+  text-wrap: balance;
+}
+
+#research + section > div > div.grid > div:first-child h2::after {
+  content: '';
+  display: block;
+  width: 54px;
+  height: 2px;
+  margin-top: 2rem;
+  border-radius: 999px;
+  background: #b12f4f;
+}
+
+#research + section > div > div.grid > div:first-child > p:last-child {
+  max-width: 420px;
+  margin-top: 1.4rem !important;
+  font-size: 13px !important;
+  line-height: 1.72 !important;
+  color: #75686d !important;
+}
+
+#research + section > div > div.grid > div:first-child::after {
+  content: 'REAL SCIENCE.  REAL IMPACT.';
+  display: flex;
+  align-items: center;
+  min-height: 74px;
+  margin-top: 2.1rem;
+  padding-left: 92px;
+  background:
+    radial-gradient(circle at 36px 37px, #fff 0 24px, transparent 25px),
+    radial-gradient(circle at 36px 37px, #f8e5ea 0 36px, transparent 37px);
+  color: #9f8b91;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .25em;
+  line-height: 1.7;
+}
+
+#research + section > div > div.grid > div:last-child {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: .93fr 1.12fr .98fr !important;
+  gap: 12px !important;
+  align-items: center;
+}
+
+#research + section > div > div.grid > div:last-child > div {
+  position: relative;
+  min-height: 515px;
+  overflow: hidden !important;
+  border: 1px solid rgba(255,255,255,.78) !important;
+  border-radius: 25px !important;
+  background: #2b2124 !important;
+  box-shadow: 0 34px 65px -42px rgba(53, 23, 34, .65) !important;
+  transition: transform .35s ease, box-shadow .35s ease !important;
+}
+
+#research + section > div > div.grid > div:last-child > div:nth-child(1) {
+  transform: rotate(-1.3deg) translateY(8px);
+}
+
+#research + section > div > div.grid > div:last-child > div:nth-child(2) {
+  z-index: 2;
+  min-height: 560px;
+  transform: translateY(-10px) scale(1.025);
+}
+
+#research + section > div > div.grid > div:last-child > div:nth-child(3) {
+  transform: rotate(1.6deg) translateY(15px);
+}
+
+#research + section > div > div.grid > div:last-child > div:hover {
+  z-index: 4;
+  transform: translateY(-12px) scale(1.02) !important;
+  box-shadow: 0 42px 78px -38px rgba(53, 23, 34, .78) !important;
+}
+
+#research + section > div > div.grid > div:last-child > div > div.relative {
+  position: absolute !important;
+  inset: 0;
+  height: 100% !important;
+}
+
+#research + section > div > div.grid > div:last-child > div > div.relative img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(.84) contrast(.98) brightness(.9);
+}
+
+#research + section > div > div.grid > div:last-child > div > div.relative > div {
+  background: linear-gradient(180deg, rgba(25,18,20,.03) 25%, rgba(27,17,20,.22) 52%, rgba(21,13,16,.92) 100%) !important;
+}
+
+#research + section > div > div.grid > div:last-child > div > div.relative > span {
+  left: 25px !important;
+  right: 70px;
+  bottom: 82px !important;
+  z-index: 2;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 25px !important;
+  font-weight: 600 !important;
+  line-height: 1.05;
+  color: white;
+}
+
+#research + section > div > div.grid > div:last-child > div > p {
+  position: absolute;
+  z-index: 3;
+  left: 25px;
+  right: 55px;
+  bottom: 24px;
+  padding: 0 !important;
+  font-size: 10.5px !important;
+  line-height: 1.5 !important;
+  color: rgba(255,255,255,.84) !important;
+}
+
+#research + section > div > div.grid > div:last-child > div::before {
+  position: absolute;
+  z-index: 5;
+  top: 22px;
+  left: 22px;
+  padding: 10px 15px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 12px 26px -20px rgba(37,17,24,.75);
+  backdrop-filter: blur(10px);
+  color: #362b2f;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+#research + section > div > div.grid > div:last-child > div:nth-child(1)::before { content: '⌖  Macdonald Campus'; }
+#research + section > div > div.grid > div:last-child > div:nth-child(2)::before { content: '⚗  Controlled studies'; }
+#research + section > div > div.grid > div:last-child > div:nth-child(3)::before { content: '▣  Real cheese systems'; }
+
+#research + section > div > div.grid > div:last-child > div::after {
+  content: '→';
+  position: absolute;
+  z-index: 5;
+  right: 20px;
+  bottom: 19px;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 50%;
+  color: white;
+  font-size: 22px;
+  transition: transform .25s ease, background .25s ease;
+}
+
+#research + section > div > div.grid > div:last-child > div:hover::after {
+  transform: translateX(3px);
+  background: rgba(255,255,255,.13);
+}
+
+/* ================================================================
+   2) Scientific rigor — visual capability cards
+   ================================================================ */
+#validation {
+  position: relative;
+  overflow: hidden;
+  padding-top: 6.5rem !important;
+  padding-bottom: 7rem !important;
+  background:
+    radial-gradient(circle at 50% 15%, rgba(142, 27, 58, .05), transparent 25%),
+    linear-gradient(180deg, #fffafa 0%, #fff7f8 100%) !important;
+}
+
+#validation::before,
+#validation::after {
+  content: '';
+  position: absolute;
+  width: 430px;
+  height: 430px;
+  border: 1px solid rgba(172, 83, 104, .13);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#validation::before { left: -280px; top: -245px; }
+#validation::after { right: -265px; top: -250px; }
+
+#validation > div {
+  position: relative;
+  z-index: 1;
+  max-width: 1440px !important;
+}
+
+#validation > div > div:first-child {
+  max-width: 850px !important;
+}
+
+#validation > div > div:first-child > p:first-child {
+  font-size: 10px !important;
+  letter-spacing: .2em !important;
+  color: #a12745 !important;
+}
+
+#validation > div > div:first-child h2 {
+  margin-top: 1.15rem !important;
+  font-size: clamp(3rem, 4.15vw, 4.7rem) !important;
+  line-height: .98 !important;
+  letter-spacing: -.036em;
+  text-wrap: balance;
+}
+
+#validation > div > div:first-child > p:last-child {
+  margin-top: 1.25rem !important;
+  font-size: 13px !important;
+}
+
+#validation > div > div.mt-10.grid {
+  margin-top: 3.4rem !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 15px !important;
+}
+
+#validation > div > div.mt-10.grid > div {
+  position: relative;
+  min-height: 308px;
+  overflow: hidden;
+  padding: 26px 26px 24px !important;
+  border-radius: 24px !important;
+  border-color: rgba(214, 186, 193, .72) !important;
+  background: rgba(255,255,255,.86) !important;
+  box-shadow: 0 20px 50px -42px rgba(84, 25, 42, .55);
+  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease !important;
+}
+
+#validation > div > div.mt-10.grid > div:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(176, 103, 122, .58) !important;
+  box-shadow: 0 28px 64px -42px rgba(84, 25, 42, .67);
+}
+
+#validation > div > div.mt-10.grid > div > span:first-child {
+  width: 48px !important;
+  height: 48px !important;
+  background: #fae9ed !important;
+}
+
+#validation > div > div.mt-10.grid > div h3 {
+  margin-top: 1.35rem !important;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 21px !important;
+  font-weight: 600 !important;
+  line-height: 1.12;
+  color: #2d2226 !important;
+}
+
+#validation > div > div.mt-10.grid > div > p {
+  max-width: 83%;
+  margin-top: .65rem !important;
+  font-size: 10.8px !important;
+  line-height: 1.55 !important;
+}
+
+#validation > div > div.mt-10.grid > div::after {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  min-width: 155px;
+  padding: 14px 15px;
+  border: 1px solid #eadde1;
+  border-radius: 15px;
+  background: rgba(255,249,250,.96);
+  color: #7f6170;
+  white-space: pre-line;
+  font-size: 9px;
+  line-height: 1.8;
+  box-shadow: 0 16px 30px -26px rgba(79, 23, 41, .55);
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(1)::after {
+  content: 'TABLE     ✓\A FIGURE    ✓\A TEXT      ✓';
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(2) {
+  background: linear-gradient(135deg, #78152d 0%, #a22547 100%) !important;
+  border-color: transparent !important;
+  color: white;
+  box-shadow: 0 32px 70px -42px rgba(90, 15, 39, .82) !important;
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(2) > span:first-child {
+  background: rgba(255,255,255,.14) !important;
+  color: white !important;
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(2) h3,
+#validation > div > div.mt-10.grid > div:nth-child(2) > p {
+  color: white !important;
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(2) > p { color: rgba(255,255,255,.76) !important; }
+#validation > div > div.mt-10.grid > div:nth-child(2)::before {
+  content: 'FLEXIBLE BY DESIGN';
+  position: absolute;
+  top: 28px;
+  right: 24px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.13);
+  color: rgba(255,255,255,.92);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(2)::after {
+  content: 'Rules       ─┐\A Local ML    ─┼──→  Structured data\A LLM methods ─┘';
+  min-width: 250px;
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.92);
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(3)::after {
+  content: 'Paper\A Page 12\A Table 3\A Source text';
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(4)::after {
+  content: '✓  Approve\A ✎  Edit\A ×  Reject';
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(5)::after {
+  content: 'From papers\A      ↓\A  ◉  DATASET';
+  text-align: center;
+}
+
+#validation > div > div.mt-10.grid > div:nth-child(6)::after {
+  content: 'Experiment\A Treatment\A Condition\A Microorganism\A Observation';
+}
+
+/* ================================================================
+   3) FAQ + CTA + footer
+   ================================================================ */
+#faq {
+  position: relative;
+  overflow: hidden;
+  padding-top: 6.4rem !important;
+  padding-bottom: 3.7rem !important;
+  background:
+    radial-gradient(circle at 8% 35%, rgba(148, 34, 61, .035), transparent 24%),
+    linear-gradient(180deg, #fffafa 0%, #fff8f9 100%) !important;
+}
+
+#faq::before,
+#faq::after {
+  content: '';
+  position: absolute;
+  left: -125px;
+  width: 290px;
+  height: 290px;
+  border: 1px solid rgba(173, 89, 109, .14);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#faq::before { top: 90px; }
+#faq::after { top: 205px; }
+
+#faq > div {
+  position: relative;
+  z-index: 1;
+  max-width: 1320px !important;
+  grid-template-columns: .48fr 1.12fr !important;
+  gap: 4.8rem !important;
+}
+
+#faq > div > div:first-child > p:first-child {
+  font-size: 10px !important;
+  letter-spacing: .2em !important;
+}
+
+#faq > div > div:first-child h2 {
+  margin-top: 1.35rem !important;
+  font-size: clamp(3.8rem, 5vw, 5.35rem) !important;
+  line-height: .92 !important;
+  letter-spacing: -.045em;
+}
+
+#faq > div > div:first-child > p:last-child {
+  max-width: 330px;
+  margin-top: 2rem !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+}
+
+#faq > div > div:first-child::after {
+  content: 'STILL HAVE A QUESTION?\A We’re happy to help — reach out anytime.\A Contact us  →';
+  display: block;
+  margin-top: 2.3rem;
+  padding: 18px 0 18px 75px;
+  background: radial-gradient(circle at 28px 35px, #fae6eb 0 28px, transparent 29px);
+  color: #857278;
+  white-space: pre-line;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.75;
+}
+
+#faq > div > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 13px !important;
+}
+
+#faq > div > div:last-child > button {
+  position: relative;
+  min-height: 74px;
+  padding: 20px 24px 20px 82px !important;
+  border-radius: 21px !important;
+  border-color: #e7d8dc !important;
+  background: rgba(255,255,255,.89) !important;
+  box-shadow: 0 14px 38px -34px rgba(80,23,41,.52);
+  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease !important;
+}
+
+#faq > div > div:last-child > button:hover {
+  transform: translateY(-2px);
+  border-color: #d3abb6 !important;
+  box-shadow: 0 22px 44px -34px rgba(80,23,41,.62);
+}
+
+#faq > div > div:last-child > button::before {
+  position: absolute;
+  left: 20px;
+  top: 17px;
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fae7ec;
+  color: #a42544;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+#faq > div > div:last-child > button:nth-child(1)::before { content: '▤'; }
+#faq > div > div:last-child > button:nth-child(2)::before { content: '✦'; }
+#faq > div > div:last-child > button:nth-child(3)::before { content: '↗'; }
+#faq > div > div:last-child > button:nth-child(4)::before { content: '✓'; }
+
+#faq > div > div:last-child > button span:first-child {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  color: #2e2427 !important;
+}
+
+#faq > div > div:last-child > button > p {
+  max-width: 780px !important;
+  margin-top: .75rem !important;
+  font-size: 10.5px !important;
+  line-height: 1.55 !important;
+}
+
+/* CTA directly after FAQ */
+#faq + section {
+  padding-top: 1.1rem !important;
+  padding-bottom: 4.8rem !important;
+  background: #fff8f9 !important;
+}
+
+#faq + section > div {
+  max-width: 1450px !important;
+}
+
+#faq + section > div > div {
+  position: relative;
+  overflow: hidden;
+  min-height: 285px;
+  border-radius: 31px !important;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(255,255,255,.08) 0 86px, transparent 87px),
+    radial-gradient(circle at 72% 108%, transparent 0 112px, rgba(255,255,255,.09) 113px 114px, transparent 115px),
+    linear-gradient(110deg, #690d25 0%, #8d1b3b 50%, #ab3d5b 100%) !important;
+  box-shadow: 0 34px 68px -44px rgba(96, 16, 42, .78) !important;
+}
+
+#faq + section > div > div::after {
+  content: '◒';
+  position: absolute;
+  right: 38px;
+  bottom: -64px;
+  color: rgba(255,255,255,.12);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 220px;
+  line-height: 1;
+  transform: rotate(-18deg);
+  pointer-events: none;
+}
+
+#faq + section h2 {
+  max-width: 760px;
+  font-size: clamp(2.7rem, 4vw, 4.5rem) !important;
+  line-height: 1.02 !important;
+  letter-spacing: -.032em;
+}
+
+#faq + section p:last-child {
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+}
+
+#faq + section a {
+  min-height: 46px;
+  border-radius: 14px !important;
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+#faq + section a:hover {
+  transform: translateY(-2px);
+}
+
+main + footer {
+  background: #fffdfd !important;
+  border-top-color: #eadde0 !important;
+}
+
+main + footer > div {
+  min-height: 88px;
+  max-width: 1450px !important;
+}
+
+/* ================================================================
+   Responsive behavior
+   ================================================================ */
+@media (max-width: 1180px) {
+  #research + section > div > div.grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #research + section > div > div.grid > div:first-child {
+    max-width: 720px !important;
+  }
+
+  #research + section > div > div.grid > div:last-child > div {
+    min-height: 430px;
+  }
+
+  #research + section > div > div.grid > div:last-child > div:nth-child(2) {
+    min-height: 470px;
+  }
+
+  #validation > div > div.mt-10.grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  #research + section > div > div.grid > div:last-child {
+    grid-template-columns: 1fr !important;
+  }
+
+  #research + section > div > div.grid > div:last-child > div,
+  #research + section > div > div.grid > div:last-child > div:nth-child(1),
+  #research + section > div > div.grid > div:last-child > div:nth-child(2),
+  #research + section > div > div.grid > div:last-child > div:nth-child(3) {
+    min-height: 430px;
+    transform: none;
+  }
+
+  #faq > div {
+    grid-template-columns: 1fr !important;
+    gap: 2.5rem !important;
+  }
+}
+
+@media (max-width: 680px) {
+  #research + section,
+  #validation,
+  #faq {
+    padding-top: 4.5rem !important;
+    padding-bottom: 4.5rem !important;
+  }
+
+  #research + section > div > div.grid > div:first-child h2,
+  #validation > div > div:first-child h2,
+  #faq > div > div:first-child h2 {
+    font-size: 2.85rem !important;
+  }
+
+  #validation > div > div.mt-10.grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #validation > div > div.mt-10.grid > div {
+    min-height: 280px;
+  }
+
+  #faq > div > div:last-child > button {
+    padding-left: 70px !important;
+  }
+
+  #faq + section > div > div {
+    min-height: 330px;
+  }
+}
