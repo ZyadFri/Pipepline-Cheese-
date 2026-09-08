@@ -32,6 +32,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, project_scope
+from app.core.errors import classify_extraction_error
 from app.db.database import SessionLocal, get_db
 from app.db.models import (
     AssetContextLink, ExtractionAsset, ExtEvidence,
@@ -534,17 +535,18 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             "Workspace extraction failed for paper %d: %s", paper_id, exc, exc_info=True
         )
         try:
+            safe_message = classify_extraction_error(exc)
             paper = db.query(Paper).filter(Paper.id == paper_id).first()
             job   = db.query(Job).filter(Job.id == job_id).first()
             if paper:
                 paper.status = "failed"
-                paper.error_message = str(exc)
+                paper.error_message = safe_message
             if job:
                 job.status = "failed"
-                job.error_message = str(exc)[:500]
+                job.error_message = safe_message
             db.commit()
             if job:
-                emit(db, job_id, "job_failed", str(exc)[:300])
+                emit(db, job_id, "job_failed", safe_message)
         except Exception:
             pass
     finally:
@@ -1261,7 +1263,7 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
                 job.status = "failed"
-                job.error_message = str(exc)[:500]
+                job.error_message = classify_extraction_error(exc)
                 job.completed_at = datetime.utcnow()
             db.commit()
         except Exception:

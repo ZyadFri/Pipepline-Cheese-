@@ -71,6 +71,15 @@ class Settings(BaseSettings):
     # Set to 1 for strict page-by-page extraction, or 0 to disable chunking.
     DOCLING_CHUNK_SIZE: int = 2
 
+    # --- GLiNER (local, zero-shot NER — no API key, no external calls) ---
+    # Small checkpoint chosen deliberately: runs on CPU in well under a second
+    # per paragraph, which matters since it's invoked once per unique
+    # context-link text span for a whole paper. Override via .env to try a
+    # larger checkpoint (e.g. urchade/gliner_medium-v2.1) if recall matters
+    # more than latency for a given deployment.
+    GLINER_MODEL_NAME: str = "urchade/gliner_small-v2.1"
+    GLINER_THRESHOLD: float = 0.35
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

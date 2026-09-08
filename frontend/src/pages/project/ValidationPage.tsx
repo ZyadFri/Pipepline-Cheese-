@@ -229,6 +229,7 @@ export default function ValidationPage() {
   const [sending, setSending] = useState(false)
   const [job, setJob] = useState<ExtractionJob | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [method, setMethod] = useState<'llm' | 'rules' | 'gliner'>('llm')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -296,7 +297,7 @@ export default function ValidationPage() {
     if (!paperId || !pkgData) return
     setSending(true)
     try {
-      const response = await extractionEnginesApi.run(pid, paperId, 'llm')
+      const response = await extractionEnginesApi.run(pid, paperId, method)
       setJob({
         job_id: response.job_id,
         status: 'queued',
@@ -422,6 +423,28 @@ export default function ValidationPage() {
             </section>
 
             <section className="mt-7 flex flex-col items-center">
+              <div className="mb-4 flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                {([
+                  { key: 'llm', label: 'AI extraction', hint: 'Best coverage, uses an external AI service' },
+                  { key: 'rules', label: 'Fast rules', hint: 'Instant, reads tables directly — no AI' },
+                  { key: 'gliner', label: 'Local AI', hint: 'Runs on this server, no external service' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    disabled={isRunning || sending}
+                    onClick={() => setMethod(opt.key)}
+                    title={opt.hint}
+                    className={`rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      method === opt.key
+                        ? 'bg-[#93052f] text-white'
+                        : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={handleExtract}
                 disabled={!canExtract}

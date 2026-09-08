@@ -26,6 +26,10 @@ numpy>=1.26.0
 # name variants against the alias lists in app/extraction/lexicons/*.yml)
 rapidfuzz>=3.6.0
 
+# GLiNER extraction engine — local zero-shot NER, no API key, no external calls.
+# torch is already a transitive dependency of docling; gliner reuses it.
+gliner>=0.2.13
+
 # Async job queue (M9 production hardening)
 celery>=5.4.0
 redis>=5.0.0

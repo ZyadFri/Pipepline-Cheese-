@@ -24,6 +24,7 @@ from typing import Optional
 import pandas as pd
 
 from app.core.config import settings
+from app.core.errors import classify_provider_error, is_temporary_provider_error
 from app.services.docling_extractor import DoclingFigure
 from app.services.food_extractor import (
     _gemini_client,
@@ -38,20 +39,6 @@ _MIN_IMAGE_DIM = 50
 _MIN_ROWS = 2
 _MIN_COLS = 2
 _MAX_COLS = 20
-
-_TEMP_PROVIDER_MARKERS = (
-    "429",
-    "503",
-    "rate limit",
-    "rate_limit",
-    "resource_exhausted",
-    "quota",
-    "overloaded",
-    "temporarily unavailable",
-    "service unavailable",
-    "timeout",
-    "timed out",
-)
 
 
 def _validate_dataframe(df: pd.DataFrame) -> tuple:
@@ -165,11 +152,6 @@ def _skip_all(figures: list, reason: str) -> list:
         )
         for idx, fig in enumerate(figures, start=1)
     ]
-
-
-def _is_temporary_provider_error(exc: Exception) -> bool:
-    message = str(exc).lower()
-    return any(marker in message for marker in _TEMP_PROVIDER_MARKERS)
 
 
 def _call_vision(client, user_content) -> str:
@@ -354,12 +336,15 @@ def convert_charts(figures: list, cache_dir: str):
             )
 
         except Exception as exc:
-            temporary = _is_temporary_provider_error(exc)
-            if temporary:
+            # Full technical detail always goes to the log; only the
+            # classified, safe sentence below is ever attached to the asset
+            # as reject_reason, which the frontend shows to the user
+            # (AssetDetailPanel's "Conversion warning" panel) — never a raw
+            # provider error, status code, or stack trace.
+            if is_temporary_provider_error(exc):
                 logger.warning(
                     "Chart digitization temporarily unavailable for %s: %s",
-                    img_p.name,
-                    exc,
+                    img_p.name, exc, exc_info=True,
                 )
                 yield ChartResult(
                     item_ref=fig.item_ref,
@@ -368,10 +353,10 @@ def convert_charts(figures: list, cache_dir: str):
                     image_hash=img_hash,
                     csv_path=None,
                     status="skipped",
-                    reject_reason="chart reader temporarily unavailable; original figure preserved",
+                    reject_reason=f"{classify_provider_error(exc)} (original figure preserved.)",
                 )
             else:
-                logger.warning("Chart extraction error for %s: %s", img_p.name, exc)
+                logger.warning("Chart extraction error for %s: %s", img_p.name, exc, exc_info=True)
                 yield ChartResult(
                     item_ref=fig.item_ref,
                     figure_index=idx,
@@ -379,5 +364,5 @@ def convert_charts(figures: list, cache_dir: str):
                     image_hash=img_hash,
                     csv_path=None,
                     status="error",
-                    reject_reason=str(exc)[:200],
+                    reject_reason=classify_provider_error(exc),
                 )
