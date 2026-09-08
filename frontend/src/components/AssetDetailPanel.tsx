@@ -1,166 +1,49 @@
-import { useEffect, useState } from 'react'
-import { X, ExternalLink, FileSpreadsheet, CheckCircle, Star, AlertTriangle, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ArrowLeft, ArrowRight, CheckCircle2, Download, ExternalLink,
+  FileText, Image as ImageIcon, Table2, X,
+} from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { workspaceApi } from '../services/api'
-import { fetchAuthenticatedBlob, fetchAuthenticatedText, downloadAuthenticated } from '../services/download'
+import api, { workspaceApi } from '../services/api'
+import { downloadAuthenticated, fetchAuthenticatedBlob } from '../services/download'
 import type { ExtractionAsset, AssetDetail, ContextLink } from '../types/workspace'
 import AuthImage from './AuthImage'
 
-const LINK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  caption:                   { label: 'Caption',           color: 'bg-blue-50 text-blue-700' },
-  neighbor_before:           { label: 'Before',            color: 'bg-slate-100 text-slate-600' },
-  neighbor_after:            { label: 'After',             color: 'bg-slate-100 text-slate-600' },
-  explicit_figure_reference: { label: 'Explicit ref',      color: 'bg-emerald-50 text-emerald-700' },
-  same_section:              { label: 'Same section',      color: 'bg-amber-50 text-amber-700' },
-  keyword_match:             { label: 'Keyword match',     color: 'bg-violet-50 text-violet-600' },
+function displayType(asset: ExtractionAsset) {
+  if (asset.asset_type === 'native_table') return 'Table'
+  if (asset.classification === 'chart') return 'Chart'
+  if (asset.classification === 'photograph') return 'Photograph'
+  return 'Figure'
 }
 
-interface CsvPreviewProps { projectId: number; paperId: number; assetId: number }
-
-function CsvPreview({ projectId, paperId, assetId }: CsvPreviewProps) {
-  const [rows, setRows] = useState<string[][]>([])
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    fetchAuthenticatedText(workspaceApi.csvUrl(projectId, paperId, assetId))
-      .then((txt) => {
-        const lines = txt.trim().split('\n').slice(0, 12)
-        setRows(lines.map((l) => l.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))))
-      })
-      .catch(() => setError(true))
-  }, [projectId, paperId, assetId])
-
-  if (error) return <p className="text-xs text-slate-400 italic">Could not load CSV preview.</p>
-  if (!rows.length) return <p className="text-xs text-slate-400">Loading…</p>
-
-  const [header, ...data] = rows
-  return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="text-[11px] w-full">
-        <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            {header.map((h, i) => (
-              <th key={i} className="px-2.5 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, ri) => (
-            <tr key={ri} className="border-b border-slate-100 last:border-0 even:bg-slate-50/50">
-              {row.map((cell, ci) => (
-                <td key={ci} className="px-2.5 py-1 text-slate-700 whitespace-nowrap">{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-interface ExtractRowsProps { projectId: number; paperId: number; assetId: number }
-
-interface ExtractedRow {
-  cheese_product: string
-  treatment: string
-  day: number | null
-  indicator_type: string
-  indicator_unit: string
-  indicator_value: number
-  confidence: number | null
-}
-
-/** Instant, deterministic table -> rows preview — no LLM call, nothing
- * persisted. Reuses the exact same rule-based parser a whole-paper Rules
- * extraction run uses, just scoped to this one table. */
-function ExtractRowsAction({ projectId, paperId, assetId }: ExtractRowsProps) {
-  const [loading, setLoading] = useState(false)
-  const [rows, setRows] = useState<ExtractedRow[] | null>(null)
-
-  const run = async () => {
-    setLoading(true)
-    try {
-      const res = await workspaceApi.extractRows(projectId, paperId, assetId)
-      setRows(res.rows)
-      if (res.row_count === 0) toast('No structured rows could be extracted from this table', { icon: 'ℹ️' })
-    } catch {
-      toast.error('Row extraction failed')
-    } finally {
-      setLoading(false)
-    }
+function fallbackTitle(asset: ExtractionAsset) {
+  switch (asset.classification) {
+    case 'publisher_logo': return 'Publisher logo'
+    case 'license_icon': return 'Publication mark'
+    case 'decorative_asset': return 'Document figure'
+    case 'photograph': return 'Photograph'
+    case 'diagram': return 'Diagram'
+    case 'chemical_structure': return 'Chemical structure'
+    case 'multi_panel_figure': return 'Multi-panel figure'
+    case 'chart': return 'Chart'
+    case 'native_table': return 'Table'
+    default: return asset.asset_type === 'native_table' ? 'Table' : 'Figure'
   }
-
-  return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={run}
-        disabled={loading}
-        className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-60"
-      >
-        {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-        Extract rows
-      </button>
-      {rows && rows.length > 0 && (
-        <div className="mt-2 overflow-x-auto rounded-lg border border-emerald-100">
-          <table className="text-[10.5px] w-full">
-            <thead>
-              <tr className="bg-emerald-50/60 border-b border-emerald-100">
-                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Treatment</th>
-                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Day</th>
-                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Indicator</th>
-                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Value</th>
-                <th className="px-2 py-1 text-left font-semibold text-emerald-700">Confidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} className="border-b border-slate-100 last:border-0">
-                  <td className="px-2 py-1 text-slate-700">{r.treatment}</td>
-                  <td className="px-2 py-1 text-slate-700">{r.day ?? '—'}</td>
-                  <td className="px-2 py-1 text-slate-700">{r.indicator_type}</td>
-                  <td className="px-2 py-1 text-slate-700">{r.indicator_value} {r.indicator_unit}</td>
-                  <td className="px-2 py-1 text-slate-500">{r.confidence != null ? r.confidence.toFixed(2) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
 }
 
-interface ContextBlock { link: ContextLink; expanded: boolean; toggle: () => void }
+function cleanSnippet(text: string, max = 112) {
+  const compact = text.replace(/\s+/g, ' ').trim()
+  if (compact.length <= max) return compact
+  return `${compact.slice(0, max).trim()}…`
+}
 
-function ContextItem({ link, expanded, toggle }: ContextBlock) {
-  const meta = LINK_TYPE_LABELS[link.link_type] ?? { label: link.link_type, color: 'bg-slate-100 text-slate-600' }
-  const short = link.text.length > 240 && !expanded
-  return (
-    <div className="border border-slate-100 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/80 border-b border-slate-100">
-        <span className={clsx('text-[10px] font-semibold px-2 py-0.5 rounded-full', meta.color)}>{meta.label}</span>
-        {link.page_number && (
-          <span className="text-[10px] text-slate-400">p.{link.page_number}</span>
-        )}
-        <span className="ml-auto text-[10px] text-slate-300">{link.score.toFixed(2)}</span>
-      </div>
-      <div className="px-3 py-2">
-        <p className="text-[12px] text-slate-600 leading-relaxed whitespace-pre-line">
-          {short ? link.text.slice(0, 240) + '…' : link.text}
-        </p>
-        {link.text.length > 240 && (
-          <button
-            onClick={toggle}
-            className="mt-1.5 flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700"
-          >
-            {expanded ? <><ChevronUp size={11} />Show less</> : <><ChevronDown size={11} />Show more</>}
-          </button>
-        )}
-      </div>
-    </div>
-  )
+function contextPriority(link: ContextLink) {
+  if (link.link_type === 'caption') return 5
+  if (link.link_type === 'explicit_figure_reference') return 4
+  if (link.link_type === 'neighbor_before' || link.link_type === 'neighbor_after') return 3
+  if (link.link_type === 'same_section') return 2
+  return 1
 }
 
 interface Props {
@@ -169,18 +52,59 @@ interface Props {
   paperId: number
   onClose: () => void
   onToggleSelect: (asset: ExtractionAsset, val: boolean) => void
+  assets?: ExtractionAsset[]
+  onNavigate?: (asset: ExtractionAsset) => void
 }
 
-export default function AssetDetailPanel({ asset, projectId, paperId, onClose, onToggleSelect }: Props) {
+export default function AssetDetailPanel({
+  asset,
+  projectId,
+  paperId,
+  onClose,
+  onToggleSelect,
+  assets = [],
+  onNavigate,
+}: Props) {
   const [detail, setDetail] = useState<AssetDetail | null>(null)
-  const [imgTab, setImgTab] = useState<'figure' | 'page'>('figure')
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
   const [selecting, setSelecting] = useState(false)
   const [imgError, setImgError] = useState(false)
 
   useEffect(() => {
-    workspaceApi.getAsset(projectId, paperId, asset.id).then(setDetail)
-  }, [asset.id, projectId, paperId])
+    setDetail(null)
+    setImgError(false)
+    workspaceApi.getAsset(projectId, paperId, asset.id).then(setDetail).catch(() => null)
+  }, [asset.id, paperId, projectId])
+
+  const currentIndex = assets.findIndex((a) => a.id === asset.id)
+  const canPrev = currentIndex > 0
+  const canNext = currentIndex >= 0 && currentIndex < assets.length - 1
+
+  const title = asset.caption?.trim() || fallbackTitle(asset)
+  const type = displayType(asset)
+  const imageUrl = asset.asset_type === 'native_table' && !asset.has_image
+    ? null
+    : workspaceApi.imageUrl(projectId, paperId, asset.id)
+  const fullPageUrl = workspaceApi.pageImageUrl(projectId, paperId, asset.id)
+
+  const mentions = useMemo(() => {
+    const links = detail?.context_links ?? []
+    const bestByPage = new Map<number, ContextLink>()
+
+    for (const link of [...links].sort((a, b) => contextPriority(b) - contextPriority(a))) {
+      if (!link.page_number || !link.text?.trim()) continue
+      if (!bestByPage.has(link.page_number)) bestByPage.set(link.page_number, link)
+    }
+
+    const rows = Array.from(bestByPage.entries())
+      .sort(([a], [b]) => a - b)
+      .slice(0, 3)
+      .map(([page, link]) => ({ page, text: cleanSnippet(link.text) }))
+
+    if (!rows.length && asset.page_number) {
+      return [{ page: asset.page_number, text: `Located on page ${asset.page_number} of the paper.` }]
+    }
+    return rows
+  }, [asset.page_number, detail?.context_links])
 
   const handleSelect = async () => {
     setSelecting(true)
@@ -191,241 +115,192 @@ export default function AssetDetailPanel({ asset, projectId, paperId, onClose, o
     }
   }
 
-  const toggleExpand = (i: number) =>
-    setExpanded((prev) => ({ ...prev, [i]: !prev[i] }))
+  const openFullPage = () => {
+    fetchAuthenticatedBlob(fullPageUrl)
+      .then((blob) => window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer'))
+      .catch(() => toast.error('Could not open the page'))
+  }
 
-  const imgUrl = imgTab === 'figure'
-    ? workspaceApi.imageUrl(projectId, paperId, asset.id)
-    : workspaceApi.pageImageUrl(projectId, paperId, asset.id)
-
-  const typeLabel = asset.asset_type === 'native_table' ? 'Table' : 'Figure'
+  const downloadItem = () => {
+    if (asset.asset_type === 'native_table' && asset.has_csv) {
+      downloadAuthenticated(
+        workspaceApi.exportAssetUrl(projectId, paperId, asset.id, 'xlsx'),
+        `table_page_${asset.page_number ?? asset.id}.xlsx`,
+      )
+      return
+    }
+    if (asset.classification === 'chart' && asset.has_csv) {
+      downloadAuthenticated(
+        workspaceApi.csvUrl(projectId, paperId, asset.id),
+        `chart_page_${asset.page_number ?? asset.id}.csv`,
+      )
+      return
+    }
+    if (imageUrl) {
+      downloadAuthenticated(imageUrl, `figure_page_${asset.page_number ?? asset.id}.png`)
+      return
+    }
+    toast('This item has no separate file to download', { icon: 'ℹ️' })
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div className="flex-1 bg-black/30" onClick={onClose} />
+    <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-[520px] bg-white border-l border-[#eadfe2] shadow-[-26px_0_70px_rgba(45,26,31,0.15)] flex flex-col">
+      <header className="h-[68px] shrink-0 flex items-center gap-3 px-5 border-b border-[#eee5e7] bg-white">
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-bold text-slate-900">{type}</div>
+          {asset.page_number != null && <div className="text-[11px] text-slate-400 mt-0.5">Page {asset.page_number}</div>}
+        </div>
 
-      {/* Panel */}
-      <div className="w-full max-w-3xl bg-white h-full shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-slate-900 text-sm">
-              {typeLabel} · Page {asset.page_number ?? '?'}
-            </h2>
-            {asset.section_name && (
-              <span className="text-xs text-slate-400">{asset.section_name}</span>
-            )}
-            {asset.relevance_score > 0 && (
-              <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                Score {asset.relevance_score.toFixed(1)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
+        {assets.length > 1 && (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
             <button
-              onClick={handleSelect}
-              disabled={selecting}
-              className={clsx(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
-                asset.selected_for_llm
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-              )}
+              type="button"
+              disabled={!canPrev}
+              onClick={() => canPrev && onNavigate?.(assets[currentIndex - 1])}
+              className="h-8 w-8 rounded-full border border-[#e8e1e3] flex items-center justify-center hover:bg-slate-50 disabled:opacity-30"
             >
-              {asset.selected_for_llm ? <CheckCircle size={13} /> : <Star size={13} />}
-              {asset.selected_for_llm ? 'Included as evidence' : 'Include as evidence'}
+              <ArrowLeft size={14} />
             </button>
-            <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-              <X size={18} className="text-slate-500" />
+            <span className="min-w-[36px] text-center font-semibold">{currentIndex + 1} / {assets.length}</span>
+            <button
+              type="button"
+              disabled={!canNext}
+              onClick={() => canNext && onNavigate?.(assets[currentIndex + 1])}
+              className="h-8 w-8 rounded-full border border-[#e8e1e3] flex items-center justify-center hover:bg-slate-50 disabled:opacity-30"
+            >
+              <ArrowRight size={14} />
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Body — two columns */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 divide-x divide-slate-200 min-h-full">
+        <button type="button" onClick={onClose} className="h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50">
+          <X size={17} />
+        </button>
+      </header>
 
-            {/* Left: image + CSV */}
-            <div className="flex flex-col gap-4 p-4 overflow-y-auto">
-              {/* Image tabs */}
-              {(asset.has_image || asset.has_page_image) && (
-                <>
-                  <div className="flex gap-1 mb-1">
-                    {asset.has_image && (
-                      <button
-                        onClick={() => setImgTab('figure')}
-                        className={clsx(
-                          'text-xs px-3 py-1 rounded-lg font-medium transition-colors',
-                          imgTab === 'figure' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                        )}
-                      >
-                        Figure
-                      </button>
-                    )}
-                    {asset.has_page_image && (
-                      <button
-                        onClick={() => setImgTab('page')}
-                        className={clsx(
-                          'text-xs px-3 py-1 rounded-lg font-medium transition-colors',
-                          imgTab === 'page' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                        )}
-                      >
-                        Full page
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        fetchAuthenticatedBlob(imgUrl)
-                          .then((blob) => window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer'))
-                          .catch(() => toast.error('Could not open image'))
-                      }}
-                      className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <ExternalLink size={11} /> Open
-                    </button>
-                  </div>
-                  {!imgError ? (
-                    <AuthImage
-                      key={imgUrl}
-                      src={imgUrl}
-                      alt={asset.caption ?? ''}
-                      className="w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
-                      onError={() => setImgError(true)}
-                    />
-                  ) : (
-                    <div className="h-40 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 text-xs">
-                      Image unavailable
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* CSV preview */}
-              {asset.has_csv && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileSpreadsheet size={13} className="text-emerald-600" />
-                    <span className="text-xs font-semibold text-slate-700">Chart CSV</span>
-                    <span className="text-[10px] text-slate-400">
-                      {asset.csv_rows}r × {asset.csv_cols}c
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => downloadAuthenticated(
-                        workspaceApi.csvUrl(projectId, paperId, asset.id), `chart_${asset.id}.csv`,
-                      )}
-                      className="ml-auto text-xs text-blue-500 hover:text-blue-700"
-                    >
-                      Download
-                    </button>
-                  </div>
-                  <CsvPreview projectId={projectId} paperId={paperId} assetId={asset.id} />
-                </div>
-              )}
-
-              {/* Native table CSV */}
-              {asset.asset_type === 'native_table' && asset.has_csv && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <FileSpreadsheet size={13} className="text-blue-600" />
-                    <span className="text-xs font-semibold text-slate-700">Table Data</span>
-                    <div className="ml-auto flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => downloadAuthenticated(
-                          workspaceApi.csvUrl(projectId, paperId, asset.id), `table_${asset.id}.csv`,
-                        )}
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        CSV
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => downloadAuthenticated(
-                          workspaceApi.exportAssetUrl(projectId, paperId, asset.id, 'xlsx'), `table_${asset.id}.xlsx`,
-                        )}
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        Excel
-                      </button>
-                    </div>
-                  </div>
-                  <CsvPreview projectId={projectId} paperId={paperId} assetId={asset.id} />
-                  <ExtractRowsAction projectId={projectId} paperId={paperId} assetId={asset.id} />
-                </div>
-              )}
-
-              {/* Conversion warning */}
-              {asset.conversion_status === 'failed' && asset.conversion_error && (
-                <div className="flex gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                  <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-600">{asset.conversion_error}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Right: metadata + context */}
-            <div className="flex flex-col gap-4 p-4 overflow-y-auto">
-              {/* Asset info */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Details</h3>
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                  <dt className="text-slate-400">Type</dt>
-                  <dd className="text-slate-700 font-medium capitalize">{asset.classification.replace('_', ' ')}</dd>
-                  <dt className="text-slate-400">Page</dt>
-                  <dd className="text-slate-700 font-medium">{asset.page_number ?? '—'}</dd>
-                  {asset.section_name && (
-                    <>
-                      <dt className="text-slate-400">Section</dt>
-                      <dd className="text-slate-700 font-medium truncate">{asset.section_name}</dd>
-                    </>
-                  )}
-                  <dt className="text-slate-400">Relevance</dt>
-                  <dd className="text-amber-600 font-semibold">{(asset.relevance_score ?? 0).toFixed(1)} / 10</dd>
-                  <dt className="text-slate-400">Ref</dt>
-                  <dd className="text-slate-500 font-mono text-[10px]">{asset.docling_item_ref ?? '—'}</dd>
-                </dl>
+      <div className="flex-1 overflow-y-auto p-5 bg-[#fffdfc]">
+        <div className="rounded-2xl border border-[#e9e1e3] bg-white overflow-hidden shadow-sm">
+          <div className="min-h-[255px] max-h-[340px] bg-[#fbfaf9] flex items-center justify-center overflow-hidden">
+            {asset.asset_type === 'native_table' && !asset.has_image ? (
+              <div className="flex flex-col items-center gap-3 text-slate-300 py-14">
+                <Table2 size={52} strokeWidth={1.25} />
+                <span className="text-xs font-medium text-slate-400">
+                  {asset.csv_rows != null ? `${asset.csv_rows} rows × ${asset.csv_cols ?? 0} columns` : 'Scientific table'}
+                </span>
               </div>
+            ) : imageUrl && !imgError ? (
+              <AuthImage
+                src={imageUrl}
+                alt={title}
+                className="w-full h-full max-h-[340px] object-contain p-4"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <ImageIcon size={52} strokeWidth={1.25} className="text-slate-300" />
+            )}
+          </div>
+        </div>
 
-              {/* Caption */}
-              {asset.caption && (
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Caption</h3>
-                  <p className="text-[12px] text-slate-600 leading-relaxed italic">"{asset.caption}"</p>
-                </div>
+        <div className="mt-4 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[17px] font-bold leading-snug text-slate-900">{title}</h2>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className={clsx(
+                'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                type === 'Chart' ? 'bg-emerald-50 text-emerald-700' :
+                type === 'Table' ? 'bg-blue-50 text-blue-700' :
+                type === 'Photograph' ? 'bg-orange-50 text-orange-700' :
+                'bg-rose-50 text-[#8B1538]',
+              )}>
+                {type}
+              </span>
+              {asset.page_number != null && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">p.{asset.page_number}</span>
               )}
-
-              {/* Context links */}
-              {detail?.context_links && detail.context_links.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Related text ({detail.context_links.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {detail.context_links.map((link, i) => (
-                      <ContextItem
-                        key={i}
-                        link={link}
-                        expanded={!!expanded[i]}
-                        toggle={() => toggleExpand(i)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {detail && (!detail.context_links || detail.context_links.length === 0) && (
-                <p className="text-xs text-slate-400 italic">No context links found.</p>
-              )}
-              {!detail && (
-                <p className="text-xs text-slate-400">Loading context…</p>
+              {asset.selected_for_llm && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                  <CheckCircle2 size={11} /> Included
+                </span>
               )}
             </div>
           </div>
         </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={openFullPage}
+            className="h-10 rounded-xl bg-[#8B1538] text-white text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#74112f] transition-colors"
+          >
+            <ExternalLink size={13} /> Open full page
+          </button>
+          <button
+            type="button"
+            onClick={downloadItem}
+            className="h-10 rounded-xl border border-[#e6dde0] bg-white text-slate-600 text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-slate-50"
+          >
+            <Download size={13} /> Download
+          </button>
+          <button
+            type="button"
+            onClick={handleSelect}
+            disabled={selecting}
+            className={clsx(
+              'h-10 rounded-xl border text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60',
+              asset.selected_for_llm
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-[#e6dde0] bg-white text-[#8B1538] hover:bg-[#fff7f8]',
+            )}
+          >
+            <CheckCircle2 size={13} /> {asset.selected_for_llm ? 'Included' : 'Use as evidence'}
+          </button>
+        </div>
+
+        {mentions.length > 0 && (
+          <section className="mt-6 pt-5 border-t border-[#eee5e7]">
+            <h3 className="text-sm font-bold text-slate-900 mb-3">Where this appears</h3>
+            <div className="space-y-2.5">
+              {mentions.map((mention) => {
+                const pageUrl = `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/pages/${mention.page}/image`
+                return (
+                  <div key={`${mention.page}-${mention.text}`} className="flex items-center gap-3 rounded-2xl border border-[#eee7e8] bg-white p-3">
+                    <span className="shrink-0 rounded-full bg-[#f4f7ff] px-2.5 py-1 text-[11px] font-bold text-[#3157a4]">p.{mention.page}</span>
+                    <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-slate-600 line-clamp-2">{mention.text}</p>
+                    <div className="h-12 w-16 shrink-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
+                      <AuthImage src={pageUrl} alt={`Page ${mention.page}`} className="h-full w-full object-cover object-top" />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        <section className="mt-6 pt-5 border-t border-[#eee5e7]">
+          <h3 className="text-sm font-bold text-slate-900 mb-3">Document details</h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 text-xs">
+              <div className="h-8 w-8 rounded-xl bg-[#faf4f6] text-[#8B1538] flex items-center justify-center"><ImageIcon size={14} /></div>
+              <span className="w-16 text-slate-400">Type</span>
+              <span className="font-semibold text-slate-700">{type}</span>
+            </div>
+            {asset.page_number != null && (
+              <div className="flex items-center gap-3 text-xs">
+                <div className="h-8 w-8 rounded-xl bg-[#faf4f6] text-[#8B1538] flex items-center justify-center"><FileText size={14} /></div>
+                <span className="w-16 text-slate-400">Page</span>
+                <span className="font-semibold text-slate-700">{asset.page_number}</span>
+              </div>
+            )}
+            {asset.paper_name && (
+              <div className="flex items-start gap-3 text-xs">
+                <div className="h-8 w-8 shrink-0 rounded-xl bg-[#faf4f6] text-[#8B1538] flex items-center justify-center"><FileText size={14} /></div>
+                <span className="w-16 shrink-0 pt-2 text-slate-400">Source</span>
+                <span className="font-semibold text-slate-700 leading-relaxed pt-1.5 break-words">{asset.paper_name}</span>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
-    </div>
+    </aside>
   )
 }
