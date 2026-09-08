@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.500 --> 00:00:14.276
+Cheese Database turns scientific research papers into structured, reviewable research data. Each project keeps its papers, extracted evidence and scientific results together in one workspace.
+
+00:00:15.682 --> 00:00:23.914
+After uploading a research paper, the platform analyzes the document while keeping the original paper available for inspection.
+
+00:00:25.309 --> 00:00:34.117
+Tables, figures and relevant scientific evidence are captured directly from the paper, while preserving their connection to the original source.
+
+00:00:35.478 --> 00:00:45.390
+The extraction layer converts this evidence into structured scientific information, including experimental conditions, treatments and reported measurements.
+
+00:00:46.782 --> 00:00:57.174
+Researchers remain in control. Extracted observations can be inspected, edited, approved or rejected before they become trusted data.
+
+00:00:58.566 --> 00:01:08.382
+The platform also preserves the scientific structure behind the measurements, connecting each study to its experiments, treatment arms and observations.
+
+00:01:09.571 --> 00:01:21.595
+Approved observations flow into a searchable scientific database. Only fields that are relevant to the paper need to appear, avoiding unnecessarily sparse datasets.
+
+00:01:22.781 --> 00:01:30.989
+The resulting dataset can then be exported in common formats for further analysis, modelling or research workflows.
+
+00:01:32.487 --> 00:01:49.047
+From the original research paper to structured, traceable data, Cheese Database keeps the evidence, scientific context and researcher review connected throughout the workflow. Built for research that needs to remain inspectable, structured and reusable.
