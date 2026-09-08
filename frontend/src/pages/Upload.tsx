@@ -3,11 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
   Upload as UploadIcon, FileText, X, ArrowLeft, CloudUpload, Microscope, ChevronRight,
-  Table2, Image as ImageIcon, FileSearch, ShieldCheck,
+  Table2, Image as ImageIcon, FileSearch, ShieldCheck, Zap, Gauge,
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { papersApi, workspaceApi } from '../services/api'
+import api, { papersApi, workspaceApi } from '../services/api'
 
 const EXTRACT_ITEMS = [
   { Icon: FileText, title: 'Text & metadata', body: 'Titles, authors, abstract, methods, and more.' },
@@ -15,6 +15,8 @@ const EXTRACT_ITEMS = [
   { Icon: ImageIcon, title: 'Figures', body: 'Charts, images, and figure captions.' },
   { Icon: FileSearch, title: 'Context', body: 'Cheese type, matrices, conditions, outcomes.' },
 ]
+
+type AnalysisMode = 'standard' | 'fast'
 
 export default function Upload() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -24,6 +26,7 @@ export default function Upload() {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [mode, setMode] = useState<'workspace' | 'batch'>('workspace')
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('standard')
 
   const onDrop = useCallback((accepted: File[]) => {
     const pdfs = accepted.filter((f) => f.type === 'application/pdf' || f.name.endsWith('.pdf'))
@@ -44,26 +47,31 @@ export default function Upload() {
 
   const remove = (name: string) => setFiles((prev) => prev.filter((f) => f.name !== name))
 
+  const startAnalysis = async (paperId: number) => {
+    if (analysisMode === 'fast') {
+      return api.post(`/projects/${pid}/papers/${paperId}/workspace-fast`).then((r) => r.data)
+    }
+    return workspaceApi.start(pid, paperId)
+  }
+
   const handleUpload = async () => {
     if (!files.length) return
     setUploading(true)
     try {
       const created: { id: number }[] = await papersApi.upload(pid, files)
       if (mode === 'workspace' && created.length === 1) {
+        // Start explicitly before navigation so the paper workspace sees the
+        // chosen mode instead of auto-starting the standard path.
+        await startAnalysis(created[0].id)
         navigate(`/projects/${pid}/papers/${created[0].id}/overview`)
         return
       }
-      // Batch mode: start the same Docling/asset-extraction pipeline single
-      // uploads get, one paper at a time. Each call just enqueues a background
-      // job server-side, so this loop finishes quickly even though extraction
-      // itself keeps running after navigating away. Sequential, not concurrent —
-      // chart reading calls a vision-model API per figure, and firing every
-      // paper's figures at once would multiply that load unpredictably.
+      // Batch mode starts the selected Docling path one paper at a time.
       for (const paper of created) {
-        try { await workspaceApi.start(pid, paper.id) }
+        try { await startAnalysis(paper.id) }
         catch { /* one paper failing to start shouldn't block the rest */ }
       }
-      toast.success(`${files.length} paper${files.length > 1 ? 's' : ''} uploaded — extraction started`)
+      toast.success(`${files.length} paper${files.length > 1 ? 's' : ''} uploaded — ${analysisMode === 'fast' ? 'fast' : 'standard'} extraction started`)
       navigate(`/projects/${pid}`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Upload failed')
@@ -94,7 +102,7 @@ export default function Upload() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
         <div className="space-y-6">
-          {/* Mode selector */}
+          {/* Upload mode selector */}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => { setMode('workspace'); setFiles([]) }}
@@ -144,6 +152,53 @@ export default function Upload() {
                 </p>
               </div>
             </button>
+          </div>
+
+          {/* Docling analysis mode */}
+          <div className="rounded-2xl border border-[#eadde1] bg-[linear-gradient(135deg,#fffdfd,#fff5f7)] p-4 shadow-[0_16px_34px_-30px_rgba(122,27,46,.45)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[.11em] text-[#8B1730]">Analysis speed</p>
+                <p className="mt-1 text-xs text-slate-500">Choose the current method or the optimized Docling path so you can compare both.</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#9b6a77] ring-1 ring-[#eadde1]">A/B comparison</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => setAnalysisMode('standard')}
+                className={clsx(
+                  'rounded-xl border-2 p-3.5 text-left transition-all',
+                  analysisMode === 'standard'
+                    ? 'border-[#8B1730] bg-white shadow-[0_12px_26px_-22px_rgba(122,27,46,.65)]'
+                    : 'border-[#eee4e7] bg-white/70 hover:border-[#d9bdc5]',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff1f4] text-[#8B1730]"><Gauge size={17} /></span>
+                  {analysisMode === 'standard' && <span className="rounded-full bg-[#8B1730] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">Selected</span>}
+                </div>
+                <p className="mt-3 text-sm font-semibold text-slate-800">Standard extraction</p>
+                <p className="mt-1 text-[10.5px] leading-relaxed text-slate-500">Current method · accurate table mode · OCR · 2-page chunks · 2× figure rendering.</p>
+              </button>
+
+              <button
+                onClick={() => setAnalysisMode('fast')}
+                className={clsx(
+                  'rounded-xl border-2 p-3.5 text-left transition-all',
+                  analysisMode === 'fast'
+                    ? 'border-[#8B1730] bg-white shadow-[0_12px_26px_-22px_rgba(122,27,46,.65)]'
+                    : 'border-[#eee4e7] bg-white/70 hover:border-[#d9bdc5]',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Zap size={17} /></span>
+                  {analysisMode === 'fast' && <span className="rounded-full bg-[#8B1730] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">Selected</span>}
+                </div>
+                <p className="mt-3 text-sm font-semibold text-slate-800">Fast extraction</p>
+                <p className="mt-1 text-[10.5px] leading-relaxed text-slate-500">4-page chunks · fast tables · 1× figures · OCR skipped only when native text is already available.</p>
+              </button>
+            </div>
+            <p className="mt-3 text-[10px] text-slate-400">Scanned PDFs automatically keep OCR in Fast extraction, so text is not intentionally dropped.</p>
           </div>
 
           {/* Drop zone */}
@@ -237,7 +292,9 @@ export default function Upload() {
               {uploading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
               ) : mode === 'workspace' ? (
-                <><Microscope size={14} /> Analyze in Workspace</>
+                analysisMode === 'fast'
+                  ? <><Zap size={14} /> Fast extraction</>
+                  : <><Microscope size={14} /> Standard extraction</>
               ) : (
                 <><UploadIcon size={14} /> Upload {files.length || ''} PDF{files.length !== 1 ? 's' : ''}</>
               )}
