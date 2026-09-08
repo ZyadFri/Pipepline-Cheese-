@@ -1,7 +1,9 @@
 import os as _os
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.db.database import Base, engine, apply_column_migrations
 from app.api.routes import (
@@ -83,6 +85,20 @@ app.include_router(insights.router, prefix="/api")
 
 # ── LLM-backed paper assistant (summary card, ask-this-paper chat) ─────────────
 app.include_router(paper_assistant.router, prefix="/api")
+
+
+@app.get("/api/public/demo-video", include_in_schema=False)
+def public_demo_video():
+    """Serve the real captioned application walkthrough to the public landing page."""
+    video_path = Path(__file__).resolve().parents[2] / "docs" / "demo" / "app_walkthrough.mp4"
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Demo video is not available")
+    return FileResponse(
+        str(video_path),
+        media_type="video/mp4",
+        filename="cheese-database-demo.mp4",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @app.get("/api/health")
