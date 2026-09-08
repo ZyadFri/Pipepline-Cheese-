@@ -1,0 +1,359 @@
+/* Landing page — Recent research section only.
+   This deliberately does not touch any other landing-page section. */
+
+#research {
+  position: relative;
+  isolation: isolate;
+  padding-top: 5.25rem !important;
+  padding-bottom: 5.5rem !important;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(152, 35, 65, 0.055), transparent 31%),
+    linear-gradient(180deg, #fffafa 0%, #fff7f8 58%, #fffafb 100%) !important;
+}
+
+/* Editorial cheese/research image at the top-right, as in the approved concept. */
+#research::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  top: 0;
+  right: 0;
+  width: min(47vw, 760px);
+  height: 355px;
+  background-image:
+    linear-gradient(90deg, #fffafa 0%, rgba(255,250,250,.93) 10%, rgba(255,250,250,.34) 47%, rgba(255,250,250,.08) 100%),
+    linear-gradient(180deg, rgba(255,250,250,.05), rgba(255,250,250,.5)),
+    url('https://commons.wikimedia.org/wiki/Special:Redirect/file/Various_cheeses.jpg?width=1800');
+  background-size: cover;
+  background-position: center 42%;
+  opacity: .74;
+  filter: saturate(.78) contrast(.92);
+  pointer-events: none;
+}
+
+#research::after {
+  content: 'Science for better evidence';
+  position: absolute;
+  z-index: -1;
+  top: 8.1rem;
+  right: clamp(2.5rem, 9vw, 10rem);
+  max-width: 180px;
+  color: rgba(109, 39, 57, .72);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.45rem;
+  line-height: 1.06;
+  font-style: italic;
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+
+/* Header: broader editorial scale with breathing room on the image side. */
+#research > div.relative.mx-auto > div.flex:first-of-type {
+  min-height: 225px;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  position: relative;
+}
+
+#research > div.relative.mx-auto > div.flex:first-of-type > div:first-child {
+  max-width: 760px !important;
+  position: relative;
+  z-index: 2;
+}
+
+#research > div.relative.mx-auto > div.flex:first-of-type h2 {
+  max-width: 760px;
+  font-size: clamp(2.65rem, 4vw, 4.7rem) !important;
+  line-height: .98 !important;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+#research > div.relative.mx-auto > div.flex:first-of-type h2::first-line {
+  color: #8f1e3b;
+}
+
+#research > div.relative.mx-auto > div.flex:first-of-type p:last-child {
+  max-width: 650px !important;
+  font-size: 12.5px !important;
+  line-height: 1.65 !important;
+}
+
+#research > div.relative.mx-auto > div.flex:first-of-type > div:last-child {
+  position: relative;
+  z-index: 2;
+  margin-top: 106px;
+  margin-right: 1.5rem;
+  border-color: rgba(194, 139, 153, .45) !important;
+  background: rgba(255,255,255,.82) !important;
+  box-shadow: 0 20px 50px -38px rgba(84, 25, 42, .55);
+  backdrop-filter: blur(12px);
+}
+
+/* Convert the old 3-column tile grid into one publication per horizontal row. */
+#research > div.relative.mx-auto > div.mt-10.grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  margin-top: 2.4rem !important;
+  position: relative;
+  z-index: 3;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: 70px 170px minmax(0, 1fr) 285px !important;
+  align-items: center !important;
+  gap: 22px !important;
+  min-height: 252px !important;
+  padding: 17px 20px 17px 14px !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(211, 174, 184, .58) !important;
+  background: rgba(255,255,255,.93) !important;
+  box-shadow: 0 22px 58px -42px rgba(92, 27, 47, .55) !important;
+  overflow: hidden;
+  transform: none !important;
+  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease !important;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(171, 82, 105, .58) !important;
+  box-shadow: 0 30px 68px -40px rgba(92, 27, 47, .7) !important;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a::before {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 18px 8px 18px 8px;
+  border-right: 1px solid #f0e3e6;
+  color: #9d2945;
+  white-space: pre-line;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(1)::before {
+  content: '01\A\A FOOD QUALITY\A & ANALYTICS';
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(2)::before {
+  content: '02\A\A FUNCTIONAL\A FOODS';
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(3)::before {
+  content: '03\A\A AI & DECISION\A SYSTEMS';
+}
+
+/* Right-side scientific metadata panel. The whole card already opens the DOI. */
+#research > div.relative.mx-auto > div.mt-10.grid > a::after {
+  align-self: stretch;
+  display: block;
+  padding: 18px 10px 62px 20px;
+  border-left: 1px solid #eee0e4;
+  color: #74686d;
+  white-space: pre-line;
+  font-size: 10px;
+  line-height: 2.05;
+  letter-spacing: .005em;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(1)::after {
+  content: 'DOI   10.1016/j.fochx.2026.104189\A Published   2026\A Journal   Food Chemistry: X\A Keywords   Honey · Enzymatic activity · Carbohydrates';
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(2)::after {
+  content: 'DOI   10.3390/foods13020204\A Published   2024\A Journal   Foods\A Keywords   Probiotics · Cricket proteins · Gut microbiota';
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(3)::after {
+  content: 'DOI   10.1016/j.renene.2025.124047\A Published   2025\A Journal   Renewable Energy\A Keywords   Photovoltaics · Performance evaluation · Machine learning';
+}
+
+/* Make the miniature paper feel like a real document object rather than a card icon. */
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.relative.mx-auto {
+  width: 160px !important;
+  height: 218px !important;
+  margin: 0 !important;
+  border-radius: 5px !important;
+  border-color: #d9d2d4 !important;
+  box-shadow: 0 18px 34px -24px rgba(42, 22, 30, .58) !important;
+  transform: translateZ(0);
+  transition: transform .28s ease, box-shadow .28s ease;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:hover > div.relative.mx-auto {
+  transform: translateY(-3px) rotate(-.35deg);
+  box-shadow: 0 24px 42px -24px rgba(42, 22, 30, .65) !important;
+}
+
+/* Main publication content. */
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 {
+  align-self: stretch;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 4px !important;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > div:first-child {
+  order: 1;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > p:nth-child(2) {
+  order: 2;
+  margin-top: 10px !important;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > h3 {
+  order: 3;
+  margin-top: 5px !important;
+  max-width: 690px;
+  font-size: clamp(21px, 1.7vw, 28px) !important;
+  line-height: 1.06 !important;
+  letter-spacing: -.02em;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > p:nth-child(4) {
+  order: 4;
+  margin-top: 12px !important;
+  font-size: 11px !important;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > p:nth-child(5) {
+  order: 5;
+  margin-top: 2px !important;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > p:nth-child(6) {
+  order: 6;
+  max-width: 690px;
+  margin-top: 12px !important;
+  font-size: 10.5px !important;
+  line-height: 1.55 !important;
+  display: block !important;
+  overflow: visible !important;
+  -webkit-line-clamp: unset !important;
+}
+
+/* Existing Open DOI control becomes the burgundy action button in the metadata area. */
+#research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > span:last-child {
+  position: absolute;
+  z-index: 4;
+  right: 24px;
+  bottom: 20px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+  height: 38px;
+  margin: 0 !important;
+  padding: 0 17px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #8f1736, #6e1027);
+  color: white !important;
+  box-shadow: 0 13px 25px -16px rgba(108, 16, 39, .8);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+#research > div.relative.mx-auto > div.mt-10.grid > a:hover > div.min-w-0 > span:last-child {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px -14px rgba(108, 16, 39, .85);
+}
+
+/* Subtle category accent on the left edge of each paper row. */
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(1) {
+  border-left: 3px solid #d8a247 !important;
+}
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(2) {
+  border-left: 3px solid #c97788 !important;
+}
+#research > div.relative.mx-auto > div.mt-10.grid > a:nth-child(3) {
+  border-left: 3px solid #a985b8 !important;
+}
+
+@media (max-width: 1199px) {
+  #research::before {
+    width: 52vw;
+    opacity: .48;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a {
+    grid-template-columns: 56px 155px minmax(0,1fr) 230px !important;
+    gap: 16px !important;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a > div.relative.mx-auto {
+    width: 148px !important;
+    height: 205px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  #research::before,
+  #research::after {
+    display: none;
+  }
+
+  #research > div.relative.mx-auto > div.flex:first-of-type {
+    min-height: 0;
+  }
+
+  #research > div.relative.mx-auto > div.flex:first-of-type > div:last-child {
+    margin: 0 !important;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a {
+    grid-template-columns: 52px 145px minmax(0,1fr) !important;
+    min-height: 225px !important;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a::after {
+    display: none;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a > div.min-w-0 > span:last-child {
+    position: static;
+    order: 7;
+    align-self: flex-start;
+    margin-top: 15px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  #research {
+    padding-top: 4rem !important;
+    padding-bottom: 4rem !important;
+  }
+
+  #research > div.relative.mx-auto > div.flex:first-of-type h2 {
+    font-size: 2.55rem !important;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    padding: 18px !important;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a::before {
+    min-height: auto;
+    padding: 0 0 10px;
+    border-right: 0;
+    border-bottom: 1px solid #f0e3e6;
+    white-space: normal;
+  }
+
+  #research > div.relative.mx-auto > div.mt-10.grid > a > div.relative.mx-auto {
+    width: 150px !important;
+    height: 205px !important;
+    margin: 0 auto !important;
+  }
+}
