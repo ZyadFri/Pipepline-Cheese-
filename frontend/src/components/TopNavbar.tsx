@@ -136,10 +136,10 @@ export default function TopNavbar() {
   }
 
   return (
-    <header className="relative z-50 h-[78px] shrink-0 bg-[#fffdfd] px-2 pt-2 lg:px-3">
-      <div className="relative flex h-[64px] items-center overflow-visible rounded-[24px] border border-[#eadde1] bg-[linear-gradient(105deg,rgba(255,255,255,.98)_0%,rgba(255,250,251,.97)_48%,rgba(252,241,244,.96)_100%)] px-4 shadow-[0_14px_38px_-26px_rgba(76,21,39,.55),0_2px_8px_rgba(76,21,39,.05)] lg:px-6">
+    <header className="relative z-50 h-[78px] shrink-0 bg-[#fff6f8] px-2 pt-2 lg:px-3">
+      <div className="relative flex h-[64px] items-center overflow-visible rounded-[24px] border border-[#ead5db] bg-[linear-gradient(105deg,rgba(255,248,250,.99)_0%,rgba(255,244,247,.98)_50%,rgba(252,236,241,.98)_100%)] px-4 shadow-[0_14px_38px_-26px_rgba(76,21,39,.55),0_2px_8px_rgba(76,21,39,.06)] lg:px-6">
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-          <div className="absolute left-[43%] top-[-56px] h-[112px] w-[280px] rounded-full bg-[radial-gradient(circle,rgba(139,23,48,.07),transparent_68%)]" />
+          <div className="absolute left-[43%] top-[-56px] h-[112px] w-[280px] rounded-full bg-[radial-gradient(circle,rgba(139,23,48,.09),transparent_68%)]" />
           <div className="absolute right-[9%] top-1/2 h-20 w-36 -translate-y-1/2 opacity-[.18] [background-image:linear-gradient(90deg,transparent_0_11%,rgba(139,23,48,.12)_11%_12%,transparent_12%_25%,rgba(139,23,48,.12)_25%_26%,transparent_26%_39%,rgba(139,23,48,.12)_39%_40%,transparent_40%)]" />
         </div>
 
