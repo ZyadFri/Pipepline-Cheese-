@@ -170,18 +170,18 @@ function LandingHeader() {
 
 function PaperPreview({ paper }: { paper: ResearchPaper }) {
   return (
-    <div className="relative mx-auto h-[215px] w-[154px] shrink-0 overflow-hidden rounded-[7px] border border-[#ded8d9] bg-white p-3 shadow-[0_18px_30px_-22px_rgba(50,25,33,.5)]">
+    <div className="relative mx-auto h-[228px] w-[164px] shrink-0 overflow-hidden rounded-[8px] border border-[#ded8d9] bg-white p-3 shadow-[0_20px_36px_-24px_rgba(50,25,33,.52)]">
       <div className="flex items-center justify-between border-b border-[#eee8e9] pb-2 text-[5.8px] font-bold uppercase tracking-[.08em] text-[#7A1B2E]">
         <span>{paper.journal}</span><span>{paper.year}</span>
       </div>
-      <p className="mt-3 font-display text-[9.5px] font-semibold leading-[1.15] text-[#252024]">{paper.title}</p>
+      <p className="mt-3 font-display text-[9.7px] font-semibold leading-[1.14] text-[#252024]">{paper.title}</p>
       <p className="mt-2 line-clamp-3 text-[5.8px] leading-[1.35] text-[#766c70]">{paper.authors}</p>
       <div className="mt-3 space-y-1.5">
         {[100, 92, 96, 82].map((width) => <div key={width} className="h-1 rounded-full bg-[#e8e3e4]" style={{ width: `${width}%` }} />)}
       </div>
       <div className="mt-3 grid grid-cols-3 gap-1">
         {[55, 76, 42, 68, 86, 60].map((height, index) => (
-          <div key={index} className="flex h-8 items-end justify-center rounded-sm bg-[#faf7f8] px-1">
+          <div key={index} className="flex h-9 items-end justify-center rounded-sm bg-[#faf7f8] px-1">
             <span className="w-full rounded-t-sm bg-[#d7a3b0]" style={{ height: `${height}%` }} />
           </div>
         ))}
@@ -191,23 +191,88 @@ function PaperPreview({ paper }: { paper: ResearchPaper }) {
   )
 }
 
-function ResearchCard({ paper }: { paper: ResearchPaper }) {
+function ResearchCard({ paper, index }: { paper: ResearchPaper; index: number }) {
+  const [copied, setCopied] = useState(false)
+  const doiLabel = paper.doi.replace('https://doi.org/', '')
+  const publisher = paper.journal === 'Foods' ? 'MDPI' : 'ScienceDirect'
+
+  const copyDoi = async () => {
+    try {
+      await navigator.clipboard.writeText(doiLabel)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   return (
-    <a href={paper.doi} target="_blank" rel="noreferrer" className="group grid min-h-[292px] grid-cols-[130px_1fr] gap-4 rounded-[20px] border border-[#eadfe2] bg-white p-4 shadow-[0_18px_45px_-36px_rgba(80,20,41,.5)] transition duration-300 hover:-translate-y-1 hover:border-[#d9b9c2] hover:shadow-[0_28px_55px_-38px_rgba(86,22,44,.65)] sm:grid-cols-[154px_1fr]">
-      <PaperPreview paper={paper} />
-      <div className="min-w-0 py-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.08em] text-[#7A1B2E]" style={{ background: paper.accent }}>{paper.tag}</span>
-          <span className="text-[10px] font-medium text-[#a08d93]">{paper.year}</span>
+    <article className="group relative overflow-hidden rounded-[24px] border border-[#e6d8dc] bg-white/94 shadow-[0_24px_60px_-48px_rgba(85,24,44,.72)] transition duration-300 hover:-translate-y-1 hover:border-[#cf9eaa] hover:shadow-[0_34px_68px_-46px_rgba(85,24,44,.78)]">
+      <div className="absolute inset-y-0 left-0 w-[3px] bg-[linear-gradient(180deg,#d98b45,#9f2040_60%,#7A1B2E)] opacity-80" />
+      <div className="grid gap-5 p-5 md:grid-cols-[72px_176px_minmax(0,1fr)] xl:grid-cols-[76px_185px_minmax(0,1fr)_310px] xl:gap-6 xl:p-6">
+        <div className="flex md:flex-col md:items-center">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#9f2545,#7A1B2E)] font-display text-[17px] font-semibold text-white shadow-[0_12px_26px_-14px_rgba(122,27,46,.8)]">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <div className="ml-4 min-w-0 md:ml-0 md:mt-5 md:text-center">
+            <p className="text-[8px] font-bold uppercase leading-[1.55] tracking-[.16em] text-[#ad5368]">{paper.tag}</p>
+          </div>
         </div>
-        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[.08em] text-[#aa5367]">Verified publication</p>
-        <h3 className="mt-1.5 font-display text-[18px] font-semibold leading-[1.12] text-[#282023]">{paper.title}</h3>
-        <p className="mt-3 text-[11px] font-semibold text-[#7A1B2E]">{paper.featuredAuthor}</p>
-        <p className="mt-1 text-[10px] text-[#8f8186]">{paper.journal}</p>
-        <p className="mt-3 line-clamp-3 text-[10.5px] leading-relaxed text-[#6f6469]">{paper.summary}</p>
-        <span className="mt-4 inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#7A1B2E]">Open DOI <ExternalLink size={10} /></span>
+
+        <div className="flex items-center justify-center">
+          <PaperPreview paper={paper} />
+        </div>
+
+        <div className="min-w-0 py-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-[#edc9d1] bg-[#fff7f8] px-2.5 py-1 text-[8.5px] font-bold uppercase tracking-[.09em] text-[#a02442]">Verified publication</span>
+            <span className="rounded-full px-2.5 py-1 text-[8.5px] font-bold uppercase tracking-[.09em] text-[#7A1B2E]" style={{ background: paper.accent }}>{paper.journal}</span>
+            <span className="text-[10px] font-semibold text-[#a18f95]">{paper.year}</span>
+          </div>
+          <h3 className="mt-3 max-w-[760px] font-display text-[25px] font-medium leading-[1.02] tracking-[-.02em] text-[#282023] lg:text-[28px]">
+            {paper.title}
+          </h3>
+          <p className="mt-3 text-[10.5px] leading-relaxed text-[#6f6268]">
+            <span className="font-bold text-[#a02140]">{paper.featuredAuthor}</span>
+            <span className="text-[#8d7d83]"> · {paper.authors}</span>
+          </p>
+          <p className="mt-4 max-w-[760px] text-[11px] leading-[1.7] text-[#75696e]">{paper.summary}</p>
+          <a href={paper.doi} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#8f1d38] transition hover:text-[#681226]">
+            View on {publisher} <ExternalLink size={10} />
+          </a>
+        </div>
+
+        <div className="border-t border-[#eee4e7] pt-4 md:col-span-3 xl:col-span-1 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+          <dl className="space-y-3 text-[10px]">
+            <div className="grid grid-cols-[82px_1fr] items-start gap-3 border-b border-[#f2e9eb] pb-3">
+              <dt className="font-semibold text-[#8e2d45]">DOI</dt>
+              <dd className="break-all text-[#756a6f]">{doiLabel}</dd>
+            </div>
+            <div className="grid grid-cols-[82px_1fr] gap-3 border-b border-[#f2e9eb] pb-3">
+              <dt className="font-semibold text-[#8e2d45]">Published</dt>
+              <dd className="text-[#756a6f]">{paper.year}</dd>
+            </div>
+            <div className="grid grid-cols-[82px_1fr] gap-3 border-b border-[#f2e9eb] pb-3">
+              <dt className="font-semibold text-[#8e2d45]">Journal</dt>
+              <dd className="text-[#756a6f]">{paper.journal}</dd>
+            </div>
+            <div className="grid grid-cols-[82px_1fr] gap-3">
+              <dt className="font-semibold text-[#8e2d45]">Researcher</dt>
+              <dd className="font-medium text-[#5f5157]">{paper.featuredAuthor}</dd>
+            </div>
+          </dl>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <a href={paper.doi} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-[13px] bg-[#8b1835] px-4 py-3 text-[10.5px] font-semibold text-white shadow-[0_14px_28px_-18px_rgba(122,27,46,.75)] transition hover:-translate-y-0.5 hover:bg-[#6e1128]">
+              Read the paper <ArrowRight size={12} />
+            </a>
+            <button onClick={copyDoi} className="inline-flex items-center justify-center gap-2 rounded-[13px] border border-[#dec7cd] bg-white px-4 py-3 text-[10.5px] font-semibold text-[#752038] transition hover:border-[#c89ba6] hover:bg-[#fff8fa]">
+              {copied ? 'DOI copied' : 'Copy DOI'}
+            </button>
+          </div>
+        </div>
       </div>
-    </a>
+    </article>
   )
 }
 
@@ -377,7 +442,6 @@ function Workflow() {
         </div>
 
         <div className="relative mt-16">
-          {/* Connecting line threading through every step — the literal "pipeline" */}
           <div className="pointer-events-none absolute left-0 right-0 top-7 hidden h-px bg-[linear-gradient(90deg,transparent,#e6c3cd_6%,#e6c3cd_94%,transparent)] xl:block" />
 
           <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-5 xl:gap-5">
@@ -390,14 +454,10 @@ function Workflow() {
                     <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#8B1730,#4E0F1C)] text-white shadow-[0_16px_32px_-14px_rgba(87,24,46,.65)] transition-transform duration-300 group-hover:scale-105">
                       <IconComponent size={19} />
                     </span>
-                    {!isLast && (
-                      <ChevronRight size={16} className="mx-1 shrink-0 text-[#dcb8c1] xl:hidden" />
-                    )}
+                    {!isLast && <ChevronRight size={16} className="mx-1 shrink-0 text-[#dcb8c1] xl:hidden" />}
                   </div>
 
-                  <p className="font-display pointer-events-none mt-3 select-none text-[52px] font-medium leading-none text-[#f4e3e7]">
-                    {number as string}
-                  </p>
+                  <p className="font-display pointer-events-none mt-3 select-none text-[52px] font-medium leading-none text-[#f4e3e7]">{number as string}</p>
 
                   <div className="-mt-6 pl-0.5">
                     <h3 className="text-[13.5px] font-semibold text-[#2d2528]">{title as string}</h3>
@@ -415,18 +475,65 @@ function Workflow() {
 
 function ResearchSection() {
   return (
-    <section id="research" className="relative overflow-hidden border-b border-[#efe4e7] bg-[#fff8fa] py-16 lg:py-20">
-      <div className="absolute -right-24 top-10 h-80 w-80 rounded-full bg-[#f5e5e9] blur-3xl" />
-      <div className="relative mx-auto max-w-[1500px] px-6 sm:px-8 lg:px-10">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-[720px]">
-            <p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">Recent research</p>
-            <h2 className="mt-3 font-display text-[42px] font-medium leading-[1.02] text-[#281f22]">Real publications from the researchers behind the project.</h2>
-            <p className="mt-4 max-w-[650px] text-[12px] leading-relaxed text-[#74676d]">Every title below is a real publication and links to its DOI. No fabricated paper titles are used on this page.</p>
-          </div>
-          <div className="rounded-[16px] border border-[#e8d7dc] bg-white px-4 py-3 text-[10px] leading-relaxed text-[#776a70]"><span className="font-semibold text-[#7A1B2E]">Verified metadata</span><br />DOI · journal · year · authors</div>
+    <section id="research" className="relative overflow-hidden border-b border-[#eadde0] bg-[#fff9fa] py-0">
+      <div className="relative overflow-hidden border-b border-[#eadde0]">
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff9fa_0%,#fff9fa_46%,rgba(255,249,250,.92)_58%,rgba(255,249,250,.30)_100%)]" />
+        <img src={MEDIA.aging} alt="Food science research" className="absolute right-0 top-0 h-full w-[48%] object-cover opacity-60" />
+        <div className="absolute right-[6%] top-[14%] hidden rotate-[-2deg] lg:block">
+          <p className="font-display text-[23px] italic leading-tight text-[#734956]">Science<br />for better<br />food systems.</p>
+          <span className="mt-2 block h-px w-14 bg-[#a73550]" />
         </div>
-        <div className="mt-10 grid gap-4 xl:grid-cols-3">{RESEARCH_PAPERS.map((paper) => <ResearchCard key={paper.doi} paper={paper} />)}</div>
+        <div className="absolute bottom-[7%] right-[8%] hidden w-[245px] space-y-2 xl:block">
+          {['FOOD CHEMISTRY', 'DAIRY SCIENCE', 'MICROBIOLOGY', 'FOOD QUALITY'].map((label, i) => (
+            <div key={label} className="rounded-[7px] border border-white/45 bg-[#2c2930]/90 px-4 py-2.5 font-display text-[12px] tracking-[.06em] text-white shadow-[0_16px_24px_-18px_rgba(20,15,17,.8)]" style={{ transform: `translateX(${i * 7}px)` }}>
+              {label}
+            </div>
+          ))}
+        </div>
+
+        <div className="relative mx-auto max-w-[1500px] px-6 py-16 sm:px-8 lg:px-10 lg:py-20">
+          <div className="max-w-[760px]">
+            <p className="text-[9.5px] font-bold uppercase tracking-[.18em] text-[#a12241]">Recent research</p>
+            <h2 className="mt-3 font-display text-[43px] font-medium leading-[.98] tracking-[-.02em] text-[#281f22] sm:text-[48px]">Real publications from the researchers behind the project.</h2>
+            <p className="mt-5 max-w-[690px] text-[12.5px] leading-[1.75] text-[#74676d]">Explore peer-reviewed research from our team. Every publication below is real, linked to its DOI, and presented with verified journal, year and author information.</p>
+
+            <div className="mt-8 flex flex-wrap gap-x-8 gap-y-4">
+              {[
+                ['Verified metadata', 'DOI · journal · year · authors', ShieldCheck],
+                ['Linked to the source', 'Open the publisher record directly', Link2],
+                ['From our research team', 'McGill and collaborators', Users],
+              ].map(([title, body, Icon]) => {
+                const ItemIcon = Icon as typeof ShieldCheck
+                return (
+                  <div key={title as string} className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f8e8ec] text-[#9d2945]"><ItemIcon size={14} /></span>
+                    <div><p className="text-[10px] font-semibold text-[#34292e]">{title as string}</p><p className="mt-0.5 text-[8.5px] text-[#8b7b81]">{body as string}</p></div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative mx-auto max-w-[1500px] px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
+        <div className="space-y-4">
+          {RESEARCH_PAPERS.map((paper, index) => <ResearchCard key={paper.doi} paper={paper} index={index} />)}
+        </div>
+
+        <div className="relative mt-7 overflow-hidden rounded-[24px] bg-[linear-gradient(108deg,#650f24,#8c1a37_62%,#a83c57)] px-6 py-7 text-white shadow-[0_28px_58px_-40px_rgba(94,17,39,.78)] md:px-8">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border border-white/10" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10"><BookOpen size={19} /></span>
+              <div>
+                <p className="text-[8.5px] font-bold uppercase tracking-[.18em] text-white/60">Explore more</p>
+                <h3 className="mt-1 font-display text-[28px] font-medium leading-tight">Discover the researchers behind these publications</h3>
+              </div>
+            </div>
+            <a href="#team" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[13px] bg-white px-5 py-3 text-[10.5px] font-semibold text-[#7A1B2E] transition hover:-translate-y-0.5">Meet the research team <ArrowRight size={12} /></a>
+          </div>
+        </div>
       </div>
     </section>
   )
