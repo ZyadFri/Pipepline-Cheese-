@@ -1,14 +1,12 @@
-import { Outlet, NavLink, useParams } from 'react-router-dom'
+import { Outlet, NavLink, useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { workspaceApi, papersApi } from '../../services/api'
 import type { WorkspaceStatus } from '../../types/workspace'
 import {
-  FileText, Cpu, BarChart2, ShieldCheck, ClipboardList,
-  Database, Loader2, LayoutDashboard,
+  ArrowLeft, BarChart2, ShieldCheck, ClipboardList,
+  Database, Loader2, LayoutDashboard, Images,
 } from 'lucide-react'
 import clsx from 'clsx'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PaperInfo {
   id: number
@@ -17,8 +15,6 @@ interface PaperInfo {
   page_count: number
 }
 
-// ─── Tab config ───────────────────────────────────────────────────────────────
-
 interface Tab {
   path: string
   label: string
@@ -26,6 +22,9 @@ interface Tab {
   enabled: (ws: WorkspaceStatus | null) => boolean
   suffix?: (paperIdNum: number) => string
 }
+
+const isEvidenceReady = (ws: WorkspaceStatus | null) =>
+  ws?.status === 'completed' || ws?.status === 'partial_success'
 
 const TABS: Tab[] = [
   {
@@ -36,21 +35,21 @@ const TABS: Tab[] = [
   },
   {
     path: 'docling',
-    label: 'Docling Results',
-    Icon: Cpu,
-    enabled: (ws) => ws?.status === 'completed' || ws?.status === 'failed',
+    label: 'Evidence',
+    Icon: Images,
+    enabled: (ws) => isEvidenceReady(ws),
   },
   {
     path: 'charts',
     label: 'Charts',
     Icon: BarChart2,
-    enabled: (ws) => ws?.status === 'completed' && (ws.result?.charts ?? 0) > 0,
+    enabled: (ws) => isEvidenceReady(ws) && (ws?.result?.charts ?? 0) > 0,
   },
   {
     path: 'validation',
-    label: 'Validation',
+    label: 'Extract data',
     Icon: ShieldCheck,
-    enabled: (ws) => ws?.status === 'completed',
+    enabled: (ws) => isEvidenceReady(ws),
     suffix: (pid) => `?paperId=${pid}`,
   },
   {
@@ -61,104 +60,100 @@ const TABS: Tab[] = [
   },
   {
     path: 'database',
-    label: 'Database Rows',
+    label: 'Database',
     Icon: Database,
     enabled: () => true,
   },
 ]
 
-// ─── Context header badge ─────────────────────────────────────────────────────
-
 function WorkspaceBadge({ ws }: { ws: WorkspaceStatus | null }) {
   if (!ws || ws.status === 'not_started') return null
+
   const [text, cls] =
-    ws.status === 'completed'  ? ['Docling Complete', 'bg-emerald-50 text-emerald-700'] :
-    ws.status === 'running'    ? [`Running ${ws.progress}%`, 'bg-blue-50 text-blue-600'] :
-    ws.status === 'queued'     ? ['Queued', 'bg-sky-50 text-sky-600'] :
-    ws.status === 'failed'     ? ['Docling Failed', 'bg-red-50 text-red-600'] :
-                                 [ws.status, 'bg-slate-100 text-slate-500']
+    ws.status === 'completed' || ws.status === 'partial_success'
+      ? [ws.status === 'partial_success' ? 'Ready · review warnings' : 'Analysis ready', 'bg-emerald-50 text-emerald-700 border-emerald-100']
+      : ws.status === 'running'
+      ? [`Analyzing ${ws.progress}%`, 'bg-[#fff5f7] text-[#8B1730] border-[#efd6dc]']
+      : ws.status === 'queued'
+      ? ['Preparing analysis', 'bg-sky-50 text-sky-600 border-sky-100']
+      : ws.status === 'failed'
+      ? ['Analysis failed', 'bg-red-50 text-red-600 border-red-100']
+      : [ws.status, 'bg-slate-100 text-slate-500 border-slate-200']
+
   return (
-    <span className={clsx('flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0', cls)}>
-      {ws.status === 'running' && <Loader2 size={8} className="animate-spin" />}
+    <span className={clsx('flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold', cls)}>
+      {(ws.status === 'running' || ws.status === 'queued') && <Loader2 size={9} className="animate-spin" />}
       {text}
     </span>
   )
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function PaperShell() {
   const { projectId, paperId } = useParams<{ projectId: string; paperId: string }>()
-  const pid        = Number(projectId)
+  const pid = Number(projectId)
   const paperIdNum = Number(paperId)
 
-  const [paper, setPaper]   = useState<PaperInfo | null>(null)
-  const [ws, setWs]         = useState<WorkspaceStatus | null>(null)
+  const [paper, setPaper] = useState<PaperInfo | null>(null)
+  const [ws, setWs] = useState<WorkspaceStatus | null>(null)
   const [wsLoaded, setWsLoaded] = useState(false)
 
   useEffect(() => {
-    // Parallel fetch: paper info + workspace status
     Promise.allSettled([
       papersApi.list(pid).then((list: PaperInfo[]) => {
         const found = list.find((p) => p.id === paperIdNum)
         if (found) setPaper(found)
       }),
-      workspaceApi.status(pid, paperIdNum).then((s: WorkspaceStatus) => {
-        setWs(s)
-      }),
+      workspaceApi.status(pid, paperIdNum).then((s: WorkspaceStatus) => setWs(s)),
     ]).finally(() => setWsLoaded(true))
   }, [pid, paperIdNum])
 
-  // Remember the last-active paper for this project so the project-level
-  // sidebar (e.g. "Validation Queue") can return to it instead of an
-  // arbitrary "first" paper.
+  // Keep the status badge fresh while analysis is running. The overview page
+  // has its own faster live stream; this lightweight poll is only for the
+  // persistent shell/navigation above it.
+  useEffect(() => {
+    if (ws?.status !== 'running' && ws?.status !== 'queued') return
+    const id = window.setInterval(() => {
+      workspaceApi.status(pid, paperIdNum).then((s: WorkspaceStatus) => setWs(s)).catch(() => null)
+    }, 3500)
+    return () => window.clearInterval(id)
+  }, [ws?.status, pid, paperIdNum])
+
   useEffect(() => {
     if (!Number.isNaN(pid) && !Number.isNaN(paperIdNum)) {
       try {
         localStorage.setItem(`lastPaperId:${pid}`, String(paperIdNum))
       } catch {
-        // ignore storage errors (private browsing, quota, etc.)
+        // ignore storage errors
       }
     }
   }, [pid, paperIdNum])
 
-  // Extract document hash from stored filename (12-char uid prefix before first underscore)
-  const docHash = paper?.filename ? paper.filename.split('_')[0] : null
-
   const base = `/projects/${projectId}/papers/${paperId}`
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--background)' }}>
-
-      {/* ── Context header ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3 min-w-0">
-        <FileText size={13} className="text-slate-400 shrink-0" />
-        <span className="font-semibold text-slate-800 text-xs truncate flex-1" title={paper?.original_name}>
-          {paper?.original_name ?? `Paper ${paperIdNum}`}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          <code className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[10px] font-mono">
-            #{paperIdNum}
-          </code>
-          {ws?.job_id && (
-            <code className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[10px] font-mono">
-              run #{ws.job_id}
-            </code>
-          )}
-          {docHash && (
-            <code className="bg-slate-50 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-mono" title="Document hash">
-              {docHash}
-            </code>
-          )}
-          {paper?.page_count ? (
-            <span className="text-[10px] text-slate-300">{paper.page_count}pp</span>
-          ) : null}
+    <div className="flex h-full flex-col overflow-hidden bg-[#fffdfd]">
+      <div className="shrink-0 border-b border-[#efe6e8] bg-white px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            to={`/projects/${projectId}`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#eee4e7] text-[#7d8a9d] transition hover:border-[#d9bdc5] hover:bg-[#fff8fa] hover:text-[#7A1B2E]"
+            title="Back to project dashboard"
+          >
+            <ArrowLeft size={14} />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-semibold text-[#202a3c]" title={paper?.original_name}>
+              {paper?.original_name ?? `Paper ${paperIdNum}`}
+            </p>
+            <p className="mt-0.5 text-[9.5px] text-[#93a0b1]">
+              {paper?.page_count ? `${paper.page_count} pages · ` : ''}Research paper workspace
+            </p>
+          </div>
           {wsLoaded && <WorkspaceBadge ws={ws} />}
         </div>
       </div>
 
-      {/* ── Tab navigation ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white border-b border-slate-200 flex items-end gap-0 px-4 overflow-x-auto scrollbar-none">
+      <div className="scrollbar-none flex shrink-0 items-end gap-1 overflow-x-auto border-b border-[#efe6e8] bg-white px-4">
         {TABS.map(({ path, label, Icon, enabled, suffix }) => {
           const active = enabled(ws)
           const to = `${base}/${path}${suffix ? suffix(paperIdNum) : ''}`
@@ -168,12 +163,12 @@ export default function PaperShell() {
               to={to}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-1.5 px-3.5 py-2.5 text-[12px] font-medium border-b-2 whitespace-nowrap transition-colors select-none',
+                  'flex select-none items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-[11.5px] font-medium transition-colors',
                   !active
                     ? 'pointer-events-none border-transparent text-slate-300'
                     : isActive
-                    ? 'border-[#7A1B2E] text-[#7A1B2E] font-semibold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200 cursor-pointer',
+                    ? 'border-[#8B1730] font-semibold text-[#8B1730]'
+                    : 'border-transparent text-[#657389] hover:border-[#ead8dd] hover:text-[#273247]',
                 )
               }
             >
@@ -184,8 +179,7 @@ export default function PaperShell() {
         })}
       </div>
 
-      {/* ── Page content ───────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <Outlet />
       </div>
     </div>
