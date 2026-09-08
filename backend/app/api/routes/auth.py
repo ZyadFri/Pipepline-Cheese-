@@ -13,6 +13,7 @@ from app.schemas.auth import (
     LoginRequest, ProfileUpdateRequest, RegisterRequest, TokenResponse, UserOut,
 )
 from app.api.deps import get_current_user
+from app.services.llm_usage import summarize_usage_for_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -142,6 +143,21 @@ def _serve_avatar(user: User):
     if not user.avatar_path or not Path(user.avatar_path).exists():
         raise HTTPException(404, "No avatar set for this user")
     return FileResponse(user.avatar_path, headers={"Cache-Control": "max-age=3600"})
+
+
+@router.get("/me/llm-usage")
+def get_my_llm_usage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """LLM/vision API consumption for the current user: total calls and
+    tokens, a breakdown by model and by feature, recent activity, and — only
+    where the provider's response actually included it — the most recent
+    rate-limit snapshot per provider. There is no "total quota remaining"
+    figure here: no provider exposes an account credit balance on the same
+    endpoint this app calls for chat completions, so showing one would mean
+    making it up."""
+    return summarize_usage_for_user(db, current_user.id)
 
 
 @router.get("/users/{user_id}/avatar")

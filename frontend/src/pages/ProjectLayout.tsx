@@ -8,7 +8,10 @@ export default function ProjectLayout() {
       <TopNavbar />
       <div className="flex min-h-0 flex-1">
         <ProjectSidebar />
-        <main className="flex-1 overflow-y-auto bg-white min-w-0 flex flex-col">
+        <main
+          className="flex-1 overflow-y-auto min-w-0 flex flex-col"
+          style={{ background: 'var(--background)' }}
+        >
           <Outlet />
         </main>
       </div>

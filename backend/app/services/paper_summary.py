@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Experiment, Observation, Paper, Study, TreatmentArm
 from app.services.llm_qa import ask_llm
+from app.services.llm_usage import usage_context
 from app.services.paper_context import gather_paper_text_spans
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,10 @@ def _parse_summary_json(raw: str) -> dict:
     }
 
 
-def get_or_generate_summary(paper: Paper, project_id: int, db: Session, *, regenerate: bool = False) -> dict:
+def get_or_generate_summary(
+    paper: Paper, project_id: int, db: Session, *, regenerate: bool = False, user_id: int | None = None,
+) -> dict:
+    provider_fallback: list = []
     if paper.summary_json and not regenerate:
         result = json.loads(paper.summary_json)
         result["cached"] = True
@@ -87,13 +91,19 @@ def get_or_generate_summary(paper: Paper, project_id: int, db: Session, *, regen
         if not context.strip():
             raise RuntimeError("No extracted text is available for this paper yet — run extraction first.")
 
-        raw = ask_llm(_SYSTEM_PROMPT, f"PAPER TEXT EXCERPTS:\n{context}", max_tokens=700)
+        with usage_context(feature="paper_summary", user_id=user_id, project_id=project_id, paper_id=paper.id) as ctx:
+            raw = ask_llm(_SYSTEM_PROMPT, f"PAPER TEXT EXCERPTS:\n{context}", max_tokens=700)
+        provider_fallback = ctx.fallback_events
         result = _parse_summary_json(raw)
 
+        # Cached verbatim — provider_fallback is per-run, not cached, so it's
+        # added back in below regardless of which branch produced `result`.
         paper.summary_json = json.dumps(result)
         paper.summary_generated_at = datetime.utcnow()
         db.commit()
         result["cached"] = False
+
+    result["provider_fallback"] = provider_fallback
 
     result["counts"] = _structured_counts(paper.id, project_id, db)
     result["generated_at"] = paper.summary_generated_at.isoformat() if paper.summary_generated_at else None

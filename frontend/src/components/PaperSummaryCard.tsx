@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Sparkles, RefreshCw, Target, Package, FlaskConical, Activity, Lightbulb } from 'lucide-react'
 import { paperAssistantApi } from '../services/api'
 import type { PaperSummary } from '../services/api'
+import ProviderFallbackNotice from './ProviderFallbackNotice'
 
 interface Props {
   projectId: number
@@ -57,6 +58,9 @@ export default function PaperSummaryCard({ projectId, paperId }: Props) {
         <p className="mt-3 text-[11px] text-rose-600">{error}</p>
       ) : summary ? (
         <div className="mt-3 space-y-3">
+          {summary.provider_fallback.length > 0 && (
+            <ProviderFallbackNotice events={summary.provider_fallback} />
+          )}
           <div className="flex items-start gap-2">
             <Target size={13} className="mt-0.5 shrink-0 text-[#a43c55]" />
             <p className="text-[11.5px] leading-relaxed text-slate-700">{summary.objective}</p>

@@ -25,6 +25,7 @@ import { extractionEnginesApi, papersApi, workspaceApi, insightsApi } from '../.
 import type { QualityScore, MissingFieldItem } from '../../services/api'
 import AuthImage from '../../components/AuthImage'
 import QualityInsights from '../../components/QualityInsights'
+import ProviderFallbackNotice from '../../components/ProviderFallbackNotice'
 
 interface Paper {
   id: number
@@ -96,6 +97,7 @@ interface ExtractionJob {
     reasoning: string
     low_confidence_count?: number
     warnings: string[]
+    provider_fallback?: { from_provider: string; to_provider: string; reason: string }[]
   } | null
   completed_at?: string | null
 }
@@ -474,24 +476,29 @@ export default function ValidationPage() {
                     </div>
                   </div>
                 ) : job.status === 'completed' ? (
-                  <div className="flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-emerald-600" />
-                      <div>
-                        <p className="text-[13px] font-semibold text-emerald-900">Structured data is ready</p>
-                        <p className="mt-1 text-[11px] text-emerald-700">
-                          {job.result?.experiments_stored ?? 0} experiments · {job.result?.measurements_stored ?? 0} measurements
-                        </p>
-                      </div>
-                    </div>
-                    {(job.result?.experiments_stored ?? 0) > 0 && (
-                      <button
-                        onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
-                        className="rounded-xl bg-emerald-700 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-emerald-800"
-                      >
-                        Review extracted data →
-                      </button>
+                  <div className="space-y-2.5">
+                    {(job.result?.provider_fallback?.length ?? 0) > 0 && (
+                      <ProviderFallbackNotice events={job.result!.provider_fallback!} />
                     )}
+                    <div className="flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-emerald-600" />
+                        <div>
+                          <p className="text-[13px] font-semibold text-emerald-900">Structured data is ready</p>
+                          <p className="mt-1 text-[11px] text-emerald-700">
+                            {job.result?.experiments_stored ?? 0} experiments · {job.result?.measurements_stored ?? 0} measurements
+                          </p>
+                        </div>
+                      </div>
+                      {(job.result?.experiments_stored ?? 0) > 0 && (
+                        <button
+                          onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
+                          className="rounded-xl bg-emerald-700 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-emerald-800"
+                        >
+                          Review extracted data →
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : job.status === 'failed' ? (
                   <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-5">

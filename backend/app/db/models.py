@@ -56,6 +56,7 @@ class User(Base):
     projects        = relationship("Project", back_populates="owner")
     project_members = relationship("ProjectMember", back_populates="user", foreign_keys="ProjectMember.user_id")
     audit_events    = relationship("AuditEvent", back_populates="actor", foreign_keys="AuditEvent.actor_id")
+    llm_usage_events = relationship("LLMUsageEvent", back_populates="user")
 
     @property
     def has_avatar(self) -> bool:
@@ -607,6 +608,48 @@ class AuditEvent(Base):
 
     __table_args__ = (
         Index("ix_audit_entity", "entity_type", "entity_id"),
+    )
+
+
+class LLMUsageEvent(Base):
+    """Immutable log of every LLM/vision API call made by the platform — one
+    row per provider call, recorded regardless of success/failure. Powers the
+    per-user usage view on the profile page. Never cascade-deleted with its
+    user (audit-log style, like AuditEvent.actor_id) — usage history should
+    survive account changes."""
+    __tablename__ = "llm_usage_events"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    user_id            = Column(Integer, ForeignKey("users.id"), nullable=True)
+    project_id         = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    paper_id           = Column(Integer, ForeignKey("papers.id"), nullable=True)
+    feature            = Column(String, nullable=False)  # llm_extraction|llm_verification|chart_vision|paper_summary|ask_paper
+    provider           = Column(String, nullable=False)  # groq|gemini|openai|anthropic|google_ai|vertexai
+    model              = Column(String, nullable=False)
+    prompt_tokens      = Column(Integer, default=0)
+    completion_tokens  = Column(Integer, default=0)
+    total_tokens       = Column(Integer, default=0)
+    latency_ms         = Column(Integer, nullable=True)
+    success            = Column(Boolean, default=True)
+    error_message      = Column(Text, nullable=True)
+    # Best-effort snapshot of the provider's own rate-limit response headers at
+    # call time (only populated for OpenAI-SDK-shaped providers — Groq,
+    # OpenAI, Gemini's OpenAI-compat endpoint — which return these headers;
+    # Anthropic/native Gemini calls leave these null). This is the only
+    # "how much is left" signal actually obtainable from the API itself — a
+    # total account credit balance is not exposed by any chat-completions
+    # endpoint and would require separate billing-API access this app
+    # doesn't have.
+    rl_limit_requests     = Column(Integer, nullable=True)
+    rl_remaining_requests = Column(Integer, nullable=True)
+    rl_limit_tokens       = Column(Integer, nullable=True)
+    rl_remaining_tokens   = Column(Integer, nullable=True)
+    created_at         = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User", back_populates="llm_usage_events")
+
+    __table_args__ = (
+        Index("ix_llm_usage_user_created", "user_id", "created_at"),
     )
 
 

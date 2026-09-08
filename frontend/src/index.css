@@ -20,7 +20,11 @@
 :root {
   /* --- surfaces / text --------------------------------------------------- */
   --canvas: #FCFCFC;
-  --background: #FFFFFF;
+  /* A faint pink tint (not pure white) so the page background reads as one
+     continuous surface with the pink-tinted top navbar instead of a hard
+     white/pink seam right under it — cards/panels stay --card: #FFFFFF, so
+     they still pop against this. */
+  --background: #FFF8F9;
   --foreground: #17131A;
 
   --card: #FFFFFF;

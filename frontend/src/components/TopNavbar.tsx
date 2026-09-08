@@ -136,19 +136,21 @@ export default function TopNavbar() {
   }
 
   return (
-    <header className="relative z-50 h-[78px] shrink-0 bg-[#fff6f8] px-2 pt-2 lg:px-3">
-      <div className="relative flex h-[64px] items-center overflow-visible rounded-[24px] border border-[#ead5db] bg-[linear-gradient(105deg,rgba(255,248,250,.99)_0%,rgba(255,244,247,.98)_50%,rgba(252,236,241,.98)_100%)] px-4 shadow-[0_14px_38px_-26px_rgba(76,21,39,.55),0_2px_8px_rgba(76,21,39,.06)] lg:px-6">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-          <div className="absolute left-[43%] top-[-56px] h-[112px] w-[280px] rounded-full bg-[radial-gradient(circle,rgba(139,23,48,.09),transparent_68%)]" />
-          <div className="absolute right-[9%] top-1/2 h-20 w-36 -translate-y-1/2 opacity-[.18] [background-image:linear-gradient(90deg,transparent_0_11%,rgba(139,23,48,.12)_11%_12%,transparent_12%_25%,rgba(139,23,48,.12)_25%_26%,transparent_26%_39%,rgba(139,23,48,.12)_39%_40%,transparent_40%)]" />
+    <header
+      className="relative z-50 h-[78px] shrink-0 px-2 pt-2 lg:px-3"
+      style={{ background: 'var(--background)' }}
+    >
+      <div className="relative flex h-[64px] items-center overflow-visible rounded-[20px] border border-[#ecdde1] bg-white px-4 shadow-[0_1px_2px_rgba(76,21,39,.04),0_10px_28px_-22px_rgba(76,21,39,.35)] lg:px-5">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[20px]">
+          <div className="absolute left-[43%] top-[-56px] h-[112px] w-[280px] rounded-full bg-[radial-gradient(circle,rgba(139,23,48,.06),transparent_68%)]" />
         </div>
 
-        <NavLink to="/" className="relative z-10 flex min-w-0 shrink-0 items-center gap-3.5 rounded-xl transition-opacity hover:opacity-85">
-          <img src="/mcgill.png" alt="McGill" className="h-10 w-auto object-contain" />
-          <span className="hidden h-7 w-px bg-[#dcc8ce] sm:block" />
+        <NavLink to="/" className="relative z-10 flex min-w-0 shrink-0 items-center gap-3 rounded-xl py-1 transition-opacity hover:opacity-80">
+          <img src="/mcgill.png" alt="McGill" className="h-9 w-auto object-contain" />
+          <span className="hidden h-8 w-px bg-[#eee0e4] sm:block" />
           <div className="hidden min-w-0 sm:block">
-            <p className="font-display text-[17px] font-semibold leading-none text-[#7A1B2E]">Cheese Database</p>
-            <p className="mt-1 text-[9px] font-medium uppercase tracking-[0.13em] text-[#a27683]">Research platform</p>
+            <p className="font-display text-[16px] font-semibold leading-none text-[#7A1B2E]">Cheese Database</p>
+            <p className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#a9838c]">Research platform</p>
           </div>
         </NavLink>
 
@@ -164,7 +166,7 @@ export default function TopNavbar() {
               onChange={(event) => setQuery(event.target.value)}
               onFocus={() => setSearchOpen(true)}
               placeholder="Search papers, projects..."
-              className="h-10 w-full rounded-[16px] border border-[#e5dce0] bg-white/90 pl-10 pr-16 text-[12px] text-[#263247] shadow-[0_8px_24px_-22px_rgba(67,26,40,.6)] outline-none transition-all placeholder:text-[#8f9bad] focus:border-[#d7b8c1] focus:bg-white focus:shadow-[0_10px_28px_-20px_rgba(122,27,46,.45)]"
+              className="h-10 w-full rounded-[14px] border border-[#efe6e9] bg-[#faf6f7] pl-10 pr-16 text-[12px] text-[#263247] outline-none transition-all placeholder:text-[#9a99a3] focus:border-[#d7b8c1] focus:bg-white focus:shadow-[0_10px_28px_-20px_rgba(122,27,46,.45)]"
             />
             <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-md border border-[#e8e0e3] bg-[#faf7f8] px-1.5 py-1 text-[9px] font-semibold text-[#9a8790]">
               <Command size={9} /> K
@@ -216,7 +218,7 @@ export default function TopNavbar() {
                 setNotificationsOpen((value) => !value)
                 setMenuOpen(false)
               }}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-transparent text-[#425067] transition-all hover:border-[#eadde1] hover:bg-white hover:text-[#8B1730] hover:shadow-sm"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[#f1e8ea] bg-[#faf6f7] text-[#6b5c62] transition-all hover:border-[#eadde1] hover:bg-[#fff1f4] hover:text-[#8B1730]"
               aria-label="Notifications"
             >
               <Bell size={16} />
@@ -240,7 +242,7 @@ export default function TopNavbar() {
                 setMenuOpen((value) => !value)
                 setNotificationsOpen(false)
               }}
-              className="flex items-center gap-2 rounded-full border border-transparent py-1 pl-1 pr-2.5 transition-all hover:border-[#eadde1] hover:bg-white/80 hover:shadow-sm"
+              className="flex items-center gap-2 rounded-full border border-[#f1e8ea] bg-[#faf6f7] py-1 pl-1 pr-2.5 transition-all hover:border-[#eadde1] hover:bg-[#fff1f4]"
             >
               <Avatar user={user} size={34} />
               <span className="hidden max-w-[130px] truncate text-[12.5px] font-semibold text-[#2e384b] sm:block">

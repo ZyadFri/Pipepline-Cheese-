@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, Loader2, Save, Trash2 } from 'lucide-react'
 import { authApi } from '../services/api'
 import { useAuthStore } from '../store/auth'
 import Avatar from '../components/Avatar'
+import LlmUsagePanel from '../components/LlmUsagePanel'
 
 const MAX_AVATAR_MB = 5
 
@@ -219,6 +220,10 @@ export default function ProfilePage() {
             </div>
           </form>
         </div>
+      </div>
+
+      <div className="mt-5">
+        <LlmUsagePanel />
       </div>
     </div>
   )

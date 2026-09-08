@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { MessageCircleQuestion, Send, Loader2 } from 'lucide-react'
 import { paperAssistantApi } from '../services/api'
-import type { AskPaperSource } from '../services/api'
+import type { AskPaperSource, ProviderFallbackEvent } from '../services/api'
+import ProviderFallbackNotice from './ProviderFallbackNotice'
 
 interface Props {
   projectId: number
@@ -12,6 +13,7 @@ interface Turn {
   question: string
   answer: string
   sources: AskPaperSource[]
+  providerFallback: ProviderFallbackEvent[]
 }
 
 const SUGGESTIONS = [
@@ -35,7 +37,10 @@ export default function AskPaperChat({ projectId, paperId }: Props) {
     setQuestion('')
     try {
       const res = await paperAssistantApi.ask(projectId, paperId, trimmed)
-      setTurns((prev) => [...prev, { question: trimmed, answer: res.answer, sources: res.sources }])
+      setTurns((prev) => [...prev, {
+        question: trimmed, answer: res.answer, sources: res.sources,
+        providerFallback: res.provider_fallback,
+      }])
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       setError(detail || 'Could not answer that question right now.')
@@ -73,6 +78,7 @@ export default function AskPaperChat({ projectId, paperId }: Props) {
         {turns.map((t, i) => (
           <div key={i} className="space-y-1">
             <p className="text-[11.5px] font-semibold text-slate-800">{t.question}</p>
+            {t.providerFallback.length > 0 && <ProviderFallbackNotice events={t.providerFallback} />}
             <p className="text-[11.5px] leading-relaxed text-slate-600">{t.answer}</p>
             {t.sources.length > 0 && (
               <div className="flex flex-wrap gap-1 pt-0.5">

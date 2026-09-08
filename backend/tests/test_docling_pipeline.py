@@ -192,11 +192,13 @@ def test_validate_dataframe_none():
 def test_convert_charts_cache_hit(tmp_path, monkeypatch):
     """When a valid _data.csv already exists, the vision model must NOT be called.
 
-    convert_charts() is a generator that reads a figure via a Groq vision model
-    (_groq_client()) instead of the retired local PP-Chart2Table model — gated on
-    settings.GROQ_API_KEY being set, checked before the cache-hit path is even
-    reached, so that must be patched too or every figure short-circuits to
-    status="skipped" without ever consulting the cache.
+    convert_charts() is a generator that reads a figure via the OpenAI ->
+    Groq -> Gemini vision fallback chain (app.services.food_extractor.
+    _call_with_fallback) instead of the retired local PP-Chart2Table model —
+    gated on at least one provider API key being set, checked before the
+    cache-hit path is even reached, so that must be patched too or every
+    figure short-circuits to status="skipped" without ever consulting the
+    cache.
     """
     img_p = tmp_path / "image_0.png"
     img_p.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -215,14 +217,15 @@ def test_convert_charts_cache_hit(tmp_path, monkeypatch):
 
     from app.core.config import settings
     monkeypatch.setattr(settings, "GROQ_API_KEY", "dummy-test-key")
-    mock_client = MagicMock()
-    with patch("app.services.chart_converter._groq_client", return_value=mock_client):
+    with patch(
+        "app.services.chart_converter._call_with_fallback",
+        side_effect=AssertionError("vision model must not be called on a cache hit"),
+    ):
         results = list(convert_charts([fig], str(tmp_path)))  # generator — must materialize
 
     assert len(results) == 1
     assert results[0].status == "valid"
     assert results[0].csv_path == str(csv_p)
-    mock_client.chat.completions.create.assert_not_called()
 
 
 # ─── 4. Evidence package builder ─────────────────────────────────────────────
@@ -473,8 +476,7 @@ def test_chart_derived_value_is_approximate():
         ],
     }
 
-    with patch("app.services.food_extractor._groq_call") as mock_call, \
-         patch("app.services.food_extractor._groq_client") as mock_client:
+    with patch("app.services.food_extractor._call_with_fallback") as mock_call:
         mock_call.return_value = json.dumps(fake_llm_result)
         result = extract_food_data(
             evidence_packages=packages,

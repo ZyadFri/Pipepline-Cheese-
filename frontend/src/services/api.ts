@@ -53,6 +53,59 @@ export const authApi = {
   },
   deleteAvatar: () => api.delete('/auth/me/avatar').then((r) => r.data),
   avatarUrl: (userId: number) => `${api.defaults.baseURL}/auth/users/${userId}/avatar`,
+  llmUsage: (): Promise<LLMUsageSummary> => api.get('/auth/me/llm-usage').then((r) => r.data),
+}
+
+// ── LLM usage (consumption shown on the profile page) ──────────────────────
+
+export interface LLMUsageByModel {
+  provider: string
+  model: string
+  calls: number
+  total_tokens: number
+}
+
+export interface LLMUsageByFeature {
+  feature: string
+  calls: number
+  total_tokens: number
+}
+
+export interface LLMUsageEvent {
+  id: number
+  feature: string
+  provider: string
+  model: string
+  total_tokens: number
+  latency_ms: number | null
+  success: boolean
+  error_message: string | null
+  project_id: number | null
+  paper_id: number | null
+  created_at: string
+}
+
+export interface LLMUsageRateLimit {
+  provider: string
+  model: string
+  limit_requests: number | null
+  remaining_requests: number | null
+  limit_tokens: number | null
+  remaining_tokens: number | null
+  as_of: string
+}
+
+export interface LLMUsageSummary {
+  total_calls: number
+  successful_calls: number
+  failed_calls: number
+  total_prompt_tokens: number
+  total_completion_tokens: number
+  total_tokens: number
+  by_model: LLMUsageByModel[]
+  by_feature: LLMUsageByFeature[]
+  recent: LLMUsageEvent[]
+  rate_limits: LLMUsageRateLimit[]
 }
 
 // ── Projects ──────────────────────────────────────────────────────────────
@@ -464,6 +517,12 @@ export const insightsApi = {
 
 // ── Paper assistant (LLM-backed summary card + ask-this-paper chat) ───────
 
+export interface ProviderFallbackEvent {
+  from_provider: string
+  to_provider: string
+  reason: string
+}
+
 export interface PaperSummary {
   objective: string
   product: string
@@ -473,6 +532,7 @@ export interface PaperSummary {
   counts: { experiment_count: number; observation_count: number }
   generated_at: string | null
   cached: boolean
+  provider_fallback: ProviderFallbackEvent[]
 }
 
 export interface AskPaperSource {
@@ -483,6 +543,7 @@ export interface AskPaperSource {
 export interface AskPaperResponse {
   answer: string
   sources: AskPaperSource[]
+  provider_fallback: ProviderFallbackEvent[]
 }
 
 export const paperAssistantApi = {

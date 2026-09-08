@@ -38,7 +38,10 @@ class LLMExtractionEngine(ExtractionEngine):
                 reasoning_summary="No relevant evidence found in the selected assets.",
             )
 
-        result = extract_food_data(evidence_packages=packages, known_item_refs=known_refs, enable_verification=True)
+        result = extract_food_data(
+            evidence_packages=packages, known_item_refs=known_refs, enable_verification=True,
+            project_id=project_id, paper_id=paper_id,
+        )
         ir = llm_dict_to_ir(result, paper_id, project_id)
         ir.warnings = []
         return ir

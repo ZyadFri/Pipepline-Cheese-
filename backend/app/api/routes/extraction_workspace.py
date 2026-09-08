@@ -48,6 +48,7 @@ from app.services.docling_extractor import (
 )
 from app.services.evidence_package import EvidenceItem, EvidencePackage
 from app.services.food_extractor import extract_food_data
+from app.services.llm_usage import usage_context
 from app.services.job_events import emit
 
 logger = logging.getLogger(__name__)
@@ -444,31 +445,33 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
         # so the Live Gallery updates per-figure instead of going quiet until the
         # slowest step in the whole pipeline finishes.
         n_read = 0
-        for cr in convert_charts(chart_candidates, str(cache_dir)):
-            if _cancelled():
-                _finish_cancelled()
-                return
+        with usage_context(feature="chart_vision", user_id=job.created_by,
+                            project_id=project_id, paper_id=paper_id) as chart_usage_ctx:
+            for cr in convert_charts(chart_candidates, str(cache_dir)):
+                if _cancelled():
+                    _finish_cancelled()
+                    return
 
-            aid = asset_map.get(cr.item_ref)
-            asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first() if aid else None
-            if not asset:
-                continue
+                aid = asset_map.get(cr.item_ref)
+                asset = db.query(ExtractionAsset).filter(ExtractionAsset.id == aid).first() if aid else None
+                if not asset:
+                    continue
 
-            _apply_chart_result(asset, cr)
-            if cr.status == "error":
-                warnings.append(
-                    f"Chart on page {asset.page_number} could not be digitized: {cr.reject_reason}"
-                )
-                emit(db, job_id, "asset_failed", cr.reject_reason,
-                     asset_id=asset.id, asset_type="figure", page_number=asset.page_number)
+                _apply_chart_result(asset, cr)
+                if cr.status == "error":
+                    warnings.append(
+                        f"Chart on page {asset.page_number} could not be digitized: {cr.reject_reason}"
+                    )
+                    emit(db, job_id, "asset_failed", cr.reject_reason,
+                         asset_id=asset.id, asset_type="figure", page_number=asset.page_number)
 
-            _classify_and_commit(asset)
+                _classify_and_commit(asset)
 
-            n_read += 1
-            job.progress = 65 + min(20, int(20 * n_read / max(1, len(chart_candidates))))
-            job.current_step = f"Read {n_read}/{len(chart_candidates)} chart figures"
-            db.commit()
-            emit(db, job_id, "chart_read", job.current_step, asset_id=asset.id, status=cr.status)
+                n_read += 1
+                job.progress = 65 + min(20, int(20 * n_read / max(1, len(chart_candidates))))
+                job.current_step = f"Read {n_read}/{len(chart_candidates)} chart figures"
+                db.commit()
+                emit(db, job_id, "chart_read", job.current_step, asset_id=asset.id, status=cr.status)
 
         job.progress  = 85
         job.current_step = "Scoring scientific relevance"
@@ -525,6 +528,7 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
             "page_count": docling_result.page_count,
             "decorative_excluded": n_logos,
             "warnings": warnings,
+            "provider_fallback": chart_usage_ctx.fallback_events,
         })
         db.commit()
         emit(db, job_id, "job_completed", step_summary, status=job.status, warnings=warnings)
@@ -1175,6 +1179,7 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
             evidence_packages=packages,
             known_item_refs=known_refs,
             enable_verification=True,
+            user_id=job.created_by, project_id=project_id, paper_id=paper_id,
         )
 
         experiments_data = result.get("experiments", [])
@@ -1252,6 +1257,7 @@ def _run_llm_validation(paper_id: int, project_id: int, job_id: int) -> None:
             "low_confidence_count": result.get("low_confidence_count", 0),
             "warnings": warnings,
             "promotion": promotion,
+            "provider_fallback": result.get("provider_fallback", []),
         })
         db.commit()
 

@@ -9,6 +9,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.services.llm_qa import ask_llm
+from app.services.llm_usage import usage_context
 from app.services.paper_context import gather_paper_text_spans
 
 _STOPWORDS = frozenset({
@@ -43,12 +44,15 @@ def _retrieve(paper_id: int, question: str, db: Session) -> list[dict]:
     return [s for s, _ in matched[:_TOP_K]] or spans[:_TOP_K]
 
 
-def answer_question_about_paper(paper_id: int, question: str, db: Session) -> dict:
+def answer_question_about_paper(
+    paper_id: int, question: str, db: Session, *, user_id: int | None = None, project_id: int | None = None,
+) -> dict:
     spans = _retrieve(paper_id, question, db)
     if not spans:
         return {
             "answer": "This paper hasn't been extracted yet, so there's no text to search.",
             "sources": [],
+            "provider_fallback": [],
         }
 
     parts: list[str] = []
@@ -64,7 +68,8 @@ def answer_question_about_paper(paper_id: int, question: str, db: Session) -> di
 
     context = "\n\n".join(parts)
     prompt = f"EXCERPTS FROM THE PAPER:\n{context}\n\nQUESTION: {question}"
-    answer = ask_llm(_SYSTEM_PROMPT, prompt, max_tokens=400).strip()
+    with usage_context(feature="ask_paper", user_id=user_id, project_id=project_id, paper_id=paper_id) as ctx:
+        answer = ask_llm(_SYSTEM_PROMPT, prompt, max_tokens=400).strip()
 
     return {
         "answer": answer or "I couldn't generate an answer from the extracted text.",
@@ -72,4 +77,5 @@ def answer_question_about_paper(paper_id: int, question: str, db: Session) -> di
             {"page_number": s["page_number"], "snippet": s["text"][:220]}
             for s in used[:4]
         ],
+        "provider_fallback": ctx.fallback_events,
     }

@@ -25,12 +25,7 @@ import pandas as pd
 
 from app.core.config import settings
 from app.services.docling_extractor import DoclingFigure
-from app.services.food_extractor import (
-    _gemini_client,
-    _groq_call,
-    _groq_client,
-    _provider_call,
-)
+from app.services.food_extractor import _call_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -172,31 +167,15 @@ def _is_temporary_provider_error(exc: Exception) -> bool:
     return any(marker in message for marker in _TEMP_PROVIDER_MARKERS)
 
 
-def _call_vision(client, user_content) -> str:
-    """Use Groq when configured, otherwise use Gemini directly.
-
-    When Groq is configured, _groq_call already performs bounded retries and
-    falls back to Gemini if a Google key is available.
-    """
-    if client is not None:
-        return _groq_call(
-            client,
-            settings.GROQ_VISION_MODEL,
-            system=None,
-            user_content=user_content,
-            max_tokens=1500,
-            json_mode=False,
-        ).strip()
-
-    gemini_client = _gemini_client()
-    return _provider_call(
-        gemini_client,
-        settings.GOOGLE_AI_MODEL,
-        system=None,
-        user_content=user_content,
-        max_tokens=1500,
-        json_mode=False,
-        provider_label="Gemini",
+def _call_vision(user_content) -> str:
+    """Reads one chart image via the same OpenAI -> Groq -> Gemini fallback
+    chain text extraction uses, with the vision-capable model for each tier
+    (Groq's text model can't read images, so that tier needs its own
+    GROQ_VISION_MODEL override; OpenAI's gpt-4o-mini and Gemini's
+    gemini-2.5-flash are already vision-capable as their normal models)."""
+    return _call_with_fallback(
+        system=None, user_content=user_content, max_tokens=1500, json_mode=False,
+        groq_model=settings.GROQ_VISION_MODEL,
     ).strip()
 
 
@@ -208,11 +187,10 @@ def convert_charts(figures: list, cache_dir: str):
     and the paper extraction remains usable instead of being marked partial
     failure for an optional enrichment step.
     """
-    if not settings.GROQ_API_KEY and not settings.GOOGLE_API_KEY:
+    if not settings.OPENAI_API_KEY and not settings.GROQ_API_KEY and not settings.GOOGLE_API_KEY:
         yield from _skip_all(figures, "No vision provider API key configured")
         return
 
-    client = _groq_client() if settings.GROQ_API_KEY else None
     called_api = False
 
     for idx, fig in enumerate(figures, start=1):
@@ -299,7 +277,7 @@ def convert_charts(figures: list, cache_dir: str):
                 {"type": "text", "text": _CHART_EXTRACTION_PROMPT},
                 {"type": "image_url", "image_url": {"url": data_url}},
             ]
-            raw = _call_vision(client, user_content)
+            raw = _call_vision(user_content)
 
             if raw.upper().startswith("NOT_A_CHART"):
                 yield ChartResult(

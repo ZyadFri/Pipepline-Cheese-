@@ -44,7 +44,7 @@ def get_paper_summary(
     _require_project(project_id, user, db)
     paper = _get_paper_or_404(project_id, paper_id, db)
     try:
-        return get_or_generate_summary(paper, project_id, db, regenerate=regenerate)
+        return get_or_generate_summary(paper, project_id, db, regenerate=regenerate, user_id=user.id)
     except RuntimeError as exc:
         raise HTTPException(400, str(exc))
     except Exception:
@@ -67,7 +67,9 @@ def ask_paper(
     _require_project(project_id, user, db)
     _get_paper_or_404(project_id, paper_id, db)
     try:
-        return answer_question_about_paper(paper_id, body.question.strip(), db)
+        return answer_question_about_paper(
+            paper_id, body.question.strip(), db, user_id=user.id, project_id=project_id,
+        )
     except Exception:
         logger.error("Ask-this-paper failed for paper %s", paper_id, exc_info=True)
         raise HTTPException(502, "Could not answer that question right now. Please try again shortly.")

@@ -24,6 +24,9 @@ import time
 from typing import Any, Optional
 
 from app.core.config import settings
+from app.services.llm_usage import (
+    note_fallback, parse_openai_style_rate_limit_headers, record_usage, usage_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +202,17 @@ def _recover_experiments(raw: str) -> list:
     return objects
 
 
-# ─── LLM clients (Groq primary, Gemini fallback) ───────────────────────────────
+# ─── LLM clients (OpenAI primary, Groq fallback, Gemini last resort) ───────────
+
+def _openai_client():
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError("openai package required — pip install openai")
+    if not settings.OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not set in backend/.env")
+    return OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=0)
+
 
 def _groq_client():
     try:
@@ -259,71 +272,132 @@ def _provider_call(
     max_chars = len(user_content) if is_text else None
     content = user_content
     retries_503 = 0
+    provider_key = provider_label.lower()
 
     for _attempt in range(8):
         messages = [{"role": "user", "content": content}]
         if system:
             messages.insert(0, {"role": "system", "content": system})
+        kwargs = dict(model=model, messages=messages, max_tokens=max_tokens, temperature=0.05)
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        call_start = time.monotonic()
         try:
-            kwargs = dict(model=model, messages=messages, max_tokens=max_tokens, temperature=0.05)
-            if json_mode:
-                kwargs["response_format"] = {"type": "json_object"}
-            resp = client.chat.completions.create(**kwargs)
-            raw = resp.choices[0].message.content or "{}"
-            if resp.choices[0].finish_reason == "length":
-                logger.warning("Response truncated (finish_reason=length)")
-            return raw
+            # with_raw_response gives access to the provider's rate-limit
+            # headers alongside the normal parsed body — the only real
+            # "how much is left" signal any of these APIs expose.
+            raw_response = client.chat.completions.with_raw_response.create(**kwargs)
         except Exception as exc:
+            latency_ms = int((time.monotonic() - call_start) * 1000)
             err = str(exc)
             is_413 = "413" in err or "request_too_large" in err or "Request Entity Too Large" in err
-            is_429 = "429" in err or "rate_limit_exceeded" in err or "RESOURCE_EXHAUSTED" in err
+            is_quota_exhausted = "insufficient_quota" in err or "exceeded your current quota" in err.lower()
+            is_429 = ("429" in err or "rate_limit_exceeded" in err or "RESOURCE_EXHAUSTED" in err) and not is_quota_exhausted
+            if is_quota_exhausted:
+                # A hard billing/quota exhaustion, not a transient per-minute
+                # rate limit — retrying the same key won't help, so raise
+                # immediately instead of burning up to 8 retries waiting on
+                # an account that's simply out of credit. The caller's
+                # provider-fallback chain (see _call_with_fallback) is what
+                # actually recovers from this.
+                record_usage(provider=provider_key, model=model, latency_ms=latency_ms,
+                              success=False, error_message=err)
+                raise
             if is_413 and is_text and max_chars > 1000:
                 max_chars //= 2
                 content = user_content[:max_chars] + "\n\n[Content truncated]"
                 logger.warning("%s 413 — retrying with %d chars", provider_label, max_chars)
+                continue
             elif is_429:
                 m = re.search(r"try again in ([\d.]+)s", err)
                 wait = min(float(m.group(1)) + 2.0, 30.0) if m else 10.0
                 logger.warning("%s 429 — waiting %.1fs", provider_label, wait)
                 time.sleep(wait)
+                continue
             elif "503" in err and retries_503 < 2:
                 retries_503 += 1
                 logger.warning("%s 503 (model overloaded) — retry %d/2 in 4s", provider_label, retries_503)
                 time.sleep(4.0)
+                continue
             else:
+                record_usage(provider=provider_key, model=model, latency_ms=latency_ms,
+                              success=False, error_message=err)
                 raise
 
+        resp = raw_response.parse()
+        latency_ms = int((time.monotonic() - call_start) * 1000)
+        raw = resp.choices[0].message.content or "{}"
+        if resp.choices[0].finish_reason == "length":
+            logger.warning("Response truncated (finish_reason=length)")
+        usage = resp.usage
+        record_usage(
+            provider=provider_key, model=model,
+            prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
+            completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
+            total_tokens=getattr(usage, "total_tokens", 0) if usage else 0,
+            latency_ms=latency_ms, success=True,
+            rate_limit=parse_openai_style_rate_limit_headers(raw_response.headers),
+        )
+        return raw
+
+    record_usage(provider=provider_key, model=model, success=False,
+                  error_message="call failed after maximum retries")
     raise RuntimeError(f"{provider_label} call failed after maximum retries")
 
 
-def _groq_call(
-    client,
-    model: str,
+def _call_with_fallback(
     system: Optional[str],
     user_content,                      # str, for text; list[dict], for vision content parts
     max_tokens: int = 4096,
     json_mode: bool = True,
+    *,
+    openai_model: Optional[str] = None,
+    groq_model: Optional[str] = None,
+    gemini_model: Optional[str] = None,
 ) -> str:
     """
-    Calls Groq (with its own adaptive retry, see _provider_call). If Groq's
-    retries are fully exhausted — the free-tier quota is the expected real-world
-    cause — and GOOGLE_API_KEY is configured, falls back to Gemini
-    (settings.GOOGLE_AI_MODEL) for this one call instead of failing the
-    extraction. Used identically for text extraction and chart reading, so both
-    get the fallback for free. Silent no-op fallback-wise when no Gemini key is
-    set: behavior is unchanged from Groq-only.
+    Three-tier provider chain: OpenAI (primary) → Groq (fallback) → Gemini
+    (last resort). Each tier only runs if its own API key is configured, and
+    a tier is skipped straight to the next on ANY failure from that
+    provider (_provider_call already exhausts that provider's own retries
+    first) — most commonly a quota/billing exhaustion. Every time a fallback
+    actually happens, note_fallback() records it against the ambient
+    usage_context() so callers can tell the user "the primary provider is
+    exhausted, this ran on the backup instead" instead of that only being
+    visible in a log.
+
+    openai_model/groq_model/gemini_model let a caller (e.g. chart_converter's
+    vision reads) use a different model per tier than plain text extraction —
+    defaults are the text-extraction models.
     """
-    try:
-        return _provider_call(client, model, system, user_content, max_tokens, json_mode, "Groq")
-    except Exception as exc:
-        if not settings.GOOGLE_API_KEY:
-            raise
-        logger.warning("Groq exhausted (%s) — falling back to Gemini", str(exc)[:200])
-        gemini_client = _gemini_client()
-        return _provider_call(
-            gemini_client, settings.GOOGLE_AI_MODEL, system, user_content,
-            max_tokens, json_mode, "Gemini",
+    tiers = [
+        ("openai", settings.OPENAI_API_KEY, _openai_client, openai_model or settings.OPENAI_MODEL, "OpenAI"),
+        ("groq", settings.GROQ_API_KEY, _groq_client, groq_model or settings.GROQ_FOOD_MODEL, "Groq"),
+        ("google_ai", settings.GOOGLE_API_KEY, _gemini_client, gemini_model or settings.GOOGLE_AI_MODEL, "Gemini"),
+    ]
+    available = [t for t in tiers if t[1]]
+    if not available:
+        raise RuntimeError(
+            "No LLM provider is configured — set OPENAI_API_KEY, GROQ_API_KEY, "
+            "or GOOGLE_API_KEY in backend/.env"
         )
+
+    last_error: Optional[str] = None
+    for i, (provider_key, _api_key, client_factory, model, label) in enumerate(available):
+        try:
+            client = client_factory()
+            return _provider_call(client, model, system, user_content, max_tokens, json_mode, label)
+        except Exception as exc:
+            last_error = str(exc)
+            is_last_tier = i == len(available) - 1
+            if is_last_tier:
+                raise
+            next_provider = available[i + 1][0]
+            logger.warning("%s exhausted/failed (%s) — falling back to %s", label, last_error[:200], next_provider)
+            note_fallback(from_provider=provider_key, to_provider=next_provider, reason=last_error)
+
+    raise RuntimeError(f"All configured LLM providers failed. Last error: {last_error}")
 
 
 # ─── Evidence ref validation ───────────────────────────────────────────────────
@@ -365,14 +439,12 @@ def _build_user_message(package_text: str, known_refs: set) -> str:
 
 
 def _extract_package(
-    client,
-    model: str,
     package,           # EvidencePackage
     known_refs: set,
 ) -> dict:
     """Run Pass 1 extraction on a single evidence package."""
     user_msg = _build_user_message(package.render(), known_refs)
-    raw = _groq_call(client, model, SYSTEM_PROMPT, user_msg, max_tokens=4096)
+    raw = _call_with_fallback(SYSTEM_PROMPT, user_msg, max_tokens=4096)
     result = _parse_json(raw)
     if not isinstance(result.get("experiments"), list):
         # Try salvage
@@ -384,8 +456,6 @@ def _extract_package(
 # ─── Pass 2 — verification ────────────────────────────────────────────────────
 
 def _verify_low_confidence(
-    client,
-    model: str,
     low_conf_items: list,
     package_text: str,
     known_refs: set,
@@ -400,7 +470,7 @@ def _verify_low_confidence(
         f"Verify these {len(low_conf_items)} low-confidence measurements:\n{items_json}"
     )
     try:
-        raw = _groq_call(client, model, VERIFY_SYSTEM_PROMPT, user_msg, max_tokens=2048)
+        raw = _call_with_fallback(VERIFY_SYSTEM_PROMPT, user_msg, max_tokens=2048)
         result = _parse_json(raw)
         return result.get("verified", [])
     except Exception as exc:
@@ -440,6 +510,10 @@ def extract_food_data(
     known_item_refs: set,
     model: Optional[str] = None,
     enable_verification: bool = True,
+    *,
+    user_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    paper_id: Optional[int] = None,
 ) -> dict:
     """
     Extract food-safety data from evidence packages.
@@ -448,8 +522,13 @@ def extract_food_data(
     ----------
     evidence_packages : List[EvidencePackage] — from evidence_package.build_packages()
     known_item_refs   : Set[str]              — from DoclingResult.known_item_refs
-    model             : Groq model ID, defaults to settings.GROQ_FOOD_MODEL
+    model             : deprecated, ignored — each provider tier in the
+                        OpenAI → Groq → Gemini fallback chain uses its own
+                        configured model (see _call_with_fallback).
     enable_verification: run Pass 2 for low-confidence items
+    user_id/project_id/paper_id: attribution for the LLM usage log (app.services.llm_usage)
+                        — optional; a caller without a user in scope (e.g. the
+                        compare-mode engine wrapper) can omit user_id.
 
     Returns
     -------
@@ -457,42 +536,47 @@ def extract_food_data(
       reasoning_summary : str
       experiments       : list[dict]
       low_confidence_count : int
+      provider_fallback : list[dict] — non-empty only if a configured
+                          provider was exhausted/failed during this run and
+                          extraction fell back to the next one; each entry is
+                          {"from_provider", "to_provider", "reason"}.
     """
     if not evidence_packages:
-        return {"reasoning_summary": "No relevant evidence found.", "experiments": [], "low_confidence_count": 0}
-
-    _model = model or settings.GROQ_FOOD_MODEL
-    client = _groq_client()
+        return {"reasoning_summary": "No relevant evidence found.", "experiments": [], "low_confidence_count": 0,
+                "provider_fallback": []}
 
     all_experiments: list = []
     all_reasoning: list = []
     low_conf_items: list = []
+    fallback_events: list = []
 
     # ── Pass 1: extract from each evidence package ────────────────────────────
-    for pkg in evidence_packages:
-        logger.info("Extracting from package %d/%d (~%d tokens) …",
-                    pkg.index, len(evidence_packages), pkg.token_estimate)
-        try:
-            result = _extract_package(client, _model, pkg, known_item_refs)
-        except Exception as exc:
-            logger.error("Package %d extraction failed: %s", pkg.index, exc)
-            continue
+    with usage_context(feature="llm_extraction", user_id=user_id, project_id=project_id, paper_id=paper_id) as ctx1:
+        for pkg in evidence_packages:
+            logger.info("Extracting from package %d/%d (~%d tokens) …",
+                        pkg.index, len(evidence_packages), pkg.token_estimate)
+            try:
+                result = _extract_package(pkg, known_item_refs)
+            except Exception as exc:
+                logger.error("Package %d extraction failed: %s", pkg.index, exc)
+                continue
 
-        exps = result.get("experiments", [])
-        if result.get("reasoning_summary"):
-            all_reasoning.append(result["reasoning_summary"])
+            exps = result.get("experiments", [])
+            if result.get("reasoning_summary"):
+                all_reasoning.append(result["reasoning_summary"])
 
-        # Validate docling_item_ref citations
-        exps = _validate_refs(exps, known_item_refs)
+            # Validate docling_item_ref citations
+            exps = _validate_refs(exps, known_item_refs)
 
-        # Tag chart-derived measurements
-        for exp in exps:
-            for meas in exp.get("measurements", []):
-                if any(ev.get("source_type") == "chart_csv"
-                       for ev in meas.get("evidence", [])):
-                    meas["value_is_approximate"] = True
+            # Tag chart-derived measurements
+            for exp in exps:
+                for meas in exp.get("measurements", []):
+                    if any(ev.get("source_type") == "chart_csv"
+                           for ev in meas.get("evidence", [])):
+                        meas["value_is_approximate"] = True
 
-        all_experiments.extend(exps)
+            all_experiments.extend(exps)
+    fallback_events.extend(ctx1.fallback_events)
 
     # ── Collect low-confidence items for Pass 2 ───────────────────────────────
     if enable_verification:
@@ -521,13 +605,16 @@ def extract_food_data(
         logger.info("Pass 2: verifying %d low-confidence measurements", len(low_conf_items))
         # Use the combined content of all packages as context
         combined_text = "\n\n".join(pkg.render() for pkg in evidence_packages)
-        corrections = _verify_low_confidence(
-            client, _model, low_conf_items, combined_text[:8000], known_item_refs
-        )
+        with usage_context(feature="llm_verification", user_id=user_id, project_id=project_id, paper_id=paper_id) as ctx2:
+            corrections = _verify_low_confidence(
+                low_conf_items, combined_text[:8000], known_item_refs
+            )
+        fallback_events.extend(ctx2.fallback_events)
         all_experiments = _apply_corrections(all_experiments, corrections)
 
     return {
         "reasoning_summary": " | ".join(all_reasoning) if all_reasoning else "",
         "experiments": all_experiments,
         "low_confidence_count": len(low_conf_items),
+        "provider_fallback": fallback_events,
     }
