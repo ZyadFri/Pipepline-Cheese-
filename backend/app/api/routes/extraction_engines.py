@@ -1,19 +1,10 @@
 """
 extraction_engines.py — Multi-engine extraction API.
 
-Exposes the rule-based extraction engine (app/extraction/rules/engine.py)
-alongside the existing LLM flow (app/services/food_extractor.py, reached here
-via a thin alias) through one uniform endpoint shape, plus read endpoints for
-what each engine produced and for facts that didn't map to a canonical field.
-
-`engine=ml` and `engine=compare` are intentionally rejected with a clear
-"not available yet" message rather than silently stubbed — see
-docs/extraction_engines.md for what's implemented vs. planned.
-
-Routes:
-  POST  /projects/{pid}/papers/{paper_id}/extract?engine=llm|rules   Start extraction
-  GET   /projects/{pid}/papers/{paper_id}/extractions                Per-engine summary
-  GET   /projects/{pid}/papers/{paper_id}/unmapped-facts              Preserved-but-unmapped facts
+Exposes the rule-based extraction engine alongside the existing LLM flow through
+one uniform endpoint. Internal canonical-bridge facts are deliberately excluded
+from user-facing unmapped-fact counts and lists: they are transport records for
+known schema fields, not unresolved science facts.
 """
 import json
 import logging
@@ -26,21 +17,22 @@ from app.api.deps import get_current_user
 from app.api.routes.extraction_workspace import _get_paper, _require_project
 from app.db.database import SessionLocal, get_db
 from app.db.models import ExtExperiment, ExtMeasurement, ExtUnmappedFact, Job, Paper, User
-from app.extraction.rules.engine import RuleExtractionEngine
+from app.extraction.common.canonical_bridge import BRIDGE_CATEGORY
 from app.extraction.common.persist import persist_paper_extraction
+from app.extraction.rules.engine import RuleExtractionEngine
 from app.services.canonical_promoter import promote_ext_paper_to_canonical
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["extraction-engines"])
 
 SUPPORTED_ENGINES = {"llm", "rules"}
-NOT_YET_AVAILABLE = {"ml": "The ML extraction engine is not implemented yet.",
-                      "compare": "Compare mode is not implemented yet — run 'llm' and 'rules' separately."}
+NOT_YET_AVAILABLE = {
+    "ml": "The ML extraction engine is not implemented yet.",
+    "compare": "Compare mode is not implemented yet — run 'llm' and 'rules' separately.",
+}
 
 
 def _run_rule_extraction(paper_id: int, project_id: int, job_id: int) -> None:
-    """Background task mirroring _run_llm_validation's shape: own session,
-    Job status updates, never leaves the job stuck on an unhandled exception."""
     db = SessionLocal()
     try:
         paper = db.query(Paper).filter(Paper.id == paper_id).first()
@@ -79,6 +71,7 @@ def _run_rule_extraction(paper_id: int, project_id: int, job_id: int) -> None:
         job.result_json = json.dumps({
             "experiments_stored": persist_counts["experiments_stored"],
             "measurements_stored": persist_counts["measurements_stored"],
+            "structured_context_fields_stored": persist_counts.get("structured_context_fields_stored", 0),
             "unmapped_facts_stored": persist_counts["unmapped_facts_stored"],
             "reasoning": result.reasoning_summary,
             "warnings": result.warnings,
@@ -119,8 +112,6 @@ def start_extraction(
         raise HTTPException(400, f"Unknown engine '{engine}'. Supported: {sorted(SUPPORTED_ENGINES)}")
 
     if engine == "llm":
-        # Thin alias — same underlying flow as POST .../send-to-llm, exposed
-        # here too so the frontend can call one uniform endpoint per engine.
         from app.api.routes.extraction_workspace import send_to_llm
         return send_to_llm(project_id, paper_id, background_tasks, db, user)
 
@@ -151,8 +142,6 @@ def list_extractions(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Per-engine summary of what's been run on this paper — the data behind a
-    comparison view without needing a separate comparison endpoint yet."""
     _require_project(project_id, user, db)
     _get_paper(project_id, paper_id, db)
 
@@ -161,11 +150,13 @@ def list_extractions(
         exp_ids = [r.id for r in db.query(ExtExperiment.id).filter(
             ExtExperiment.paper_id == paper_id, ExtExperiment.engine == engine,
         ).all()]
-        meas_count = 0
-        if exp_ids:
-            meas_count = db.query(ExtMeasurement).filter(ExtMeasurement.experiment_id.in_(exp_ids)).count()
+        meas_count = db.query(ExtMeasurement).filter(
+            ExtMeasurement.experiment_id.in_(exp_ids)
+        ).count() if exp_ids else 0
         unmapped_count = db.query(ExtUnmappedFact).filter(
-            ExtUnmappedFact.paper_id == paper_id, ExtUnmappedFact.engine == engine,
+            ExtUnmappedFact.paper_id == paper_id,
+            ExtUnmappedFact.engine == engine,
+            ExtUnmappedFact.category != BRIDGE_CATEGORY,
         ).count()
         last_job = db.query(Job).filter(
             Job.paper_id == paper_id,
@@ -194,12 +185,13 @@ def list_unmapped_facts(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Scientifically meaningful facts an engine detected but couldn't map to a
-    canonical field — preserved with provenance instead of discarded."""
     _require_project(project_id, user, db)
     _get_paper(project_id, paper_id, db)
 
-    q = db.query(ExtUnmappedFact).filter(ExtUnmappedFact.paper_id == paper_id)
+    q = db.query(ExtUnmappedFact).filter(
+        ExtUnmappedFact.paper_id == paper_id,
+        ExtUnmappedFact.category != BRIDGE_CATEGORY,
+    )
     if engine:
         q = q.filter(ExtUnmappedFact.engine == engine)
     facts = q.order_by(ExtUnmappedFact.id.desc()).all()
