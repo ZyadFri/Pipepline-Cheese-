@@ -1,242 +1,68 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  RefreshCw, Loader2, Table2, BarChart2, Image, AlertCircle,
-  Eye, EyeOff, ChevronDown, ChevronRight, FileText,
+  AlertCircle, BarChart3, Camera, Grid2X2, Image as ImageIcon,
+  List, Loader2, RefreshCw, Table2,
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import { workspaceApi } from '../../services/api'
-import AuthImage from '../../components/AuthImage'
 import type { ExtractionAsset } from '../../types/workspace'
+import AssetCard from '../../components/AssetCard'
 import AssetDetailPanel from '../../components/AssetDetailPanel'
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
+const BURGUNDY = '#8B1538'
 
-const NON_SCIENTIFIC = ['publisher_logo', 'license_icon', 'decorative_asset']
+type FilterKey = 'all' | 'figures' | 'tables' | 'photos' | 'charts'
+type ViewMode = 'grid' | 'list'
+type SortMode = 'paper' | 'newest'
 
-const CLASS_META: Record<string, { label: string; cls: string }> = {
-  chart:               { label: 'Chart',              cls: 'bg-emerald-100 text-emerald-700' },
-  native_table:        { label: 'Native Table',       cls: 'bg-[#f3dde2] text-[#661523]' },
-  photograph:          { label: 'Photograph',         cls: 'bg-slate-100 text-slate-600' },
-  diagram:             { label: 'Diagram',            cls: 'bg-violet-100 text-violet-700' },
-  chemical_structure:  { label: 'Chemical Structure', cls: 'bg-amber-100 text-amber-700' },
-  multi_panel_figure:  { label: 'Multi-Panel',        cls: 'bg-indigo-100 text-indigo-700' },
-  publisher_logo:      { label: 'Publisher Logo',     cls: 'bg-slate-100 text-slate-400' },
-  license_icon:        { label: 'License Icon',       cls: 'bg-slate-100 text-slate-400' },
-  decorative_asset:    { label: 'Decorative',         cls: 'bg-slate-100 text-slate-400' },
-  unknown:             { label: 'Unknown',            cls: 'bg-slate-100 text-slate-500' },
+function isChart(a: ExtractionAsset) {
+  return a.asset_type === 'figure' && a.classification === 'chart'
 }
 
-// ─── Asset row ─────────────────────────────────────────────────────────────────
-
-interface AssetRowProps {
-  asset: ExtractionAsset
-  pid: number
-  paperIdNum: number
-  onToggle: (id: number, val: boolean) => Promise<void>
-  onClick: (asset: ExtractionAsset) => void
+function isPhoto(a: ExtractionAsset) {
+  return a.asset_type === 'figure' && a.classification === 'photograph'
 }
 
-function AssetRow({ asset, pid, paperIdNum, onToggle, onClick }: AssetRowProps) {
-  const [toggling, setToggling] = useState(false)
-  const [imgError, setImgError] = useState(false)
+function isFigure(a: ExtractionAsset) {
+  return a.asset_type === 'figure' && !isChart(a) && !isPhoto(a)
+}
 
-  const cls = CLASS_META[asset.classification] ?? CLASS_META.unknown
-  const imgUrl = workspaceApi.imageUrl(pid, paperIdNum, asset.id)
-
-  const handleToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setToggling(true)
-    try {
-      await onToggle(asset.id, !asset.selected_for_llm)
-    } finally {
-      setToggling(false)
-    }
+function fallbackTitle(asset: ExtractionAsset) {
+  switch (asset.classification) {
+    case 'publisher_logo': return 'Publisher logo'
+    case 'license_icon': return 'Publication mark'
+    case 'decorative_asset': return 'Document figure'
+    case 'photograph': return 'Photograph'
+    case 'diagram': return 'Diagram'
+    case 'chemical_structure': return 'Chemical structure'
+    case 'multi_panel_figure': return 'Multi-panel figure'
+    case 'chart': return 'Chart'
+    case 'native_table': return 'Table'
+    default: return asset.asset_type === 'native_table' ? 'Table' : 'Figure'
   }
-
-  const bboxStr = asset.bbox
-    ? `[${asset.bbox.x1.toFixed(0)}, ${asset.bbox.y1.toFixed(0)}, ${asset.bbox.x2.toFixed(0)}, ${asset.bbox.y2.toFixed(0)}]`
-    : null
-
-  return (
-    <div
-      onClick={() => onClick(asset)}
-      className={clsx(
-        'group flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all',
-        'hover:shadow-sm hover:border-slate-300',
-        asset.selected_for_llm
-          ? 'border-[#d9a5b3] bg-[#fdf3f5]/20'
-          : 'border-slate-200 bg-white',
-      )}
-    >
-      {/* Thumbnail / icon */}
-      <div className="w-14 h-14 rounded-md bg-slate-100 shrink-0 overflow-hidden flex items-center justify-center">
-        {asset.asset_type === 'figure' && asset.has_image && !imgError ? (
-          <AuthImage
-            src={imgUrl}
-            alt={asset.caption ?? 'Figure'}
-            className="w-full h-full object-contain"
-            onError={() => setImgError(true)}
-          />
-        ) : asset.asset_type === 'native_table' ? (
-          <Table2 size={20} className="text-slate-400" />
-        ) : (
-          <Image size={20} className="text-slate-300" />
-        )}
-      </div>
-
-      {/* Metadata */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start gap-2 justify-between">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0', cls.cls)}>
-              {cls.label}
-            </span>
-            {asset.page_number != null && (
-              <span className="text-[10px] text-slate-400 shrink-0">p.{asset.page_number}</span>
-            )}
-            {asset.section_name && (
-              <span className="text-[10px] text-slate-400 italic truncate">{asset.section_name}</span>
-            )}
-            {asset.relevance_score > 0 && (
-              <span className={clsx(
-                'text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0',
-                asset.relevance_score >= 3 ? 'bg-emerald-50 text-emerald-700' :
-                asset.relevance_score >= 1 ? 'bg-amber-50 text-amber-600' :
-                'bg-slate-50 text-slate-500',
-              )}>
-                ★ {asset.relevance_score.toFixed(1)}
-              </span>
-            )}
-          </div>
-
-          {/* Include / Exclude button */}
-          <button
-            onClick={handleToggle}
-            disabled={toggling}
-            title={asset.selected_for_llm ? 'Remove from evidence' : 'Include as evidence'}
-            className={clsx(
-              'shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100',
-              asset.selected_for_llm
-                ? 'bg-[#f3dde2] text-[#661523] hover:bg-[#e8c6d0] opacity-100'
-                : 'bg-slate-100 text-slate-400 hover:bg-slate-200',
-            )}
-          >
-            {toggling ? (
-              <Loader2 size={9} className="animate-spin" />
-            ) : asset.selected_for_llm ? (
-              <Eye size={9} />
-            ) : (
-              <EyeOff size={9} />
-            )}
-            {asset.selected_for_llm ? 'Included' : 'Include'}
-          </button>
-        </div>
-
-        {/* Caption */}
-        {asset.caption ? (
-          <p className="text-[11px] text-slate-600 mt-1 leading-relaxed line-clamp-2">{asset.caption}</p>
-        ) : (
-          <p className="text-[11px] text-slate-300 mt-1 italic">No caption</p>
-        )}
-
-        {/* Technical metadata row */}
-        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          {asset.docling_item_ref && (
-            <code className="text-[9px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded font-mono">
-              {asset.docling_item_ref}
-            </code>
-          )}
-          {bboxStr && (
-            <code className="text-[9px] text-slate-300 font-mono">bbox {bboxStr}</code>
-          )}
-          {asset.asset_type === 'native_table' && asset.csv_rows != null && (
-            <span className="text-[9px] text-emerald-600 font-medium">
-              {asset.csv_rows}r × {asset.csv_cols}c
-            </span>
-          )}
-          {asset.conversion_status === 'complete' && (
-            <span className="text-[9px] text-emerald-600 font-medium">CSV ready</span>
-          )}
-          {asset.conversion_status === 'failed' && (
-            <span className="text-[9px] text-red-500 font-medium">Conversion failed</span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
-// ─── Section ───────────────────────────────────────────────────────────────────
-
-interface SectionProps {
-  title: string
-  icon: React.ReactNode
-  assets: ExtractionAsset[]
-  pid: number
-  paperIdNum: number
-  onToggle: (id: number, val: boolean) => Promise<void>
-  onClick: (asset: ExtractionAsset) => void
-  defaultOpen?: boolean
-  countCls?: string
+function simpleType(asset: ExtractionAsset) {
+  if (asset.asset_type === 'native_table') return 'Table'
+  if (asset.classification === 'chart') return 'Chart'
+  if (asset.classification === 'photograph') return 'Photograph'
+  return 'Figure'
 }
-
-function Section({
-  title, icon, assets, pid, paperIdNum, onToggle, onClick,
-  defaultOpen = true, countCls,
-}: SectionProps) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  if (assets.length === 0) return null
-
-  return (
-    <div className="mb-5">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-1 py-1.5 text-left rounded-lg hover:bg-slate-100 transition-colors"
-      >
-        <span className="text-slate-400">{icon}</span>
-        <span className="font-semibold text-slate-800 text-sm flex-1">{title}</span>
-        <span className={clsx('text-[10px] font-bold px-1.5 py-0.5 rounded-md mr-1', countCls ?? 'bg-slate-100 text-slate-500')}>
-          {assets.length}
-        </span>
-        {open ? (
-          <ChevronDown size={13} className="text-slate-400 shrink-0" />
-        ) : (
-          <ChevronRight size={13} className="text-slate-400 shrink-0" />
-        )}
-      </button>
-
-      {open && (
-        <div className="space-y-2 mt-2">
-          {assets.map((a) => (
-            <AssetRow
-              key={a.id}
-              asset={a}
-              pid={pid}
-              paperIdNum={paperIdNum}
-              onToggle={onToggle}
-              onClick={onClick}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DoclingResultsPage() {
   const { projectId, paperId } = useParams<{ projectId: string; paperId: string }>()
-  const pid        = Number(projectId)
+  const pid = Number(projectId)
   const paperIdNum = Number(paperId)
 
-  const [assets, setAssets]               = useState<ExtractionAsset[]>([])
-  const [loading, setLoading]             = useState(true)
-  const [error, setError]                 = useState<string | null>(null)
+  const [assets, setAssets] = useState<ExtractionAsset[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<ExtractionAsset | null>(null)
+  const [filter, setFilter] = useState<FilterKey>('all')
+  const [view, setView] = useState<ViewMode>('grid')
+  const [sort, setSort] = useState<SortMode>('paper')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -245,7 +71,7 @@ export default function DoclingResultsPage() {
       const res = await workspaceApi.listAssets(pid, paperIdNum, { limit: 500 })
       setAssets(res.items)
     } catch (e: any) {
-      setError(e.response?.data?.detail ?? 'Failed to load assets')
+      setError(e.response?.data?.detail ?? 'Could not load the extracted items')
     } finally {
       setLoading(false)
     }
@@ -253,131 +79,192 @@ export default function DoclingResultsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const handleToggle = async (assetId: number, val: boolean) => {
-    const updated = await workspaceApi.patchAsset(pid, paperIdNum, assetId, { selected_for_llm: val })
-    setAssets((prev) =>
-      prev.map((a) => (a.id === assetId ? { ...a, selected_for_llm: updated.selected_for_llm } : a)),
-    )
-    if (selectedAsset?.id === assetId) {
-      setSelectedAsset((prev) => prev ? { ...prev, selected_for_llm: updated.selected_for_llm } : prev)
-    }
-    toast.success(val ? 'Included as evidence' : 'Removed from evidence')
+  const handleToggle = async (asset: ExtractionAsset, val: boolean) => {
+    const updated = await workspaceApi.patchAsset(pid, paperIdNum, asset.id, { selected_for_llm: val })
+    setAssets((prev) => prev.map((a) => a.id === asset.id ? { ...a, selected_for_llm: updated.selected_for_llm } : a))
+    setSelectedAsset((prev) => prev?.id === asset.id ? { ...prev, selected_for_llm: updated.selected_for_llm } : prev)
+    toast.success(val ? 'Added to evidence' : 'Removed from evidence')
   }
 
-  // Group assets
-  const tables       = assets.filter((a) => a.asset_type === 'native_table')
-  const charts       = assets.filter((a) => a.asset_type === 'figure' && a.classification === 'chart')
-  const otherFigs    = assets.filter(
-    (a) => a.asset_type === 'figure' && a.classification !== 'chart' && !NON_SCIENTIFIC.includes(a.classification),
-  )
-  const nonScientific = assets.filter((a) => NON_SCIENTIFIC.includes(a.classification))
-  const includedCount = assets.filter((a) => a.selected_for_llm).length
+  const counts = useMemo(() => ({
+    all: assets.length,
+    figures: assets.filter(isFigure).length,
+    tables: assets.filter((a) => a.asset_type === 'native_table').length,
+    photos: assets.filter(isPhoto).length,
+    charts: assets.filter(isChart).length,
+  }), [assets])
 
-  // ── Loading / error ─────────────────────────────────────────────────────────
+  const visibleAssets = useMemo(() => {
+    let result = assets.filter((a) => {
+      if (filter === 'all') return true
+      if (filter === 'figures') return isFigure(a)
+      if (filter === 'tables') return a.asset_type === 'native_table'
+      if (filter === 'photos') return isPhoto(a)
+      return isChart(a)
+    })
+
+    result = [...result].sort((a, b) => {
+      if (sort === 'newest') return b.id - a.id
+      const pa = a.page_number ?? Number.MAX_SAFE_INTEGER
+      const pb = b.page_number ?? Number.MAX_SAFE_INTEGER
+      return pa - pb || a.id - b.id
+    })
+    return result
+  }, [assets, filter, sort])
+
+  const filters: { key: FilterKey; label: string; icon: React.ReactNode }[] = [
+    { key: 'all', label: 'All', icon: <Grid2X2 size={14} /> },
+    { key: 'figures', label: 'Figures', icon: <ImageIcon size={14} /> },
+    { key: 'tables', label: 'Tables', icon: <Table2 size={14} /> },
+    { key: 'photos', label: 'Photos', icon: <Camera size={14} /> },
+    { key: 'charts', label: 'Charts', icon: <BarChart3 size={14} /> },
+  ]
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-48 text-slate-400">
-        <Loader2 size={18} className="animate-spin mr-2" />
-        Loading Docling output…
+      <div className="flex items-center justify-center min-h-[360px] text-slate-400">
+        <Loader2 size={20} className="animate-spin mr-2" />
+        Loading extracted items…
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-8 text-center">
-        <AlertCircle size={28} className="text-red-400 mx-auto mb-2" />
-        <p className="text-sm text-red-600 mb-3">{error}</p>
-        <button onClick={load} className="text-xs text-slate-500 underline">Retry</button>
+      <div className="min-h-[360px] flex flex-col items-center justify-center text-center px-8">
+        <AlertCircle size={28} className="text-rose-400 mb-3" />
+        <p className="text-sm text-slate-700 mb-4">{error}</p>
+        <button onClick={load} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+          <RefreshCw size={13} /> Try again
+        </button>
       </div>
     )
   }
 
-  if (assets.length === 0) {
+  if (!assets.length) {
     return (
-      <div className="p-8 text-center text-slate-400">
-        <FileText size={40} strokeWidth={1} className="mx-auto mb-3" />
-        <p className="text-sm font-medium text-slate-500">No assets extracted yet</p>
-        <p className="text-xs mt-1">Run the Docling pipeline on the Overview tab first.</p>
+      <div className="min-h-[360px] flex flex-col items-center justify-center text-center px-8">
+        <ImageIcon size={42} strokeWidth={1.25} className="text-slate-300 mb-3" />
+        <h2 className="font-semibold text-slate-800">Evidence will appear here</h2>
+        <p className="text-xs text-slate-400 mt-1 max-w-sm">Figures, tables and photographs are shown as soon as they are extracted from the paper.</p>
       </div>
     )
   }
-
-  // ── Main layout ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Left: asset list */}
-      <div className="flex-1 overflow-y-auto p-5 min-w-0">
-        {/* Page header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">Docling Extraction Results</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {assets.length} assets · {includedCount} included as evidence
-            </p>
+    <div className="min-h-full bg-[#fcfbfa]">
+      <div className="px-6 py-5 border-b border-[#eee4e6] bg-white/90 sticky top-0 z-10 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            {filters.map((item) => {
+              const active = filter === item.key
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setFilter(item.key)}
+                  className={clsx(
+                    'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition-all',
+                    active
+                      ? 'border-[#8B1538] bg-[#8B1538] text-white shadow-sm'
+                      : 'border-[#e8e1e3] bg-white text-slate-600 hover:border-[#d9bcc5] hover:text-[#8B1538]',
+                  )}
+                >
+                  {item.icon}
+                  {item.label} ({counts[item.key]})
+                </button>
+              )
+            })}
           </div>
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 text-xs text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors"
-          >
-            <RefreshCw size={11} /> Refresh
-          </button>
-        </div>
 
-        {/* Sections */}
-        <Section
-          title="Native Tables"
-          icon={<Table2 size={14} />}
-          assets={tables}
-          pid={pid}
-          paperIdNum={paperIdNum}
-          onToggle={handleToggle}
-          onClick={setSelectedAsset}
-          countCls="bg-[#f3dde2] text-[#661523]"
-        />
-        <Section
-          title="Charts"
-          icon={<BarChart2 size={14} />}
-          assets={charts}
-          pid={pid}
-          paperIdNum={paperIdNum}
-          onToggle={handleToggle}
-          onClick={setSelectedAsset}
-          countCls="bg-emerald-100 text-emerald-700"
-        />
-        <Section
-          title="Other Figures"
-          icon={<Image size={14} />}
-          assets={otherFigs}
-          pid={pid}
-          paperIdNum={paperIdNum}
-          onToggle={handleToggle}
-          onClick={setSelectedAsset}
-          defaultOpen={false}
-        />
-        <Section
-          title="Non-Scientific Assets"
-          icon={<EyeOff size={14} />}
-          assets={nonScientific}
-          pid={pid}
-          paperIdNum={paperIdNum}
-          onToggle={handleToggle}
-          onClick={setSelectedAsset}
-          defaultOpen={false}
-          countCls="bg-slate-100 text-slate-400"
-        />
+          <div className="flex items-center gap-2">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+              className="h-10 rounded-xl border border-[#e8e1e3] bg-white px-3 text-xs font-medium text-slate-600 outline-none focus:border-[#cda7b2]"
+            >
+              <option value="paper">Paper order</option>
+              <option value="newest">Newest extracted</option>
+            </select>
+            <div className="flex rounded-xl border border-[#e8e1e3] bg-white p-1">
+              <button
+                onClick={() => setView('grid')}
+                className={clsx('h-8 w-8 rounded-lg flex items-center justify-center transition-colors', view === 'grid' ? 'bg-[#8B1538] text-white' : 'text-slate-400 hover:bg-slate-50')}
+                title="Grid view"
+              >
+                <Grid2X2 size={15} />
+              </button>
+              <button
+                onClick={() => setView('list')}
+                className={clsx('h-8 w-8 rounded-lg flex items-center justify-center transition-colors', view === 'list' ? 'bg-[#8B1538] text-white' : 'text-slate-400 hover:bg-slate-50')}
+                title="List view"
+              >
+                <List size={16} />
+              </button>
+            </div>
+            <button
+              onClick={load}
+              className="h-10 w-10 rounded-xl border border-[#e8e1e3] bg-white text-slate-400 hover:text-[#8B1538] hover:border-[#d9bcc5] flex items-center justify-center"
+              title="Refresh"
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Right: detail panel */}
+      <div className="px-6 py-6">
+        {view === 'grid' ? (
+          <div className="grid grid-cols-1 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+            {visibleAssets.map((asset) => (
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                projectId={pid}
+                paperId={paperIdNum}
+                onClick={setSelectedAsset}
+                onToggleSelect={handleToggle}
+                active={selectedAsset?.id === asset.id}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visibleAssets.map((asset) => (
+              <button
+                key={asset.id}
+                onClick={() => setSelectedAsset(asset)}
+                className={clsx(
+                  'w-full flex items-center gap-4 rounded-2xl border bg-white p-3 text-left transition-all hover:shadow-sm',
+                  selectedAsset?.id === asset.id ? 'border-[#8B1538] ring-1 ring-[#8B1538]' : 'border-[#eadfe2] hover:border-[#d9bcc5]',
+                )}
+              >
+                <div className="h-12 w-12 shrink-0 rounded-xl bg-[#f7f4f3] flex items-center justify-center">
+                  {asset.asset_type === 'native_table' ? <Table2 size={20} className="text-blue-600" /> : isChart(asset) ? <BarChart3 size={20} className="text-emerald-600" /> : isPhoto(asset) ? <Camera size={20} className="text-orange-600" /> : <ImageIcon size={20} className="text-[#8B1538]" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-900 truncate">{asset.caption?.trim() || fallbackTitle(asset)}</div>
+                  <div className="text-[11px] text-slate-400 mt-1">{simpleType(asset)}{asset.page_number != null ? ` · Page ${asset.page_number}` : ''}</div>
+                </div>
+                {asset.selected_for_llm && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Included</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!visibleAssets.length && (
+          <div className="py-20 text-center text-slate-400 text-sm">No items in this view.</div>
+        )}
+      </div>
+
       {selectedAsset && (
         <AssetDetailPanel
           asset={selectedAsset}
           projectId={pid}
           paperId={paperIdNum}
           onClose={() => setSelectedAsset(null)}
-          onToggleSelect={async (asset, val) => handleToggle(asset.id, val)}
+          onToggleSelect={handleToggle}
+          assets={visibleAssets}
+          onNavigate={setSelectedAsset}
         />
       )}
     </div>
