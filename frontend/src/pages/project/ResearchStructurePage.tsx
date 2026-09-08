@@ -112,7 +112,15 @@ export default function ResearchStructurePage() {
         return new Set(experimentRows.slice(0, 4).map((experiment) => experiment.id))
       })
     } catch (e: unknown) {
-      const message = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      // FastAPI validation errors (422) return `detail` as an array of
+      // {msg, loc, ...} objects rather than a string — rendering that array
+      // directly as JSX crashes the page, so only ever surface a string.
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+      const message = typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => (typeof d === 'object' && d && 'msg' in d ? String((d as { msg: unknown }).msg) : String(d))).join('; ')
+          : null
       setError(message || 'Could not load the research structure for this project.')
     } finally {
       setLoading(false)
