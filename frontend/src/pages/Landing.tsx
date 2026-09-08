@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BookOpen,
   ChevronDown,
+  ChevronRight,
   Database,
   ExternalLink,
   FileSearch,
@@ -366,22 +367,42 @@ function Workflow() {
   ]
 
   return (
-    <section id="pipeline" className="border-b border-[#efe4e7] bg-white py-16 lg:py-20">
-      <div className="mx-auto max-w-[1500px] px-6 sm:px-8 lg:px-10">
-        <div className="grid gap-10 lg:grid-cols-[.34fr_1fr] lg:items-start">
-          <div>
-            <p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">How it works</p>
-            <h2 className="mt-3 font-display text-[38px] font-medium leading-[1.02] text-[#281f22]">From PDF to insight, in five clear steps.</h2>
-            <p className="mt-4 text-[12px] leading-relaxed text-[#776a70]">A simple interface on top of a provenance-aware scientific workflow.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {steps.map(([number, title, description, Icon]) => {
+    <section id="pipeline" className="relative overflow-hidden border-b border-[#efe4e7] bg-[#fffdfd] py-20 lg:py-24">
+      <div className="pointer-events-none absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#f8e9ed] opacity-60 blur-3xl" />
+      <div className="relative mx-auto max-w-[1500px] px-6 sm:px-8 lg:px-10">
+        <div className="max-w-[620px]">
+          <p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">How it works</p>
+          <h2 className="mt-3 font-display text-[40px] font-medium leading-[1.02] text-[#281f22]">From PDF to insight, in five clear steps.</h2>
+          <p className="mt-4 text-[12.5px] leading-relaxed text-[#776a70]">A simple interface on top of a provenance-aware scientific workflow.</p>
+        </div>
+
+        <div className="relative mt-16">
+          {/* Connecting line threading through every step — the literal "pipeline" */}
+          <div className="pointer-events-none absolute left-0 right-0 top-7 hidden h-px bg-[linear-gradient(90deg,transparent,#e6c3cd_6%,#e6c3cd_94%,transparent)] xl:block" />
+
+          <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-5 xl:gap-5">
+            {steps.map(([number, title, description, Icon], i) => {
               const IconComponent = Icon as typeof Upload
+              const isLast = i === steps.length - 1
               return (
-                <div key={number as string} className="group rounded-[18px] border border-[#eadfe2] bg-[#fffdfd] p-4 transition hover:-translate-y-1 hover:border-[#dcbec6] hover:shadow-[0_18px_40px_-32px_rgba(87,24,46,.7)]">
-                  <div className="flex items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f8e9ed] text-[#92223d]"><IconComponent size={14} /></span><span className="text-[9px] font-bold text-[#a1465c]">{number as string}</span></div>
-                  <h3 className="mt-5 text-[12px] font-semibold text-[#2d2528]">{title as string}</h3>
-                  <p className="mt-2 text-[9.5px] leading-relaxed text-[#84767c]">{description as string}</p>
+                <div key={number as string} className="group relative">
+                  <div className="relative flex items-center">
+                    <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#8B1730,#4E0F1C)] text-white shadow-[0_16px_32px_-14px_rgba(87,24,46,.65)] transition-transform duration-300 group-hover:scale-105">
+                      <IconComponent size={19} />
+                    </span>
+                    {!isLast && (
+                      <ChevronRight size={16} className="mx-1 shrink-0 text-[#dcb8c1] xl:hidden" />
+                    )}
+                  </div>
+
+                  <p className="font-display pointer-events-none mt-3 select-none text-[52px] font-medium leading-none text-[#f4e3e7]">
+                    {number as string}
+                  </p>
+
+                  <div className="-mt-6 pl-0.5">
+                    <h3 className="text-[13.5px] font-semibold text-[#2d2528]">{title as string}</h3>
+                    <p className="mt-2 text-[10.5px] leading-relaxed text-[#84767c]">{description as string}</p>
+                  </div>
                 </div>
               )
             })}
