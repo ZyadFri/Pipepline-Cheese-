@@ -2,25 +2,38 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   BookOpen,
+  Check,
   ChevronDown,
   ChevronRight,
   Database,
+  Eye,
   ExternalLink,
   FileSearch,
+  FileText,
   FlaskConical,
+  Hash,
+  Image as ImageIcon,
+  Layers,
   Link2,
+  MapPin,
   Menu,
   Microscope,
   Pause,
+  Pencil,
   Play,
+  Quote,
   Search,
   ShieldCheck,
   Sparkles,
+  Table2,
+  TestTube2,
+  Thermometer,
   Upload,
   Users,
   X,
 } from 'lucide-react'
 import { useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useAuthStore } from '../store/auth'
 
 const BRAND = '#7A1B2E'
@@ -543,25 +556,43 @@ function ResearchSection() {
 
 function ResearchWorld() {
   const cards = [
-    [MEDIA.campus, 'Macdonald Campus', 'A research environment connecting food science, agriculture and applied innovation.'],
-    [MEDIA.lab, 'Controlled studies', 'Scientific evidence begins in carefully designed experiments and laboratory measurements.'],
-    [MEDIA.cave, 'Real cheese systems', 'The platform keeps the connection between published measurements and the products they describe.'],
+    { image: MEDIA.campus, badge: 'Macdonald Campus', Icon: MapPin, title: 'Macdonald Campus', body: 'A research environment connecting food science, agriculture and applied innovation.' },
+    { image: MEDIA.lab, badge: 'Controlled studies', Icon: Microscope, title: 'Controlled studies', body: 'Scientific evidence begins in carefully designed experiments and laboratory measurements.' },
+    { image: MEDIA.cave, badge: 'Real cheese systems', Icon: Layers, title: 'Real cheese systems', body: 'The platform keeps the connection between published measurements and the products they describe.' },
   ]
 
   return (
     <section className="border-b border-[#efe4e7] bg-white py-16 lg:py-20">
       <div className="mx-auto max-w-[1500px] px-6 sm:px-8 lg:px-10">
-        <div className="grid gap-8 lg:grid-cols-[.34fr_1fr]">
-          <div className="max-w-[390px]">
+        <div className="grid items-center gap-10 lg:grid-cols-[.34fr_1fr]">
+          <div className="max-w-[400px]">
             <p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">Research environment</p>
             <h2 className="mt-3 font-display text-[39px] font-medium leading-[1.04] text-[#281f22]">Built around the way scientific work actually happens.</h2>
             <p className="mt-4 text-[12px] leading-relaxed text-[#786b71]">The interface is organized around papers, experiments, treatments, observations, provenance and researcher review — not generic document parsing.</p>
+            <div className="mt-8 flex items-center gap-3">
+              <span className="h-8 w-8 shrink-0 rounded-full bg-[#f7e5ea]" />
+              <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#a9838c]">Real science. Real impact.</p>
+            </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {cards.map(([image, title, body]) => (
-              <div key={title} className="group overflow-hidden rounded-[22px] border border-[#e9dfe1] bg-[#fffdfd] shadow-[0_22px_50px_-42px_rgba(70,20,38,.6)]">
-                <div className="relative h-[210px] overflow-hidden"><img src={image} alt={title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent" /><span className="absolute bottom-4 left-4 text-[11px] font-semibold text-white">{title}</span></div>
-                <p className="p-4 text-[10.5px] leading-relaxed text-[#786c71]">{body}</p>
+          <div className="grid gap-5 md:grid-cols-3">
+            {cards.map(({ image, badge, Icon, title, body }) => (
+              <div key={title} className="group relative h-[300px] overflow-hidden rounded-[22px] border-4 border-white shadow-[0_22px_50px_-30px_rgba(70,20,38,.55)]">
+                <img
+                  src={image}
+                  alt={title}
+                  className="absolute inset-0 h-full w-full object-cover object-[center_78%] brightness-95 saturate-[.9] contrast-105 transition duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white bg-white px-3 py-1.5 text-[9.5px] font-bold text-[#5f4d53] shadow-sm">
+                  <Icon size={11} /> {badge}
+                </span>
+                <div className="absolute inset-x-4 bottom-4">
+                  <h3 className="font-display text-[19px] font-semibold text-white [text-shadow:0_2px_10px_rgba(0,0,0,.35)]">{title}</h3>
+                  <p className="mt-1.5 pr-11 text-[10.5px] leading-relaxed text-white/85">{body}</p>
+                </div>
+                <span className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-black/25 text-white transition group-hover:bg-black/40">
+                  <ArrowRight size={14} />
+                </span>
               </div>
             ))}
           </div>
@@ -571,25 +602,153 @@ function ResearchWorld() {
   )
 }
 
-function Capabilities() {
-  const items = [
-    ['Evidence-first extraction', 'Tables, figures and nearby text remain inspectable before structured extraction begins.', FileSearch],
-    ['Flexible extraction engines', 'Rules, local ML and LLM methods can coexist instead of forcing every paper through one method.', Sparkles],
-    ['Full provenance', 'Values can keep their paper, page, table, figure and source context for later review.', Link2],
-    ['Human in the loop', 'Researchers remain in control of approval, editing and rejection before data becomes trusted.', ShieldCheck],
-    ['One scientific database', 'Reviewed observations flow into a searchable project-level dataset rather than isolated spreadsheets.', Database],
-    ['Research-ready structure', 'Experiments, treatments, conditions, microorganisms and observations are represented explicitly.', FlaskConical],
-  ]
+function CapabilityCard({
+  title,
+  body,
+  Icon,
+  dark,
+  badge,
+  mockup,
+}: {
+  title: string
+  body: string
+  Icon: typeof FileSearch
+  dark?: boolean
+  badge?: string
+  mockup: ReactNode
+}) {
+  return (
+    <div
+      className={`relative flex flex-col overflow-hidden rounded-[20px] border p-5 transition hover:-translate-y-0.5 ${
+        dark
+          ? 'border-[#8d1735] bg-[linear-gradient(135deg,#7a122d,#9f2848)] text-white shadow-[0_30px_65px_-36px_rgba(107,16,44,.78)]'
+          : 'border-[#e9dfe2] bg-white hover:border-[#d7b7c0]'
+      }`}
+    >
+      {badge && (
+        <span className="absolute right-4 top-4 rounded-full bg-white/13 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[.08em] text-white">
+          {badge}
+        </span>
+      )}
+      <span className={`flex h-10 w-10 items-center justify-center rounded-full ${dark ? 'bg-white/15 text-white' : 'bg-[#f8e9ed] text-[#992944]'}`}>
+        <Icon size={16} />
+      </span>
+      <h3 className={`mt-4 text-[12px] font-semibold ${dark ? 'text-white' : 'text-[#2d2528]'}`}>{title}</h3>
+      <p className={`mt-2 text-[10.5px] leading-relaxed ${dark ? 'text-white/80' : 'text-[#81747a]'}`}>{body}</p>
+      <div className="mt-4 flex-1">{mockup}</div>
+    </div>
+  )
+}
 
+function Capabilities() {
   return (
     <section id="validation" className="border-b border-[#efe4e7] bg-[#fffafa] py-16 lg:py-20">
       <div className="mx-auto max-w-[1500px] px-6 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-[760px] text-center"><p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">Scientific rigor</p><h2 className="mt-3 font-display text-[44px] font-medium leading-[1.02] text-[#281f22]">More than extraction — a complete research data workflow.</h2><p className="mt-4 text-[12px] leading-relaxed text-[#776a70]">Designed to make scientific data easier to inspect, compare, approve and reuse.</p></div>
-        <div className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map(([title, body, Icon]) => {
-            const IconComponent = Icon as typeof FileSearch
-            return <div key={title as string} className="rounded-[20px] border border-[#e9dfe2] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#d7b7c0]"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f8e9ed] text-[#992944]"><IconComponent size={16} /></span><h3 className="mt-4 text-[12px] font-semibold text-[#2d2528]">{title as string}</h3><p className="mt-2 text-[10.5px] leading-relaxed text-[#81747a]">{body as string}</p></div>
-          })}
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <CapabilityCard
+            title="Evidence-first extraction"
+            body="Tables, figures and nearby text remain inspectable before structured extraction begins."
+            Icon={FileSearch}
+            mockup={
+              <div className="flex flex-wrap gap-2">
+                {[[Table2, 'Table'], [ImageIcon, 'Figure'], [FileText, 'Text']].map(([TagIcon, label]) => {
+                  const TIcon = TagIcon as typeof Table2
+                  return (
+                    <span key={label as string} className="inline-flex items-center gap-1.5 rounded-full border border-[#eadbe0] bg-[#fdf5f7] px-2.5 py-1.5 text-[9.5px] font-semibold text-[#8f2942]">
+                      <TIcon size={11} /> {label as string}
+                    </span>
+                  )
+                })}
+              </div>
+            }
+          />
+
+          <CapabilityCard
+            title="Flexible extraction engines"
+            body="Rules, local ML and LLM methods can coexist instead of forcing every paper through one method."
+            Icon={Sparkles}
+            dark
+            badge="Flexible by design"
+            mockup={
+              <div className="flex flex-wrap items-center gap-1.5">
+                {['Rules', 'Local ML', 'LLM'].map((m) => (
+                  <span key={m} className="rounded-lg border border-white/25 bg-white/10 px-2 py-1 text-[9px] font-semibold">{m}</span>
+                ))}
+                <ArrowRight size={11} className="mx-0.5 text-white/70" />
+                <span className="rounded-lg border border-white/40 bg-white/20 px-2 py-1 text-[9px] font-semibold">Structured data</span>
+              </div>
+            }
+          />
+
+          <CapabilityCard
+            title="Full provenance"
+            body="Values can keep their paper, page, table, figure and source context for later review."
+            Icon={Link2}
+            mockup={
+              <div className="space-y-1.5 rounded-[14px] border border-[#f0e5e8] bg-[#fdf8f9] p-2.5">
+                {[[BookOpen, 'Paper'], [Hash, 'Page 12'], [Table2, 'Table 3'], [Quote, 'Source text']].map(([RowIcon, label]) => {
+                  const RIcon = RowIcon as typeof BookOpen
+                  return (
+                    <div key={label as string} className="flex items-center gap-2 text-[10px] text-[#7d7076]">
+                      <RIcon size={11} className="shrink-0 text-[#b98a95]" /> {label as string}
+                    </div>
+                  )
+                })}
+              </div>
+            }
+          />
+
+          <CapabilityCard
+            title="Human in the loop"
+            body="Researchers remain in control of approval, editing and rejection before data becomes trusted."
+            Icon={ShieldCheck}
+            mockup={
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1f8a5c]/10 px-2.5 py-1.5 text-[9.5px] font-semibold text-[#1f8a5c]"><Check size={11} /> Approve</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#8f2942]/10 px-2.5 py-1.5 text-[9.5px] font-semibold text-[#8f2942]"><Pencil size={11} /> Edit</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#9a2d2d]/10 px-2.5 py-1.5 text-[9.5px] font-semibold text-[#9a2d2d]"><X size={11} /> Reject</span>
+              </div>
+            }
+          />
+
+          <CapabilityCard
+            title="One scientific database"
+            body="Reviewed observations flow into a searchable project-level dataset rather than isolated spreadsheets."
+            Icon={Database}
+            mockup={
+              <div className="flex h-14 items-end justify-center gap-0">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="-ml-2 flex h-10 w-14 items-center justify-center rounded-[10px] border border-[#eadbe0] bg-[#fdf5f7] text-[#c98da0] shadow-sm first:ml-0"
+                    style={{ zIndex: 3 - i, transform: `translateY(${i * 4}px)` }}
+                  >
+                    <Database size={14} />
+                  </span>
+                ))}
+              </div>
+            }
+          />
+
+          <CapabilityCard
+            title="Research-ready structure"
+            body="Experiments, treatments, conditions, microorganisms and observations are represented explicitly."
+            Icon={FlaskConical}
+            mockup={
+              <div className="space-y-1.5 rounded-[14px] border border-[#f0e5e8] bg-[#fdf8f9] p-2.5">
+                {[[FlaskConical, 'Experiment'], [TestTube2, 'Treatment'], [Thermometer, 'Condition'], [Microscope, 'Microorganism'], [Eye, 'Observation']].map(([RowIcon, label]) => {
+                  const RIcon = RowIcon as typeof FlaskConical
+                  return (
+                    <div key={label as string} className="flex items-center gap-2 text-[10px] text-[#7d7076]">
+                      <RIcon size={11} className="shrink-0 text-[#b98a95]" /> {label as string}
+                    </div>
+                  )
+                })}
+              </div>
+            }
+          />
         </div>
       </div>
     </section>
@@ -624,20 +783,45 @@ function TeamSection() {
 
 function FAQ() {
   const [open, setOpen] = useState<number | null>(0)
-  const items = [
-    ['What kind of papers can I upload?', 'The workspace is designed for scientific PDF papers. It supports single-paper analysis or batch uploads while keeping each paper attached to its project.'],
-    ['Does the platform only use an LLM?', 'No. The project supports deterministic rules, local ML options and LLM-based extraction. Docling remains the document-understanding layer.'],
-    ['Can I verify where a value came from?', 'Yes. The workflow keeps provenance so researchers can inspect the originating paper, page, table, figure or nearby source text before approving data.'],
-    ['What happens when a paper does not contain a field?', 'Optional scientific fields are omitted when absent. The database adapts to what the paper actually contains instead of filling the interface with missing-value placeholders.'],
+  const items: [string, string, typeof Upload][] = [
+    ['What kind of papers can I upload?', 'The workspace is designed for scientific PDF papers. It supports single-paper analysis or batch uploads while keeping each paper attached to its project.', Upload],
+    ['Does the platform only use an LLM?', 'No. The project supports deterministic rules, local ML options and LLM-based extraction. Docling remains the document-understanding layer.', Sparkles],
+    ['Can I verify where a value came from?', 'Yes. The workflow keeps provenance so researchers can inspect the originating paper, page, table, figure or nearby source text before approving data.', Link2],
+    ['What happens when a paper does not contain a field?', 'Optional scientific fields are omitted when absent. The database adapts to what the paper actually contains instead of filling the interface with missing-value placeholders.', Check],
   ]
 
   return (
-    <section id="faq" className="bg-[#fffafa] py-16 lg:py-20">
-      <div className="mx-auto grid max-w-[1250px] gap-8 px-6 sm:px-8 lg:grid-cols-[.38fr_1fr] lg:px-10">
-        <div><p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">FAQ</p><h2 className="mt-3 font-display text-[40px] font-medium text-[#281f22]">Common questions.</h2><p className="mt-4 text-[12px] leading-relaxed text-[#776a70]">A few practical answers about the research workflow.</p></div>
-        <div className="space-y-3">
-          {items.map(([question, answer], index) => (
-            <button key={question} onClick={() => setOpen(open === index ? null : index)} className="w-full rounded-[18px] border border-[#e8dce0] bg-white px-5 py-4 text-left transition hover:border-[#d7b7c0]"><div className="flex items-center justify-between gap-4"><span className="text-[11.5px] font-semibold text-[#30272a]">{question}</span><ChevronDown size={15} className={`shrink-0 text-[#8f2942] transition ${open === index ? 'rotate-180' : ''}`} /></div>{open === index && <p className="mt-3 max-w-[850px] text-[10.5px] leading-relaxed text-[#7d7076]">{answer}</p>}</button>
+    <section id="faq" className="relative overflow-hidden bg-[#fffafa] py-16 lg:py-20">
+      <div className="mx-auto grid max-w-[1250px] gap-10 px-6 sm:px-8 lg:grid-cols-[.38fr_1fr] lg:px-10">
+        <div>
+          <p className="text-[9.5px] font-bold uppercase tracking-[.16em] text-[#a12241]">FAQ</p>
+          <h2 className="mt-3 font-display text-[40px] font-medium text-[#281f22]">Common questions.</h2>
+          <p className="mt-4 text-[12px] leading-relaxed text-[#776a70]">A few practical answers about the research workflow.</p>
+
+          <div className="mt-9 flex items-start gap-3 border-t border-[#e6cdd3] pt-6">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f7e5ea] text-[#9b314b]">
+              <Search size={14} />
+            </span>
+            <div>
+              <p className="text-[9.5px] font-bold uppercase tracking-[.1em] text-[#9b314b]">Still have a question?</p>
+              <p className="mt-1 text-[10.5px] leading-relaxed text-[#786c71]">We're happy to help — reach out anytime.</p>
+              <a href="mailto:hello@cheesedatabase.mcgill.ca" className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] font-semibold text-[#7A1B2E]">Contact us <ArrowRight size={11} /></a>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {items.map(([question, answer, Icon], index) => (
+            <button key={question} onClick={() => setOpen(open === index ? null : index)} className="relative w-full rounded-[20px] border border-[#eadde1] bg-white px-5 py-4 pl-[70px] text-left shadow-[0_15px_36px_-34px_rgba(69,21,36,.52)] transition hover:border-[#d7b7c0]">
+              <span className="absolute left-5 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#f7e5ea] text-[#a12846]">
+                <Icon size={16} />
+              </span>
+              <div className="flex items-center justify-between gap-4">
+                <span className="font-display text-[15px] font-semibold text-[#30272a]">{question}</span>
+                <ChevronDown size={15} className={`shrink-0 text-[#8f2942] transition ${open === index ? 'rotate-180' : ''}`} />
+              </div>
+              {open === index && <p className="mt-3 max-w-[850px] text-[10.5px] leading-relaxed text-[#7d7076]">{answer}</p>}
+            </button>
           ))}
         </div>
       </div>
