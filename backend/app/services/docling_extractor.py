@@ -33,6 +33,7 @@ API credentials never leave the server.
 import hashlib
 import json
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterator, Optional
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 ANALYSIS_MODES = frozenset({"standard", "fast"})
 FAST_CHUNK_SIZE = 4
+_ANALYSIS_MODE_CONTEXT: ContextVar[str] = ContextVar("docling_analysis_mode", default="standard")
 
 # Sections whose content we skip (conclusions add noise, refs are not experiments)
 _SKIP_HEADINGS = frozenset({
@@ -153,6 +155,20 @@ def _normalize_mode(mode: Optional[str]) -> str:
     if value not in ANALYSIS_MODES:
         raise ValueError(f"Unsupported Docling analysis mode: {mode}")
     return value
+
+
+def set_analysis_mode(mode: str):
+    """Set the Docling mode for the current background-task context only."""
+    return _ANALYSIS_MODE_CONTEXT.set(_normalize_mode(mode))
+
+
+def reset_analysis_mode(token) -> None:
+    """Restore the previous per-task Docling mode."""
+    _ANALYSIS_MODE_CONTEXT.reset(token)
+
+
+def _resolved_mode(mode: Optional[str]) -> str:
+    return _normalize_mode(mode or _ANALYSIS_MODE_CONTEXT.get())
 
 
 def _file_hash(pdf_path: str) -> str:
@@ -562,7 +578,7 @@ def extract_pdf_progressive(
     pdf_path: str,
     chunk_size: Optional[int] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
-    analysis_mode: str = "standard",
+    analysis_mode: Optional[str] = None,
 ) -> Iterator[DoclingChunkResult]:
     """
     Extract a PDF as a stream of page-range chunks, so a caller can persist
@@ -571,7 +587,8 @@ def extract_pdf_progressive(
     DoclingChunkResult, including a failed one (never raises out of the loop).
 
     `analysis_mode="standard"` preserves the original pipeline. `"fast"`
-    selects the optimized settings documented at the top of this module.
+    selects the optimized settings documented at the top of this module. When
+    omitted, the per-background-job context is used (standard by default).
 
     On a cache hit, still yields chunk-by-chunk (from disk) so callers have a
     single code path regardless of whether this is a fresh run or a replay.
@@ -588,7 +605,7 @@ def extract_pdf_progressive(
             "docling is not installed. Run: pip install 'docling>=2.14.0,<3.0'"
         ) from exc
 
-    analysis_mode = _normalize_mode(analysis_mode)
+    analysis_mode = _resolved_mode(analysis_mode)
     if chunk_size is None:
         chunk_size = FAST_CHUNK_SIZE if analysis_mode == "fast" else settings.DOCLING_CHUNK_SIZE
 
@@ -673,7 +690,7 @@ def extract_pdf_progressive(
     )
 
 
-def extract_pdf(pdf_path: str, analysis_mode: str = "standard") -> DoclingResult:
+def extract_pdf(pdf_path: str, analysis_mode: Optional[str] = None) -> DoclingResult:
     """
     Extract a PDF using Docling and return one aggregated result.
 
@@ -684,7 +701,7 @@ def extract_pdf(pdf_path: str, analysis_mode: str = "standard") -> DoclingResult
     Raises ImportError if docling is not installed.
     Raises RuntimeError if every chunk failed (nothing was extracted at all).
     """
-    analysis_mode = _normalize_mode(analysis_mode)
+    analysis_mode = _resolved_mode(analysis_mode)
     file_hash = _file_hash(pdf_path)
     cache_dir = Path(settings.DOCLING_CACHE_DIR) / file_hash
 
