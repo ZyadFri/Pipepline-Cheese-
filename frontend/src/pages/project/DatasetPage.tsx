@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import clsx from 'clsx'
-import { reviewQueueApi, insightsApi } from '../../services/api'
-import type { DuplicatePair } from '../../services/api'
+import { reviewQueueApi } from '../../services/api'
 import type { ReviewObservation } from '../../types'
 import {
   RefreshCw, Download, Database, Search, CheckCircle2, Clock, XCircle,
-  Info, Copy, ChevronDown,
+  Info,
 } from 'lucide-react'
-import { confidenceStyle } from '../../utils/confidence'
 import EvidenceModal from '../../components/EvidenceModal'
 
 interface RichReviewObservation extends ReviewObservation {
@@ -118,8 +116,6 @@ export default function DatasetPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [evidenceFor, setEvidenceFor] = useState<RichReviewObservation | null>(null)
-  const [duplicates, setDuplicates] = useState<DuplicatePair[]>([])
-  const [showDuplicates, setShowDuplicates] = useState(false)
 
   const counts = useMemo(() => {
     const c = { approved: 0, needs_review: 0, rejected: 0 }
@@ -154,13 +150,6 @@ export default function DatasetPage() {
   }
 
   useEffect(() => { load() }, [pid, paperIdNum, statusFilter])
-
-  useEffect(() => {
-    if (!projectId) return
-    insightsApi.duplicateExperiments(pid, { paper_id: paperIdNum })
-      .then((res) => setDuplicates(res.pairs))
-      .catch(() => setDuplicates([]))
-  }, [pid, paperIdNum])
 
   const handleCsvDownload = () => {
     const csvCols = [{ id: 'id', label: 'ID', value: (o: RichReviewObservation) => o.id }, ...visibleColumns]
@@ -216,25 +205,6 @@ export default function DatasetPage() {
         </div>
       )}
 
-      {duplicates.length > 0 && (
-        <div className="mb-4 overflow-hidden rounded-xl border border-amber-200 bg-amber-50/60">
-          <button onClick={() => setShowDuplicates((v) => !v)} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left">
-            <Copy size={14} className="shrink-0 text-amber-600" />
-            <span className="text-xs font-semibold text-amber-800">{duplicates.length} possible duplicate experiment{duplicates.length === 1 ? '' : 's'} detected</span>
-            <ChevronDown size={14} className={clsx('ml-auto shrink-0 text-amber-500 transition-transform', showDuplicates && 'rotate-180')} />
-          </button>
-          {showDuplicates && <div className="space-y-1.5 px-4 pb-3">{duplicates.map((p, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] text-slate-600">
-              <span className="font-medium text-slate-800">{p.experiment_a.product_name ?? p.experiment_a.label ?? `Experiment #${p.experiment_a.id}`}</span>
-              <span className="text-slate-400">({p.experiment_a.paper_name ?? `paper ${p.experiment_a.paper_id}`})</span><span className="text-slate-400">↔</span>
-              <span className="font-medium text-slate-800">{p.experiment_b.product_name ?? p.experiment_b.label ?? `Experiment #${p.experiment_b.id}`}</span>
-              <span className="text-slate-400">({p.experiment_b.paper_name ?? `paper ${p.experiment_b.paper_id}`})</span>
-              <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">{p.similarity}% similar</span>
-            </div>
-          ))}</div>}
-        </div>
-      )}
-
       {loading ? <p className="text-slate-400 text-sm">Loading observations…</p> : observations.length === 0 ? (
         <div className="text-center py-20"><Database size={36} className="text-slate-200 mx-auto mb-3" /><p className="text-slate-500 text-sm font-medium">No observations yet</p><p className="text-xs text-slate-400 mt-1">{statusFilter ? 'No observations match this filter.' : 'Extract a paper to see structured measurements here.'}</p></div>
       ) : (
@@ -243,7 +213,6 @@ export default function DatasetPage() {
             <thead className="border-b border-slate-100 bg-slate-50/50"><tr>
               {visibleColumns.map((col) => <th key={col.id} className="px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">{col.label}</th>)}
               <th className="px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">Origin</th>
-              <th className="px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">Confidence</th>
               <th className="px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">Status</th>
               <th />
             </tr></thead>
@@ -258,7 +227,6 @@ export default function DatasetPage() {
                     </td>
                   })}
                   <td className="px-3 py-2"><span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-500">{o.value_origin === 'graph_estimated' ? 'Estimated from chart' : 'Reported directly'}</span></td>
-                  <td className="px-3 py-2">{(() => { const style = confidenceStyle(o.quality_score); return style ? <span className={clsx('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border', style.bg, style.text, style.border)} title={style.label}>{Math.round((o.quality_score ?? 0) * 100)}%</span> : null })()}</td>
                   <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_CLS[o.review_status] ?? 'bg-slate-100 text-slate-600'}`}>{STATUS_LABEL[o.review_status] ?? o.review_status}</span></td>
                   <td className="px-3 py-2">{o.evidence.length > 0 && <button onClick={() => setEvidenceFor(o)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-100 hover:text-[#8B1538]" title="Why was this extracted?"><Info size={12} /> Evidence</button>}</td>
                 </tr>

@@ -1,8 +1,6 @@
 import { X, ImageIcon, FileText } from 'lucide-react'
-import clsx from 'clsx'
 import { reviewQueueApi } from '../services/api'
 import type { ProvenanceRecord } from '../types'
-import { confidenceStyle } from '../utils/confidence'
 import AuthImage from './AuthImage'
 
 interface Props {
@@ -42,7 +40,6 @@ export default function EvidenceModal({ projectId, title, evidence, onClose }: P
             <p className="text-xs text-slate-400">No source evidence was recorded for this value.</p>
           ) : (
             evidence.map((ev) => {
-              const style = confidenceStyle(ev.confidence)
               return (
                 <div key={ev.id} className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
                   {ev.has_image ? (
@@ -76,11 +73,6 @@ export default function EvidenceModal({ projectId, title, evidence, onClose }: P
                       {ev.section_name && (
                         <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 border border-slate-200">
                           {ev.section_name}
-                        </span>
-                      )}
-                      {style && ev.confidence != null && (
-                        <span className={clsx('rounded-full px-2 py-0.5 text-[10px] font-semibold border', style.bg, style.text, style.border)}>
-                          {Math.round(ev.confidence * 100)}% · {style.label}
                         </span>
                       )}
                     </div>

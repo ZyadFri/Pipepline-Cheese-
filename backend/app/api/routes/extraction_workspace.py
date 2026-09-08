@@ -285,6 +285,7 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
                         relevance_score=0.0, selected_for_llm=False,
                     )
                 else:
+                    structure_warning = getattr(item, "structure_warning", None)
                     asset = ExtractionAsset(
                         paper_id=paper_id, project_id=project_id, job_id=job_id,
                         docling_item_ref=item.item_ref, asset_type="native_table",
@@ -293,10 +294,15 @@ def _run_workspace_extraction(paper_id: int, project_id: int, job_id: int) -> No
                         caption=item.caption, csv_path=item.csv_path,
                         page_image_path=page_img, classification="native_table",
                         conversion_status="not_applicable",
+                        conversion_error=structure_warning,
                         csv_rows=_count_csv_rows(item.csv_path),
                         csv_cols=_count_csv_cols(item.csv_path),
                         relevance_score=0.0, selected_for_llm=False,
                     )
+                    if structure_warning:
+                        warnings.append(
+                            f"Table on page {item.page_number} (ref {item.item_ref}): {structure_warning}"
+                        )
                 db.add(asset)
                 # Commit per asset (not batched at the end) — this is what makes
                 # elements actually appear in the Live Gallery as they're found.

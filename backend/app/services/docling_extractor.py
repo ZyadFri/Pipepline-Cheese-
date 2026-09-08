@@ -72,6 +72,7 @@ class DoclingTable:
     caption: Optional[str] = None
     csv_path: str = ""
     bbox: Optional[dict] = None
+    structure_warning: Optional[str] = None
 
 
 @dataclass
@@ -169,6 +170,30 @@ def reset_analysis_mode(token) -> None:
 
 def _resolved_mode(mode: Optional[str]) -> str:
     return _normalize_mode(mode or _ANALYSIS_MODE_CONTEXT.get())
+
+
+def _detect_collapsed_table(df) -> Optional[str]:
+    """Flag a known TableFormer failure mode on dense, borderless tables: every
+    body row gets merged into one, so a cell that should hold a single row
+    label/value instead holds several space-joined ones (e.g. "Enterobacteriaceae
+    Count Escherichia coli Salmonella spp. ..." in one cell). A normal single-row
+    table (e.g. a 2-column key/value pair) has short cells, so this only fires
+    when there are several columns AND the first cell reads like multiple
+    concatenated labels — real single-row tables don't look like that.
+    """
+    try:
+        if len(df) != 1 or df.shape[1] < 4:
+            return None
+        first_cell = str(df.iloc[0, 0] or "")
+        if len(first_cell.split()) > 10:
+            return (
+                "This table has only one data row despite several columns and a long, "
+                "run-on first cell — Docling's table structure recognition likely merged "
+                "several rows together. Verify the values against the original PDF page."
+            )
+    except Exception:
+        pass
+    return None
 
 
 def _file_hash(pdf_path: str) -> str:
@@ -481,6 +506,7 @@ def _convert_one_chunk(
                 caption=_caption_text(element, doc),
                 csv_path=str(csv_path),
                 bbox=bbox,
+                structure_warning=_detect_collapsed_table(df),
             ))
 
         elif isinstance(element, PictureItem):

@@ -9,11 +9,8 @@ import clsx from 'clsx'
 import { reviewQueueApi, observationsApi, projectsApi } from '../services/api'
 import type { Project, ReviewObservation } from '../types'
 import AuthImage from '../components/AuthImage'
-import { confidenceStyle } from '../utils/confidence'
 
 type StatusFilter = 'all' | 'needs_review' | 'approved' | 'rejected'
-
-const HIGH_CONFIDENCE = 0.6 // matches the Pass-2 verification threshold on the backend
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -33,21 +30,6 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejected',
 }
 
-function ConfidenceBadge({ value }: { value?: number }) {
-  const style = confidenceStyle(value)
-  if (!style) {
-    return <span className="text-[11px] text-slate-300">—</span>
-  }
-  const pct = Math.round((value ?? 0) * 100)
-  return (
-    <span
-      title={style.label}
-      className={clsx('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border', style.bg, style.text, style.border)}
-    >
-      {pct}%
-    </span>
-  )
-}
 
 function OriginBadge({ origin }: { origin: string }) {
   const isEstimated = origin === 'graph_estimated'
@@ -134,7 +116,6 @@ function MeasurementRow({
             obs.unit_normalized || '—'
           )}
         </td>
-        <td className="py-2 px-3"><ConfidenceBadge value={obs.quality_score} /></td>
         <td className="py-2 px-3"><OriginBadge origin={obs.value_origin} /></td>
         <td className="py-2 px-3">
           <span className={STATUS_BADGE[obs.review_status] || 'badge-pending'}>
@@ -182,7 +163,7 @@ function MeasurementRow({
       </tr>
       {expanded && hasEvidence && (
         <tr className="bg-slate-50/60">
-          <td colSpan={8} className="px-4 py-3">
+          <td colSpan={7} className="px-4 py-3">
             <div className="space-y-2">
               {obs.evidence.map((ev) => (
                 <div key={ev.id} className="flex items-start gap-3 text-xs">
@@ -208,7 +189,6 @@ function MeasurementRow({
                     </p>
                     <p className="text-[10px] text-slate-400 mt-0.5">
                       {ev.page_number ? `Page ${ev.page_number}` : ''}
-                      {ev.confidence != null ? ` · ${Math.round(ev.confidence * 100)}% confidence` : ''}
                     </p>
                   </div>
                 </div>
@@ -263,7 +243,6 @@ function ExperimentGroup({
               <th className="py-2 px-3">Indicator</th>
               <th className="py-2 px-3">Value</th>
               <th className="py-2 px-3">Unit</th>
-              <th className="py-2 px-3">Confidence</th>
               <th className="py-2 px-3">Source</th>
               <th className="py-2 px-3">Status</th>
               <th className="py-2 px-3"></th>
@@ -334,7 +313,6 @@ export default function Review() {
   }, [observations])
 
   const pendingRows = observations.filter((o) => o.review_status === 'needs_review')
-  const highConfidencePending = pendingRows.filter((o) => (o.quality_score ?? 0) >= HIGH_CONFIDENCE)
 
   const bulkApproveRows = async (rows: ReviewObservation[], label: string) => {
     if (!rows.length || bulkApproving) return
@@ -371,15 +349,6 @@ export default function Review() {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {highConfidencePending.length > 0 && highConfidencePending.length < pendingRows.length && (
-            <button
-              onClick={() => bulkApproveRows(highConfidencePending, 'high-confidence')}
-              disabled={bulkApproving}
-              className="btn-secondary"
-            >
-              <CheckCircle2 size={14} /> Approve high-confidence ({highConfidencePending.length})
-            </button>
-          )}
           {pendingRows.length > 0 && (
             <button
               onClick={() => bulkApproveRows(pendingRows, 'pending')}
