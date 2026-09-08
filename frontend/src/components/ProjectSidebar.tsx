@@ -5,6 +5,7 @@ import {
   Briefcase, ClipboardList, Users, Database,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useEffect } from 'react'
 import { useAuthStore } from '../store/auth'
 
 interface NavEntry { to: string; end?: boolean; label: string; Icon: React.ElementType }
@@ -84,6 +85,15 @@ export default function ProjectSidebar() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const base = `/projects/${projectId}`
+
+  useEffect(() => {
+    if (!projectId) return
+    try {
+      localStorage.setItem('lastProjectId', projectId)
+    } catch {
+      // Browsers with blocked local storage can still use the project normally.
+    }
+  }, [projectId])
 
   let lastPaperId: string | null = null
   try {
