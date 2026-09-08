@@ -32,8 +32,6 @@ import ExtractionWorkspacePage from './pages/project/ExtractionWorkspacePage'
 import PPChart2TablePage from './pages/project/PPChart2TablePage'
 import ValidationPage from './pages/project/ValidationPage'
 import AuditHistoryPage from './pages/project/AuditHistoryPage'
-import ExportPage from './pages/project/ExportPage'
-import TeamPage from './pages/project/TeamPage'
 import ProjectSettingsPage from './pages/project/ProjectSettingsPage'
 
 // Paper-centric workflow pages
@@ -65,7 +63,6 @@ export default function App() {
         <Route path="profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
       </Route>
 
-      {/* Project section — full-height dark-sidebar layout, no global header */}
       <Route
         path="/projects/:projectId"
         element={<RequireAuth><ProjectLayout /></RequireAuth>}
@@ -78,24 +75,30 @@ export default function App() {
         <Route path="review" element={<Review />} />
         <Route path="analytics" element={<Analytics />} />
 
-        {/* Canonical scientific data */}
+        {/* Core researcher-facing project pages */}
         <Route path="research-structure" element={<ResearchStructurePage />} />
         <Route path="dataset" element={<DatasetPage />} />
+        <Route path="normalization" element={<NormalizationPage />} />
 
-        {/* Old canonical browse URLs remain valid as compatibility redirects. */}
+        {/* Old scientific browse URLs remain valid without cluttering navigation. */}
         <Route path="studies" element={<Navigate to="../research-structure" replace />} />
         <Route path="experiments" element={<Navigate to="../research-structure" replace />} />
         <Route path="treatments" element={<Navigate to="../research-structure" replace />} />
 
-        {/* Data quality */}
-        <Route path="normalization" element={<NormalizationPage />} />
+        {/* Existing advanced/internal routes remain available for diagnostics. */}
         <Route path="missing" element={<MissingDataPage />} />
-
-        {/* Analysis */}
         <Route path="thresholds" element={<ThresholdShelfLifePage />} />
+        <Route path="jobs" element={<PipelineJobsPage />} />
+        <Route path="audit" element={<AuditHistoryPage />} />
+        <Route path="settings" element={<ProjectSettingsPage />} />
 
-        {/* The project dashboard is now the paper library. Keep the old URL
-            as a compatibility redirect so bookmarks do not break. */}
+        {/* Export now lives directly in Database. */}
+        <Route path="export" element={<Navigate to="../dataset" replace />} />
+
+        {/* Team collaboration is intentionally hidden until invitations are complete. */}
+        <Route path="team" element={<Navigate to=".." replace />} />
+
+        {/* The project dashboard is now the paper library. */}
         <Route path="papers" element={<Navigate to=".." replace />} />
 
         {/* Paper-centric workflow — each paper has its own sub-nav shell */}
@@ -107,20 +110,11 @@ export default function App() {
           <Route path="validation"  element={<ValidationPage />} />
           <Route path="review"      element={<Review />} />
           <Route path="database"    element={<DatasetPage />} />
-          {/* Legacy URL redirects */}
           <Route path="workspace"   element={<Navigate to="overview" replace />} />
           <Route path="chart2table" element={<Navigate to="charts" replace />} />
         </Route>
 
-        {/* Project-wide validation */}
         <Route path="validation" element={<ValidationPage />} />
-
-        {/* Operations — admin diagnostic */}
-        <Route path="jobs" element={<PipelineJobsPage />} />
-        <Route path="audit" element={<AuditHistoryPage />} />
-        <Route path="export" element={<ExportPage />} />
-        <Route path="team" element={<TeamPage />} />
-        <Route path="settings" element={<ProjectSettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
