@@ -15,10 +15,17 @@ hook (confirmed against the installed version) — page_range is the real,
 supported mechanism for this, and page numbers stay absolute across chunked
 calls (no re-offsetting needed).
 
-Results are cached on disk by file SHA-256 hash + DOCLING_CACHE_VERSION: one
-JSON file per chunk plus a manifest recording which chunks are done and
-whether the run is complete, so a crash mid-run is correctly treated as a
-cache miss on the next attempt rather than silently served as a full result.
+Two analysis modes are supported:
+  • standard: the existing accurate behavior (2-page chunks by default,
+    accurate TableFormer, OCR enabled, 2x picture images)
+  • fast: 4-page chunks, TableFormer FAST, 1x picture images, and OCR disabled
+    automatically when the PDF already has a useful native text layer. Scanned
+    or mostly image-only PDFs keep OCR enabled so fast mode does not silently
+    discard their text.
+
+Results are cached on disk by file SHA-256 hash + DOCLING_CACHE_VERSION +
+analysis mode. Switching between standard and fast deliberately invalidates the
+Docling cache so timings/results can be compared fairly.
 
 Raises ImportError when docling is not installed.
 API credentials never leave the server.
@@ -33,6 +40,9 @@ from typing import Callable, Iterator, Optional
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+ANALYSIS_MODES = frozenset({"standard", "fast"})
+FAST_CHUNK_SIZE = 4
 
 # Sections whose content we skip (conclusions add noise, refs are not experiments)
 _SKIP_HEADINGS = frozenset({
@@ -138,6 +148,13 @@ def strip_chunk_suffix(ref: str) -> str:
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def _normalize_mode(mode: Optional[str]) -> str:
+    value = (mode or "standard").strip().lower()
+    if value not in ANALYSIS_MODES:
+        raise ValueError(f"Unsupported Docling analysis mode: {mode}")
+    return value
+
+
 def _file_hash(pdf_path: str) -> str:
     sha = hashlib.sha256()
     with open(pdf_path, "rb") as fh:
@@ -160,6 +177,33 @@ def _pdf_page_count(pdf_path: str) -> int:
         return doc.page_count
     finally:
         doc.close()
+
+
+def _pdf_needs_ocr(pdf_path: str) -> bool:
+    """Cheap native-text probe used only by fast mode.
+
+    A normal scientific PDF usually has a selectable text layer on nearly all
+    pages. If at least 80% of pages contain a modest amount of native text, OCR
+    is unnecessary and is disabled. Scanned/mixed documents keep OCR enabled.
+    This probe uses PyMuPDF and is tiny compared with a Docling conversion.
+    """
+    try:
+        import fitz
+        doc = fitz.open(pdf_path)
+        try:
+            if doc.page_count <= 0:
+                return True
+            native_text_pages = 0
+            for index in range(doc.page_count):
+                text = (doc.load_page(index).get_text("text") or "").strip()
+                if len(text) >= 40:
+                    native_text_pages += 1
+            return (native_text_pages / doc.page_count) < 0.80
+        finally:
+            doc.close()
+    except Exception as exc:
+        logger.warning("Could not inspect PDF text layer; keeping OCR enabled: %s", exc)
+        return True
 
 
 def _chunk_windows(total_pages: int, chunk_size: int) -> list:
@@ -300,11 +344,20 @@ def _read_manifest(cache_dir: Path) -> Optional[dict]:
         return None
 
 
-def _complete_cached_manifest(cache_dir: Path, file_hash: str, total_pages: int) -> Optional[dict]:
+def _complete_cached_manifest(
+    cache_dir: Path,
+    file_hash: str,
+    total_pages: int,
+    analysis_mode: str,
+    chunk_size: int,
+) -> Optional[dict]:
     """Return the manifest only if it describes a complete, current-version,
-    contiguous cache for this exact file and page count — otherwise None (a
-    cache miss), so a crash mid-run or a stale/partial cache is never
-    silently served as a full result."""
+    contiguous cache for this exact file, mode, chunking and page count.
+
+    Mode/chunk checks are deliberate: switching from standard to fast (or back)
+    must perform a real conversion so users can compare both paths instead of
+    accidentally benchmarking a cache hit.
+    """
     manifest = _read_manifest(cache_dir)
     if not manifest or not manifest.get("complete"):
         return None
@@ -313,6 +366,10 @@ def _complete_cached_manifest(cache_dir: Path, file_hash: str, total_pages: int)
     if manifest.get("file_hash") != file_hash:
         return None
     if manifest.get("total_pages") != total_pages:
+        return None
+    if manifest.get("analysis_mode") != analysis_mode:
+        return None
+    if manifest.get("chunk_size") != chunk_size:
         return None
     chunks = sorted(manifest.get("chunks", []), key=lambda c: c["index"])
     if not chunks:
@@ -455,15 +512,33 @@ def _convert_one_chunk(
     )
 
 
-def _build_converter():
+def _build_converter(pdf_path: str, analysis_mode: str = "standard"):
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
 
+    analysis_mode = _normalize_mode(analysis_mode)
     pipeline_options = PdfPipelineOptions()
-    pipeline_options.images_scale = 2.0
     pipeline_options.generate_page_images = False
     pipeline_options.generate_picture_images = True
+
+    if analysis_mode == "fast":
+        # Lower figure rendering cost, use the fast table model, and only pay
+        # for OCR when the PDF does not already expose sufficient native text.
+        pipeline_options.images_scale = 1.0
+        pipeline_options.do_ocr = _pdf_needs_ocr(pdf_path)
+        try:
+            from docling.datamodel.pipeline_options import TableFormerMode
+            pipeline_options.table_structure_options.mode = TableFormerMode.FAST
+        except (ImportError, AttributeError):
+            # Older compatible Docling builds also accept the enum value string.
+            try:
+                pipeline_options.table_structure_options.mode = "fast"
+            except Exception:
+                logger.warning("Could not enable TableFormer FAST mode; using Docling default")
+    else:
+        # Preserve the exact pre-optimization behavior for fair A/B comparison.
+        pipeline_options.images_scale = 2.0
 
     # GPU acceleration when available
     try:
@@ -487,12 +562,16 @@ def extract_pdf_progressive(
     pdf_path: str,
     chunk_size: Optional[int] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    analysis_mode: str = "standard",
 ) -> Iterator[DoclingChunkResult]:
     """
     Extract a PDF as a stream of page-range chunks, so a caller can persist
     and surface each chunk's tables/figures as soon as it's ready instead of
     waiting for the whole document. Every window yields exactly one
     DoclingChunkResult, including a failed one (never raises out of the loop).
+
+    `analysis_mode="standard"` preserves the original pipeline. `"fast"`
+    selects the optimized settings documented at the top of this module.
 
     On a cache hit, still yields chunk-by-chunk (from disk) so callers have a
     single code path regardless of whether this is a fresh run or a replay.
@@ -509,8 +588,9 @@ def extract_pdf_progressive(
             "docling is not installed. Run: pip install 'docling>=2.14.0,<3.0'"
         ) from exc
 
+    analysis_mode = _normalize_mode(analysis_mode)
     if chunk_size is None:
-        chunk_size = settings.DOCLING_CHUNK_SIZE
+        chunk_size = FAST_CHUNK_SIZE if analysis_mode == "fast" else settings.DOCLING_CHUNK_SIZE
 
     file_hash = _file_hash(pdf_path)
     base_dir = Path(settings.DOCLING_CACHE_DIR)
@@ -520,9 +600,11 @@ def extract_pdf_progressive(
     total_pages = _pdf_page_count(pdf_path)
 
     # ── Cache hit ─────────────────────────────────────────────────────────────
-    manifest = _complete_cached_manifest(cache_dir, file_hash, total_pages)
+    manifest = _complete_cached_manifest(
+        cache_dir, file_hash, total_pages, analysis_mode, chunk_size,
+    )
     if manifest is not None:
-        logger.info("Docling cache hit: %s", pdf_path)
+        logger.info("Docling cache hit (%s mode): %s", analysis_mode, pdf_path)
         for c in sorted(manifest["chunks"], key=lambda c: c["index"]):
             data = json.loads(_chunk_cache_path(cache_dir, c["index"]).read_text(encoding="utf-8"))
             yield _chunk_from_dict(data)
@@ -531,11 +613,11 @@ def extract_pdf_progressive(
     # ── Fresh extraction ──────────────────────────────────────────────────────
     windows = _chunk_windows(total_pages, chunk_size)
     logger.info(
-        "Running Docling on %s — %d page(s), %d chunk(s) of up to %s page(s) …",
-        pdf_path, total_pages, len(windows), chunk_size or "all",
+        "Running Docling (%s mode) on %s — %d page(s), %d chunk(s) of up to %s page(s) …",
+        analysis_mode, pdf_path, total_pages, len(windows), chunk_size or "all",
     )
 
-    converter = _build_converter()
+    converter = _build_converter(pdf_path, analysis_mode)
     carry = _ChunkCarry()
     manifest_chunks: list = []
     md_path = cache_dir / "content.md"
@@ -568,6 +650,7 @@ def extract_pdf_progressive(
             "docling_version": settings.DOCLING_CACHE_VERSION,
             "file_hash": file_hash,
             "total_pages": total_pages,
+            "analysis_mode": analysis_mode,
             "chunk_size": chunk_size,
             "chunks": manifest_chunks,
             "complete": False,
@@ -579,17 +662,18 @@ def extract_pdf_progressive(
         "docling_version": settings.DOCLING_CACHE_VERSION,
         "file_hash": file_hash,
         "total_pages": total_pages,
+        "analysis_mode": analysis_mode,
         "chunk_size": chunk_size,
         "chunks": manifest_chunks,
         "complete": True,
     })
     logger.info(
-        "Docling complete: %s (%d chunk(s), %d page(s))",
-        pdf_path, len(manifest_chunks), total_pages,
+        "Docling complete (%s mode): %s (%d chunk(s), %d page(s))",
+        analysis_mode, pdf_path, len(manifest_chunks), total_pages,
     )
 
 
-def extract_pdf(pdf_path: str) -> DoclingResult:
+def extract_pdf(pdf_path: str, analysis_mode: str = "standard") -> DoclingResult:
     """
     Extract a PDF using Docling and return one aggregated result.
 
@@ -600,6 +684,7 @@ def extract_pdf(pdf_path: str) -> DoclingResult:
     Raises ImportError if docling is not installed.
     Raises RuntimeError if every chunk failed (nothing was extracted at all).
     """
+    analysis_mode = _normalize_mode(analysis_mode)
     file_hash = _file_hash(pdf_path)
     cache_dir = Path(settings.DOCLING_CACHE_DIR) / file_hash
 
@@ -610,7 +695,7 @@ def extract_pdf(pdf_path: str) -> DoclingResult:
     any_ok = False
     any_failed = False
 
-    for chunk in extract_pdf_progressive(pdf_path):
+    for chunk in extract_pdf_progressive(pdf_path, analysis_mode=analysis_mode):
         total_pages = chunk.total_pages
         if chunk.status == "failed":
             any_failed = True
@@ -633,7 +718,7 @@ def extract_pdf(pdf_path: str) -> DoclingResult:
         page_count=total_pages,
     )
     logger.info(
-        "Docling: %d texts, %d tables, %d figures from %s",
-        len(texts), len(tables), len(figures), pdf_path,
+        "Docling (%s): %d texts, %d tables, %d figures from %s",
+        analysis_mode, len(texts), len(tables), len(figures), pdf_path,
     )
     return result
