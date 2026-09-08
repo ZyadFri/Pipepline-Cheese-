@@ -1,81 +1,147 @@
 """
 Shared intermediate representation (IR) produced by every extraction engine
-(LLM, Rules, ML). None of these classes touch the database — they're pure data,
-built by an engine's extract_document() and consumed by
-app/extraction/common/persist.py:persist_paper_extraction(), which is the ONE
-function that writes any engine's output into the Ext* staging schema.
+(LLM, Rules, local ML). None of these classes touch the database — they're pure
+data built by an engine and consumed by the shared persistence layer.
 
-Every extracted value carries a `provenance` list so a human (or a later engine)
-can always trace a number back to the exact page/table/sentence it came from.
-Nothing in this module invents values: an engine that isn't sure MUST omit the
-field or emit an UnmappedFact instead of guessing.
+The IR intentionally mirrors the useful parts of the canonical scientific model
+rather than forcing every paper into a tiny Product/Treatment/Day/Value shape.
+Every field below is OPTIONAL unless it is part of the minimum identity of an
+object. Engines must leave a field as None/empty when the paper does not report
+it — never invent placeholders just to fill the schema. Unknown useful facts are
+still preserved as UnmappedFact.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
 class Provenance:
-    """Where one extracted value came from — the traceability the whole project depends on."""
+    """Where one extracted value came from."""
     source_type: str                       # text|table|chart|figure|caption|supplementary_material
     docling_item_ref: Optional[str] = None
     page_number: Optional[int] = None
-    source_label: Optional[str] = None     # "Table 2", "Figure 3"
-    exact_text: Optional[str] = None       # the raw sentence/cell this came from
+    source_label: Optional[str] = None
+    exact_text: Optional[str] = None
     table_row_header: Optional[str] = None
     table_col_header: Optional[str] = None
-    bbox: Optional[dict] = None            # fractional {"x1","y1","x2","y2"} — same convention as ExtractionAsset.bbox_json
+    bbox: Optional[dict] = None
     confidence: float = 0.5
-    confidence_reason: str = ""            # human-readable "why" — never fake precision
-    value_is_approximate: bool = False     # True for anything chart-digitized/estimated
+    confidence_reason: str = ""
+    value_is_approximate: bool = False
 
 
 @dataclass
 class ExtractedIngredientLink:
     ingredient_name: str
-    functional_class: str = "unknown"      # antimicrobial|antioxidant|preservative|coating_agent|acidulant|texture_modifier|combined|other|unknown
+    functional_class: str = "unknown"
     source: str = ""
     concentration: Optional[float] = None
     concentration_unit: Optional[str] = None
+    ingredient_family: Optional[str] = None
+    application_method: Optional[str] = None
+    treatment_timing: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
     provenance: list[Provenance] = field(default_factory=list)
 
 
 @dataclass
 class ExtractedObservation:
-    day: Optional[int]
-    indicator_type: str                    # raw label, e.g. "Total viable count"
-    indicator_unit: str
-    indicator_value: float
+    # Minimum observation identity/value. Existing engines can keep using these
+    # four fields exactly as before; everything else is optional enrichment.
+    day: Optional[float] = None
+    indicator_type: str = ""
+    indicator_unit: str = ""
+    indicator_value: Optional[float] = None
+
     indicator_threshold: Optional[float] = None
     value_is_approximate: bool = False
+    microorganism_name: Optional[str] = None
+
+    time_value_original: Optional[float] = None
+    time_unit_original: Optional[str] = None
+    measurement_unit_normalized: Optional[str] = None
+    value_original_text: Optional[str] = None
+    mean_value: Optional[float] = None
+    standard_deviation: Optional[float] = None
+    standard_error: Optional[float] = None
+    minimum_value: Optional[float] = None
+    maximum_value: Optional[float] = None
+    replicate_count: Optional[int] = None
+    detection_limit: Optional[float] = None
+    detection_limit_unit: Optional[str] = None
+    censoring_type: Optional[str] = None
+    missing_reason: Optional[str] = None
+    significance_letter: Optional[str] = None
+    value_origin: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
     provenance: list[Provenance] = field(default_factory=list)
 
 
 @dataclass
 class ExtractedExperiment:
+    # Minimum experiment identity retained for backward compatibility.
     cheese_product: str
     treatment: str
+
+    # Product / matrix description.
+    food_category: Optional[str] = None
+    product_family: Optional[str] = None
+    matrix_description: Optional[str] = None
+    milk_species: Optional[str] = None
+    milk_treatment: Optional[str] = None
+    fat_content_class: Optional[str] = None
+    sampling_location: Optional[str] = None
+
+    # Storage and environmental conditions.
+    storage_temperature_value: Optional[float] = None
+    storage_temperature_unit_original: Optional[str] = None
+    storage_temperature_c: Optional[float] = None
+    storage_relative_humidity: Optional[float] = None
+    packaging_type: Optional[str] = None
+    atmosphere_type: Optional[str] = None
+    gas_composition: dict[str, float] = field(default_factory=dict)
+    light_condition: Optional[str] = None
+    storage_duration_value: Optional[float] = None
+    storage_duration_unit_original: Optional[str] = None
+    storage_duration_days: Optional[float] = None
+
+    # Experimental design / starting composition.
+    study_design: Optional[str] = None
+    replicate_design: Optional[str] = None
+    artificial_inoculation: Optional[bool] = None
+    initial_ph: Optional[float] = None
+    initial_water_activity: Optional[float] = None
+    initial_salt_pct: Optional[float] = None
+    initial_moisture_pct: Optional[float] = None
+
+    # Treatment-arm context that belongs to the experiment's primary arm.
+    is_control: Optional[bool] = None
+    treatment_type: Optional[str] = None
+    application_method: Optional[str] = None
+    treatment_timing: Optional[str] = None
+
+    # Escape hatches for scientifically useful conditions not anticipated by
+    # the canonical schema. They are persisted, never silently discarded.
+    extra_conditions: dict[str, Any] = field(default_factory=dict)
+    extra_treatment: dict[str, Any] = field(default_factory=dict)
+
     ingredients: list[ExtractedIngredientLink] = field(default_factory=list)
     observations: list[ExtractedObservation] = field(default_factory=list)
-    provenance: list[Provenance] = field(default_factory=list)   # evidence for the experiment identity itself
+    provenance: list[Provenance] = field(default_factory=list)
 
 
 @dataclass
 class UnmappedFact:
-    """
-    A scientifically meaningful fact that doesn't map to a canonical field — kept,
-    never discarded, per the project's maximum-information principle. Maps 1:1 to
-    the ExtUnmappedFact table.
-    """
-    predicate: str                         # e.g. "springiness"
+    """Scientifically meaningful fact that cannot yet map to a canonical field."""
+    predicate: str
     value_raw: Optional[str] = None
     value_normalized: Optional[float] = None
     unit_raw: Optional[str] = None
     unit_normalized: Optional[str] = None
-    subject: Optional[str] = None          # nearest experiment context, free text
-    category: str = "unknown"              # composition|storage|processing|microbiology|sensory|physical|chemical|statistical|unknown
+    subject: Optional[str] = None
+    category: str = "unknown"
     raw_text: Optional[str] = None
     context: Optional[str] = None
     confidence: Optional[float] = None
@@ -85,12 +151,11 @@ class UnmappedFact:
 
 @dataclass
 class QualitativeObservation:
-    """A non-numeric finding, e.g. 'treatment significantly reduced microbial growth'."""
     subject: str
     indicator: Optional[str] = None
-    direction: Optional[str] = None        # increased|decreased|no_change|inhibited|improved|worsened
-    significance: Optional[str] = None     # significant|not_significant|unknown
-    comparison: Optional[str] = None       # what it's being compared against
+    direction: Optional[str] = None
+    significance: Optional[str] = None
+    comparison: Optional[str] = None
     raw_text: str = ""
     provenance: Optional[Provenance] = None
 
@@ -100,8 +165,8 @@ class PaperExtractionResult:
     """Top-level output of any ExtractionEngine.extract_document() call."""
     paper_id: int
     project_id: int
-    engine: str                            # llm|rules|ml
-    engine_version: str = "0.1.0"
+    engine: str
+    engine_version: str = "0.2.0"
     experiments: list[ExtractedExperiment] = field(default_factory=list)
     unmapped_facts: list[UnmappedFact] = field(default_factory=list)
     qualitative_observations: list[QualitativeObservation] = field(default_factory=list)
