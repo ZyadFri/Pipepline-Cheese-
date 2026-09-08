@@ -496,8 +496,8 @@ function ResearchSection() {
         <div className="grid gap-10 lg:grid-cols-[1fr_.72fr] lg:items-center">
           <div>
             <p className="text-[9.5px] font-bold uppercase tracking-[.18em] text-[#a12241]">Recent research</p>
-            <h2 className="mt-3 font-display text-[43px] font-medium leading-[.98] tracking-[-.02em] text-[#281f22] sm:text-[48px]">Real publications from the researchers behind the project.</h2>
-            <p className="mt-5 max-w-[560px] text-[12.5px] leading-[1.75] text-[#74676d]">Explore peer-reviewed research from our team. Every publication below is real, linked to its DOI, and presented with verified journal, year and author information.</p>
+            <h2 className="mt-3 font-display text-[43px] font-medium leading-[.98] tracking-[-.02em] text-[#281f22] sm:text-[48px]">Upload research papers. Get back a structured database — and much more.</h2>
+            <p className="mt-5 max-w-[560px] text-[12.5px] leading-[1.75] text-[#74676d]">Below are real example publications, extracted and published by the research team behind this project. Every publication is real, linked to its DOI, and presented with verified journal, year and author information.</p>
 
             <div className="mt-7 flex flex-wrap gap-2">
               {topics.map((label) => (
