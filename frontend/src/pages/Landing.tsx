@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   BookOpen,
-  CheckCircle2,
   ChevronDown,
   Database,
   ExternalLink,
@@ -211,38 +210,6 @@ function ResearchCard({ paper }: { paper: ResearchPaper }) {
   )
 }
 
-function HeroFloatCard({
-  className,
-  icon,
-  eyebrow,
-  title,
-  note,
-  delay = '0s',
-}: {
-  className: string
-  icon: React.ReactNode
-  eyebrow: string
-  title: string
-  note: string
-  delay?: string
-}) {
-  return (
-    <div
-      className={`pointer-events-none absolute z-30 hidden min-w-[190px] rounded-[20px] border border-white/90 bg-white/90 px-4 py-3.5 shadow-[0_28px_65px_-28px_rgba(68,23,37,.45)] backdrop-blur-xl xl:block ${className}`}
-      style={{ animation: `landingFloat 6s ease-in-out ${delay} infinite` }}
-    >
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#f8e8ec] text-[#92213d]">{icon}</span>
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[.14em] text-[#b26b7c]">{eyebrow}</p>
-          <p className="mt-0.5 font-display text-[18px] font-semibold leading-none text-[#34262b]">{title}</p>
-          <p className="mt-1 text-[8.5px] text-[#8a7a80]">{note}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(true)
@@ -337,8 +304,8 @@ function Hero() {
           </div>
 
           <div
-            className="absolute inset-x-[4%] top-[13%] z-20 overflow-hidden rounded-[28px] border border-[#f2e5e8] bg-[#201b1d] p-2.5 shadow-[0_45px_90px_-35px_rgba(48,20,29,.62)] transition-transform duration-200 ease-out lg:inset-x-[8%]"
-            style={{ transform: `perspective(1200px) rotateX(${tilt.y * -2.1}deg) rotateY(${tilt.x * 2.8}deg) translate3d(${tilt.x * 5}px,${tilt.y * 4}px,0)` }}
+            className="absolute inset-x-[4%] top-[13%] z-20 overflow-hidden rounded-[28px] border border-[#f2e5e8] bg-[#201b1d] p-2.5 shadow-[0_50px_100px_-32px_rgba(48,20,29,.68)] transition-transform duration-200 ease-out lg:inset-x-[8%]"
+            style={{ transform: `perspective(1200px) rotateZ(-1.6deg) rotateX(${4 + tilt.y * -2.1}deg) rotateY(${-3 + tilt.x * 2.8}deg) translate3d(${tilt.x * 5}px,${tilt.y * 4}px,0)` }}
           >
             <div className="relative overflow-hidden rounded-[20px] bg-black">
               <video ref={videoRef} autoPlay muted loop playsInline controls preload="metadata" poster={MEDIA.aging} className="aspect-video w-full bg-black object-cover">
@@ -358,18 +325,6 @@ function Hero() {
           <div className="absolute left-[47%] top-[5%] z-40 hidden -translate-x-1/2 rotate-[-2deg] xl:block">
             <p className="font-display text-[19px] italic leading-tight text-[#9b3450]">Watch a<br />live demo</p>
             <span className="ml-7 text-[28px] text-[#a33d57]">↘</span>
-          </div>
-
-          <HeroFloatCard className="left-[19%] top-[1%]" icon={<BookOpen size={17} />} eyebrow="Research papers" title="Organized" note="Real PDFs, one workspace" delay="0s" />
-          <HeroFloatCard className="right-[2%] top-[7%]" icon={<Sparkles size={17} />} eyebrow="Evidence" title="Extracted" note="Tables · figures · context" delay="-1.2s" />
-          <HeroFloatCard className="right-[-2%] top-[41%]" icon={<CheckCircle2 size={18} />} eyebrow="Review" title="Traceable" note="Source preserved" delay="-2.3s" />
-
-          <div className="absolute bottom-[11%] right-[2%] z-30 hidden rounded-[18px] border border-white/90 bg-white/92 px-4 py-3 shadow-[0_26px_55px_-28px_rgba(58,22,35,.55)] backdrop-blur xl:block" style={{ animation: 'landingFloat 6.5s ease-in-out -3.1s infinite' }}>
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#f8e8ec] text-[#92213d]"><Database size={17} /></span>
-              <div><p className="font-display text-[16px] font-semibold text-[#34262b]">Export to CSV</p><p className="text-[8.5px] text-[#8a7a80]">Reviewed data, one click away</p></div>
-              <ArrowRight size={13} className="ml-2 text-[#9b2945]" />
-            </div>
           </div>
 
           <div className="absolute bottom-[1%] right-[10%] z-30 hidden rotate-[-4deg] xl:block">
