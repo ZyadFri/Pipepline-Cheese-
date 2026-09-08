@@ -1,0 +1,462 @@
+/* Landing page — Scientific rigor / capabilities section only.
+   This file intentionally scopes every rule to #validation so the rest of the app stays untouched. */
+
+#validation {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-top: 5.75rem !important;
+  padding-bottom: 6rem !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(155, 38, 68, .035), transparent 38%),
+    linear-gradient(180deg, #fffafa 0%, #fff8f9 100%) !important;
+}
+
+#validation::before,
+#validation::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 390px;
+  height: 390px;
+  border: 1px solid rgba(170, 70, 94, .13);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#validation::before {
+  left: -235px;
+  top: -215px;
+}
+
+#validation::after {
+  right: -120px;
+  top: -265px;
+}
+
+#validation > div.mx-auto > div.mx-auto.max-w-\[760px\] {
+  max-width: 900px !important;
+}
+
+#validation > div.mx-auto > div.mx-auto.max-w-\[760px\] > p:first-child {
+  font-size: 10px !important;
+  letter-spacing: .19em !important;
+}
+
+#validation > div.mx-auto > div.mx-auto.max-w-\[760px\] > h2 {
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: clamp(2.75rem, 4.25vw, 4.5rem) !important;
+  line-height: .99 !important;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+#validation > div.mx-auto > div.mx-auto.max-w-\[760px\] > p:last-child {
+  margin-top: 1.25rem !important;
+  font-size: 13px !important;
+  color: #807278 !important;
+}
+
+/* The six capability cards become the illustrated composition from the approved reference. */
+#validation > div.mx-auto > div.mt-10.grid {
+  margin-top: 3.25rem !important;
+  gap: 18px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div {
+  min-height: 228px;
+  padding: 24px !important;
+  border-radius: 22px !important;
+  border-color: rgba(224, 201, 207, .74) !important;
+  box-shadow: 0 25px 60px -52px rgba(74, 24, 39, .52);
+  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(-n+3) {
+  min-height: 355px;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(190, 132, 148, .62) !important;
+  box-shadow: 0 34px 70px -50px rgba(79, 24, 41, .62);
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div > span:first-of-type {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 999px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div > h3 {
+  margin-top: 1rem !important;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 22px !important;
+  line-height: 1.1 !important;
+  font-weight: 500 !important;
+  letter-spacing: -.02em;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div > p {
+  max-width: 92%;
+  margin-top: .7rem !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+/* Highlighted extraction engine card. */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) {
+  border-color: rgba(139, 23, 48, .8) !important;
+  background:
+    radial-gradient(circle at 72% 18%, rgba(255,255,255,.10), transparent 32%),
+    linear-gradient(145deg, #7a1230 0%, #9f2547 62%, #8e1738 100%) !important;
+  box-shadow: 0 34px 68px -38px rgba(105, 16, 43, .72) !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > span.absolute {
+  top: 24px !important;
+  right: 24px !important;
+  padding: 6px 12px !important;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.16) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+/* ---------- Card 1: evidence first ---------- */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4 {
+  position: relative;
+  min-height: 145px;
+  margin-top: 20px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  bottom: -7px;
+  width: 48%;
+  height: 138px;
+  border: 1px solid #eadde1;
+  border-radius: 8px 8px 0 0;
+  background:
+    linear-gradient(90deg, transparent 0 18px, rgba(194,102,126,.25) 18px 112px, transparent 112px) 18px 77px / 132px 8px no-repeat,
+    repeating-linear-gradient(180deg, #ddd5d8 0 4px, transparent 4px 16px) 20px 22px / 78% 76px no-repeat,
+    #fffafa;
+  box-shadow: 0 18px 32px -25px rgba(77, 24, 40, .45);
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4::after {
+  content: '';
+  position: absolute;
+  left: 47%;
+  top: 72px;
+  width: 42px;
+  height: 1px;
+  background: #d68ea1;
+  box-shadow: 38px -21px 0 -0.2px #d68ea1, 38px 0 0 -0.2px #d68ea1, 38px 21px 0 -0.2px #d68ea1;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4 > div {
+  position: absolute;
+  right: 0;
+  top: 17px;
+  z-index: 2;
+  display: flex !important;
+  width: 41%;
+  flex-direction: column;
+  gap: 9px !important;
+  padding: 0;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4 > div > span {
+  justify-content: flex-start;
+  width: 100%;
+  border-radius: 11px !important;
+  background: rgba(255,255,255,.96) !important;
+  box-shadow: 0 8px 20px -17px rgba(80,24,40,.55);
+}
+
+/* ---------- Card 2: engine convergence diagram ---------- */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 {
+  position: relative;
+  min-height: 150px;
+  margin-top: 18px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div {
+  position: relative;
+  display: block !important;
+  height: 145px;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div > span {
+  position: absolute;
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  width: 142px;
+  height: 34px;
+  padding: 0 14px !important;
+  border-radius: 11px !important;
+  font-size: 10px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div > span:nth-child(1) { left: 0; top: 0; }
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div > span:nth-child(2) { left: 0; top: 48px; }
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div > span:nth-child(3) { left: 0; top: 96px; }
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div > svg {
+  position: absolute;
+  left: 51%;
+  top: 61px;
+  width: 18px;
+  height: 18px;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4 > div > span:last-child {
+  left: auto;
+  right: 0;
+  top: 38px;
+  width: 112px;
+  height: 76px;
+  justify-content: center;
+  text-align: center;
+  border-color: rgba(255,255,255,.45) !important;
+  background: rgba(255,244,247,.92) !important;
+  color: #7a1832 !important;
+  box-shadow: 0 18px 30px -22px rgba(34,6,16,.55);
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(2) > div.mt-4::before {
+  content: '';
+  position: absolute;
+  left: 142px;
+  top: 16px;
+  width: calc(100% - 265px);
+  height: 112px;
+  border-top: 1px solid rgba(255,255,255,.62);
+  border-bottom: 1px solid rgba(255,255,255,.62);
+  border-radius: 0 26px 26px 0;
+  opacity: .75;
+  transform: scaleY(.58);
+  transform-origin: center;
+}
+
+/* ---------- Card 3: provenance + cheese/paper composition ---------- */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 {
+  position: relative;
+  min-height: 145px;
+  margin-top: 18px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4::before {
+  content: 'Journal of\A Dairy Science';
+  white-space: pre;
+  position: absolute;
+  left: 2px;
+  bottom: 0;
+  width: 46%;
+  height: 142px;
+  box-sizing: border-box;
+  padding: 18px 14px;
+  border: 1px solid #eee1e4;
+  border-radius: 8px 8px 3px 3px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.30), rgba(255,255,255,.72)),
+    url('https://commons.wikimedia.org/wiki/Special:Redirect/file/Various_cheeses.jpg?width=700') center 76% / 76% auto no-repeat,
+    #fffdfa;
+  color: #65555b;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 10px;
+  line-height: 1.2;
+  box-shadow:
+    10px 9px 0 -4px #fbf5f6,
+    11px 10px 0 -3px #eadde1,
+    20px 17px 0 -8px #fff,
+    21px 18px 0 -7px #eadde1,
+    0 19px 32px -26px rgba(76,23,39,.5);
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 > div {
+  position: absolute;
+  right: 0;
+  top: 6px;
+  width: 42%;
+  padding: 0 0 0 16px !important;
+  border: 0 !important;
+  border-left: 1px dashed #d9a1af !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 > div > div {
+  position: relative;
+  min-height: 26px;
+  padding: 5px 9px !important;
+  border: 1px solid #eee2e5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 > div > div::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: #c85f79;
+}
+
+/* ---------- Card 4: review controls ---------- */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(4) > div.mt-4 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 88px;
+  margin-top: 8px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(4) > div.mt-4 > div {
+  display: flex !important;
+  width: 145px;
+  flex-direction: column;
+  gap: 7px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(4) > div.mt-4 span {
+  justify-content: flex-start;
+  width: 100%;
+  border: 1px solid #eadfe2;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #594a50 !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(4) > div.mt-4 span:first-child {
+  background: #f8e8ec !important;
+  color: #8e2942 !important;
+}
+
+/* ---------- Card 5: database cylinder ---------- */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 {
+  position: relative;
+  min-height: 88px;
+  margin-top: 8px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4::before {
+  content: 'From papers\A to knowledge';
+  white-space: pre;
+  position: absolute;
+  right: 24px;
+  top: -8px;
+  width: 116px;
+  padding: 8px 10px;
+  border: 1px solid #eee0e4;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+  color: #7d666f;
+  font-size: 9px;
+  line-height: 1.15;
+  box-shadow: 0 10px 22px -18px rgba(81,24,41,.4);
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div {
+  position: absolute;
+  right: 45px;
+  bottom: -6px;
+  display: block !important;
+  width: 88px;
+  height: 58px;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span {
+  position: absolute;
+  left: 7px;
+  width: 74px !important;
+  height: 30px !important;
+  border-color: #eccfd7 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(180deg,#f7dbe3,#f2c8d3) !important;
+  color: transparent !important;
+  box-shadow: 0 7px 13px -10px rgba(123,28,53,.55) !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span:nth-child(1) { top: 0; z-index: 3 !important; }
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span:nth-child(2) { top: 14px; z-index: 2 !important; }
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span:nth-child(3) { top: 28px; z-index: 1 !important; }
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div svg { opacity: 0; }
+
+/* ---------- Card 6: research structure ---------- */
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(6) > div.mt-4 {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 88px;
+  margin-top: 8px !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(6) > div.mt-4 > div {
+  position: relative;
+  width: 155px;
+  padding: 0 0 0 17px !important;
+  border: 0 !important;
+  border-left: 1px solid #dca8b5 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(6) > div.mt-4 > div > div {
+  position: relative;
+  min-height: 23px;
+  padding: 4px 9px !important;
+  border: 1px solid #eee2e5;
+  border-radius: 999px;
+  background: #fff;
+}
+
+#validation > div.mx-auto > div.mt-10.grid > div:nth-child(6) > div.mt-4 > div > div::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: #cf7188;
+}
+
+@media (max-width: 1279px) {
+  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(-n+3) {
+    min-height: 315px;
+  }
+}
+
+@media (max-width: 639px) {
+  #validation {
+    padding-top: 4.25rem !important;
+    padding-bottom: 4.5rem !important;
+  }
+
+  #validation > div.mx-auto > div.mx-auto.max-w-\[760px\] > h2 {
+    font-size: 2.6rem !important;
+  }
+
+  #validation > div.mx-auto > div.mt-10.grid > div,
+  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(-n+3) {
+    min-height: 0;
+  }
+
+  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4::before,
+  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4::before {
+    transform: scale(.88);
+    transform-origin: left bottom;
+  }
+}
