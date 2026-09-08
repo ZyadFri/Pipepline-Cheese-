@@ -7,7 +7,7 @@ from app.db.database import Base, engine, apply_column_migrations
 from app.api.routes import (
     auth, projects, papers, review_queue,
     analytics, schema,
-    extraction_workspace, extraction_engines, asset_actions,
+    extraction_workspace, fast_workspace, extraction_engines, asset_actions,
     insights, paper_assistant,
 )
 from app.api.routes import (
@@ -69,6 +69,8 @@ app.include_router(snapshots.router, prefix="/api")
 
 # ── Extraction Workspace (active extraction pipeline) ──────────────────────────
 app.include_router(extraction_workspace.router, prefix="/api")
+# Optional A/B route: same workspace pipeline with optimized Docling settings.
+app.include_router(fast_workspace.router, prefix="/api")
 
 # ── Multi-engine extraction (LLM / Rules / ML) ──────────────────────────────────
 app.include_router(extraction_engines.router, prefix="/api")
