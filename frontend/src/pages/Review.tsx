@@ -287,6 +287,7 @@ export default function Review() {
   const [observations, setObservations] = useState<ReviewObservation[]>([])
   const [filter, setFilter] = useState<StatusFilter>('needs_review')
   const [loading, setLoading] = useState(true)
+  const [bulkApproving, setBulkApproving] = useState(false)
 
   useEffect(() => {
     projectsApi.get(pid).then(setProject).catch(() => toast.error('Failed to load project'))
@@ -330,18 +331,24 @@ export default function Review() {
     return c
   }, [observations])
 
-  const highConfidencePending = observations.filter(
-    (o) => o.review_status === 'needs_review' && (o.quality_score ?? 0) >= HIGH_CONFIDENCE,
-  )
+  const pendingRows = observations.filter((o) => o.review_status === 'needs_review')
+  const highConfidencePending = pendingRows.filter((o) => (o.quality_score ?? 0) >= HIGH_CONFIDENCE)
 
-  const bulkApproveHighConfidence = async () => {
-    if (!highConfidencePending.length) return
+  const bulkApproveRows = async (rows: ReviewObservation[], label: string) => {
+    if (!rows.length || bulkApproving) return
+    const scope = paperIdNum ? 'this paper' : 'this project'
+    if (!window.confirm(`Approve all ${rows.length} ${label} row${rows.length === 1 ? '' : 's'} in ${scope}?`)) return
+
+    setBulkApproving(true)
     try {
-      const updated = await observationsApi.bulkApprove(highConfidencePending.map((o) => o.id))
-      const byId = new Map(updated.map((o) => [o.id, o]))
-      setObservations((prev) => prev.map((o) => byId.has(o.id) ? { ...o, ...byId.get(o.id) } : o))
-      toast.success(`${updated.length} high-confidence value(s) approved`)
-    } catch { toast.error('Bulk approve failed') }
+      const updated = await observationsApi.bulkApprove(rows.map((o) => o.id))
+      toast.success(`${updated.length} row${updated.length === 1 ? '' : 's'} approved`)
+      await load()
+    } catch {
+      toast.error('Could not approve the selected rows. Please try again.')
+    } finally {
+      setBulkApproving(false)
+    }
   }
 
   const backTo = paperIdNum ? `/projects/${pid}/papers/${paperIdNum}/overview` : `/projects/${pid}`
@@ -360,12 +367,47 @@ export default function Review() {
             </p>
           </div>
         </div>
-        {highConfidencePending.length > 0 && (
-          <button onClick={bulkApproveHighConfidence} className="btn-primary">
-            <CheckCircle2 size={14} /> Approve all high-confidence ({highConfidencePending.length})
-          </button>
-        )}
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {highConfidencePending.length > 0 && highConfidencePending.length < pendingRows.length && (
+            <button
+              onClick={() => bulkApproveRows(highConfidencePending, 'high-confidence')}
+              disabled={bulkApproving}
+              className="btn-secondary"
+            >
+              <CheckCircle2 size={14} /> Approve high-confidence ({highConfidencePending.length})
+            </button>
+          )}
+          {pendingRows.length > 0 && (
+            <button
+              onClick={() => bulkApproveRows(pendingRows, 'pending')}
+              disabled={bulkApproving}
+              className="btn-primary"
+            >
+              <CheckCircle2 size={14} />
+              {bulkApproving ? 'Approving…' : `Approve all pending (${pendingRows.length})`}
+            </button>
+          )}
+        </div>
       </div>
+
+      {pendingRows.length > 0 && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-[#eadde1] bg-[linear-gradient(135deg,#fffafa,#fff)] px-4 py-3">
+          <div>
+            <p className="text-xs font-semibold text-[#351f27]">Ready to review</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Approve rows individually, or approve all {pendingRows.length} currently pending rows at once.
+            </p>
+          </div>
+          <button
+            onClick={() => bulkApproveRows(pendingRows, 'pending')}
+            disabled={bulkApproving}
+            className="shrink-0 rounded-lg bg-[#8B1730] px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_20px_-14px_rgba(122,27,46,.9)] transition hover:bg-[#741326] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {bulkApproving ? 'Approving…' : `Approve all ${pendingRows.length}`}
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map(({ key, label }) => (
