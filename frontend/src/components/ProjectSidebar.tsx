@@ -1,7 +1,7 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShieldCheck, Download, Settings,
-  LogOut, ChevronRight, FlaskConical, Beaker, TestTube2, Wand2,
+  LogOut, ChevronRight, Wand2, GitBranch,
   Briefcase, ClipboardList, Users, Database, Home,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -21,12 +21,10 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Analysis',
+    label: 'Research',
     items: [
-      { to: 'studies',        label: 'Studies',       Icon: FlaskConical },
-      { to: 'experiments',    label: 'Experiments',   Icon: Beaker },
-      { to: 'treatments',     label: 'Treatments',    Icon: TestTube2 },
-      { to: 'normalization',  label: 'Normalization', Icon: Wand2 },
+      { to: 'research-structure', label: 'Research Structure', Icon: GitBranch },
+      { to: 'normalization',      label: 'Normalization',      Icon: Wand2 },
     ],
   },
   {
