@@ -1,9 +1,11 @@
 import json
 import os
 import uuid
+from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -14,6 +16,7 @@ from app.db.models import (
     Project, Study, TreatmentArm, User,
 )
 from app.schemas.papers import PaperOut
+from app.services.docling_extractor import cache_dir_for
 from app.services.pdf_extractor import extract_full_text
 
 router = APIRouter(prefix="/projects/{project_id}/papers", tags=["papers"])
@@ -39,6 +42,52 @@ def _get_project(project_id: int, user: User, db: Session) -> Project:
     if not project:
         raise HTTPException(404, "Project not found")
     return project
+
+
+def _get_paper(project_id: int, paper_id: int, db: Session) -> Paper:
+    paper = db.query(Paper).filter(Paper.id == paper_id, Paper.project_id == project_id).first()
+    if not paper:
+        raise HTTPException(404, "Paper not found")
+    return paper
+
+
+def _ensure_page_preview(paper: Paper, page_number: int) -> Path:
+    """Return a cached PNG preview for one PDF page, rendering it on demand.
+
+    The progressive extraction workspace already writes page images into the
+    same Docling cache directory. Reusing that cache means the dashboard can
+    show a first-page preview immediately after upload without duplicating work
+    once full paper analysis starts.
+    """
+    if page_number < 1:
+        raise HTTPException(404, "Page not found")
+
+    pages_dir = cache_dir_for(paper.file_path) / "pages"
+    pages_dir.mkdir(parents=True, exist_ok=True)
+    image_path = pages_dir / f"page_{page_number:04d}.png"
+    if image_path.exists():
+        return image_path
+
+    try:
+        import fitz  # PyMuPDF
+
+        doc = fitz.open(paper.file_path)
+        try:
+            if page_number > len(doc):
+                raise HTTPException(404, "Page not found")
+            page = doc.load_page(page_number - 1)
+            # A dashboard preview does not need the heavier full-resolution
+            # workspace render. 1.25x remains crisp enough for the paper card.
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.25, 1.25), alpha=False)
+            pix.save(str(image_path))
+        finally:
+            doc.close()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(503, f"Page preview unavailable: {exc}") from exc
+
+    return image_path
 
 
 @router.get("", response_model=List[PaperOut])
@@ -134,13 +183,12 @@ def papers_pipeline_status(
             .first()
         )
 
-        # Asset counts
-        n_assets = db.query(ExtractionAsset).filter(ExtractionAsset.paper_id == paper.id).count()
-        n_charts = (
-            db.query(ExtractionAsset)
-            .filter(ExtractionAsset.paper_id == paper.id, ExtractionAsset.classification == "chart")
-            .count()
-        )
+        # Asset counts used directly by the live dashboard. These are real
+        # persisted ExtractionAsset rows, never illustrative frontend values.
+        asset_q = db.query(ExtractionAsset).filter(ExtractionAsset.paper_id == paper.id)
+        n_assets = asset_q.count()
+        n_tables = asset_q.filter(ExtractionAsset.asset_type == "native_table").count()
+        n_charts = asset_q.filter(ExtractionAsset.classification == "chart").count()
 
         # Canonical promotion — a Study row is created by either promoter
         # (promote_paper_to_canonical or promote_ext_paper_to_canonical) as soon as
@@ -149,11 +197,7 @@ def papers_pipeline_status(
         study = db.query(Study).filter(Study.paper_id == paper.id).first()
 
         # Canonical observations for this paper — the active pipeline's review
-        # signal. Previously this stage read only legacy ExtractedRow counts, which
-        # the active extraction_workspace.py pipeline never writes to: a fully
-        # extracted paper would show review="not_started" and fall through to the
-        # same badge as a paper never touched. Scoped via
-        # Observation → TreatmentArm → Experiment → Study.paper_id.
+        # signal. Scoped via Observation → TreatmentArm → Experiment → Study.paper_id.
         obs_q = (
             db.query(Observation)
             .join(TreatmentArm, Observation.treatment_arm_id == TreatmentArm.id)
@@ -164,10 +208,8 @@ def papers_pipeline_status(
         n_observations = obs_q.count()
         n_obs_approved = obs_q.filter(Observation.review_status == "approved").count()
 
-        # Legacy extracted rows — kept for papers processed by the retired
-        # ExtractedRow-based pipeline generations; combined with canonical
-        # observations below so this stage reflects whichever pipeline actually
-        # produced this paper's data.
+        # Legacy extracted rows — retained only for papers processed by older
+        # pipeline generations so the dashboard remains truthful for existing data.
         n_rows = db.query(ExtractedRow).filter(ExtractedRow.paper_id == paper.id).count()
         n_approved = (
             db.query(ExtractedRow)
@@ -294,9 +336,17 @@ def papers_pipeline_status(
             },
             "counts": {
                 "assets":        n_assets,
+                "tables":        n_tables,
                 "charts":        n_charts,
                 "rows":          n_reviewable,
                 "approved_rows": n_reviewed_approved,
+            },
+            "metadata": {
+                "title": study.title if study else None,
+                "authors": study.authors if study else [],
+                "publication_year": study.publication_year if study else None,
+                "journal": study.journal if study else None,
+                "abstract": study.abstract if study else None,
             },
             "ws_result": ws_result,
             "ws_job_id":  ws_job.id  if ws_job  else None,
@@ -304,6 +354,29 @@ def papers_pipeline_status(
         })
 
     return out
+
+
+@router.get("/{paper_id}/pages/{page_number}/image")
+def get_paper_page_image(
+    project_id: int,
+    paper_id: int,
+    page_number: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Serve an authenticated PDF page preview for dashboard/paper-library UI.
+
+    Page 1 is requested by the project dashboard. The image is rendered once
+    and cached in the same directory used by progressive Docling extraction.
+    """
+    _get_project(project_id, user, db)
+    paper = _get_paper(project_id, paper_id, db)
+    image_path = _ensure_page_preview(paper, page_number)
+    return FileResponse(
+        path=str(image_path),
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.delete("/{paper_id}", status_code=204)
