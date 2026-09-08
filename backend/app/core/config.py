@@ -55,14 +55,21 @@ class Settings(BaseSettings):
     MAX_PAPERS_PER_UPLOAD: int = 10
     UPLOAD_DIR: str = "uploads"
 
-    # Docling / PP-Chart2Table cache directories (relative to backend root)
+    # Docling / chart cache directories (relative to backend root)
     DOCLING_CACHE_DIR: str = "uploads/docling_cache"
     CHART_CACHE_DIR: str = "uploads/chart_cache"
-    # Bump DOCLING_CACHE_VERSION to invalidate all cached extractions
-    DOCLING_CACHE_VERSION: str = "2"
-    # Pages per chunked Docling conversion call (progressive extraction).
-    # 0 disables chunking and falls back to one whole-document call.
-    DOCLING_CHUNK_SIZE: int = 6
+
+    # Version 3 invalidates the previous whole/large-chunk cache so papers that
+    # were already processed under the old 6-page default are rebuilt using the
+    # genuinely progressive settings below.
+    DOCLING_CACHE_VERSION: str = "3"
+
+    # Pages per Docling conversion call. Two pages is deliberately small: the
+    # converter is reused between chunks, while tables/figures can now be
+    # persisted and shown after the first couple of pages instead of waiting
+    # for a typical 6–12 page paper to finish completely.
+    # Set to 1 for strict page-by-page extraction, or 0 to disable chunking.
+    DOCLING_CHUNK_SIZE: int = 2
 
     class Config:
         env_file = ".env"
