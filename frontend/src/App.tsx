@@ -22,12 +22,10 @@ import Review from './pages/Review'
 import Analytics from './pages/Analytics'
 
 // Canonical project pages
-import StudiesPage from './pages/project/StudiesPage'
-import ExperimentsPage from './pages/project/ExperimentsPage'
+import ResearchStructurePage from './pages/project/ResearchStructurePage'
 import DatasetPage from './pages/project/DatasetPage'
 import NormalizationPage from './pages/project/NormalizationPage'
 import MissingDataPage from './pages/project/MissingDataPage'
-import TreatmentsPage from './pages/project/TreatmentsPage'
 import ThresholdShelfLifePage from './pages/project/ThresholdShelfLifePage'
 import PipelineJobsPage from './pages/project/PipelineJobsPage'
 import ExtractionWorkspacePage from './pages/project/ExtractionWorkspacePage'
@@ -81,16 +79,19 @@ export default function App() {
         <Route path="analytics" element={<Analytics />} />
 
         {/* Canonical scientific data */}
-        <Route path="studies" element={<StudiesPage />} />
-        <Route path="experiments" element={<ExperimentsPage />} />
+        <Route path="research-structure" element={<ResearchStructurePage />} />
         <Route path="dataset" element={<DatasetPage />} />
+
+        {/* Old canonical browse URLs remain valid as compatibility redirects. */}
+        <Route path="studies" element={<Navigate to="../research-structure" replace />} />
+        <Route path="experiments" element={<Navigate to="../research-structure" replace />} />
+        <Route path="treatments" element={<Navigate to="../research-structure" replace />} />
 
         {/* Data quality */}
         <Route path="normalization" element={<NormalizationPage />} />
         <Route path="missing" element={<MissingDataPage />} />
 
         {/* Analysis */}
-        <Route path="treatments" element={<TreatmentsPage />} />
         <Route path="thresholds" element={<ThresholdShelfLifePage />} />
 
         {/* The project dashboard is now the paper library. Keep the old URL
