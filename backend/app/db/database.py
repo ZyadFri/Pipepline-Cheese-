@@ -61,6 +61,12 @@ def apply_column_migrations() -> None:
         "ALTER TABLE jobs ADD COLUMN cancel_requested BOOLEAN DEFAULT 0",
         "ALTER TABLE papers ADD COLUMN summary_json TEXT",
         "ALTER TABLE papers ADD COLUMN summary_generated_at DATETIME",
+        # User profile (avatar upload, bio, job title, organization)
+        "ALTER TABLE users ADD COLUMN avatar_path VARCHAR",
+        "ALTER TABLE users ADD COLUMN bio TEXT",
+        "ALTER TABLE users ADD COLUMN job_title VARCHAR",
+        "ALTER TABLE users ADD COLUMN organization VARCHAR",
+        "ALTER TABLE users ADD COLUMN updated_at DATETIME",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

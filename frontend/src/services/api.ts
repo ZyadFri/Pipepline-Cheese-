@@ -42,6 +42,17 @@ export const authApi = {
   register: (email: string, full_name: string, password: string) =>
     api.post('/auth/register', { email, full_name, password }).then((r) => r.data),
   me: () => api.get('/auth/me').then((r) => r.data),
+  updateProfile: (data: { full_name?: string; bio?: string; job_title?: string; organization?: string }) =>
+    api.patch('/auth/me', data).then((r) => r.data),
+  uploadAvatar: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post('/auth/me/avatar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data)
+  },
+  deleteAvatar: () => api.delete('/auth/me/avatar').then((r) => r.data),
+  avatarUrl: (userId: number) => `${api.defaults.baseURL}/auth/users/${userId}/avatar`,
 }
 
 // ── Projects ──────────────────────────────────────────────────────────────

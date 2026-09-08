@@ -9,6 +9,7 @@ import Register from './pages/Register'
 // Top-level layout (Dashboard)
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
+import ProfilePage from './pages/ProfilePage'
 
 // Project layout (dark sidebar, full-height)
 import ProjectLayout from './pages/ProjectLayout'
@@ -63,6 +64,7 @@ export default function App() {
       {/* Dashboard — uses top-nav Layout; Landing when signed out */}
       <Route path="/" element={<RootGate />}>
         <Route index element={<Dashboard />} />
+        <Route path="profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
       </Route>
 
       {/* Project section — full-height dark-sidebar layout, no global header */}

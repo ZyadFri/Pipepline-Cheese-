@@ -47,10 +47,19 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active     = Column(Boolean, default=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
+    avatar_path   = Column(String, nullable=True)
+    bio           = Column(Text, nullable=True)
+    job_title     = Column(String, nullable=True)
+    organization  = Column(String, nullable=True)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     projects        = relationship("Project", back_populates="owner")
     project_members = relationship("ProjectMember", back_populates="user", foreign_keys="ProjectMember.user_id")
     audit_events    = relationship("AuditEvent", back_populates="actor", foreign_keys="AuditEvent.actor_id")
+
+    @property
+    def has_avatar(self) -> bool:
+        return bool(self.avatar_path)
 
 
 class Project(Base):
