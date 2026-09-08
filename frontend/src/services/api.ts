@@ -329,6 +329,17 @@ export const workspaceApi = {
   exportAssetUrl: (projectId: number, paperId: number, assetId: number, format: 'csv' | 'xlsx' | 'json') =>
     `${api.defaults.baseURL}/projects/${projectId}/papers/${paperId}/assets/${assetId}/export?format=${format}`,
 
+  // Raw Docling table (as parsed) + the rule engine's normalized rows for the
+  // same table, in one call — backs the table-vs-database preview.
+  exportAssetJson: (projectId: number, paperId: number, assetId: number): Promise<{
+    asset_id: number
+    table: Record<string, unknown>[]
+    rows: Record<string, unknown>[]
+    unmapped: Record<string, unknown>[]
+  }> =>
+    api.get(`/projects/${projectId}/papers/${paperId}/assets/${assetId}/export`, { params: { format: 'json' } })
+      .then((r) => r.data),
+
   // Serves the freshly-extracted ExtEvidence crop, valid only until the next
   // re-extraction (ExtEvidence is staging data, wiped and rebuilt each run) —
   // use inside the Extraction Workspace/Evidence Review flow, not Review.tsx.
@@ -386,6 +397,58 @@ export const extractionEnginesApi = {
 
   unmappedFacts: (projectId: number, paperId: number, engine?: ExtractionEngineName): Promise<UnmappedFact[]> =>
     api.get(`/projects/${projectId}/papers/${paperId}/unmapped-facts`, { params: engine ? { engine } : undefined }).then((r) => r.data),
+}
+
+// ── Insights (quality score, missing fields, duplicate experiments) ───────
+
+export interface QualityScore {
+  paper_id: number
+  has_data: boolean
+  overall_score: number
+  experiment_count: number
+  treatment_arm_count?: number
+  observation_count: number
+  breakdown: {
+    populated_field_ratio?: number
+    avg_confidence?: number
+    evidence_coverage?: number
+    review_progress?: number
+  }
+}
+
+export interface MissingFieldItem {
+  scope: 'experiment' | 'treatment_arm'
+  experiment_id: number
+  experiment_label?: string | null
+  arm_id?: number
+  arm_label?: string | null
+  field: string
+  label: string
+}
+
+export interface DuplicateExperimentRef {
+  id: number
+  label?: string | null
+  product_name?: string | null
+  paper_id?: number | null
+  paper_name?: string | null
+}
+
+export interface DuplicatePair {
+  similarity: number
+  experiment_a: DuplicateExperimentRef
+  experiment_b: DuplicateExperimentRef
+}
+
+export const insightsApi = {
+  qualityScore: (projectId: number, paperId: number): Promise<QualityScore> =>
+    api.get(`/projects/${projectId}/papers/${paperId}/quality-score`).then((r) => r.data),
+
+  missingFields: (projectId: number, paperId: number): Promise<{ paper_id: number; experiments_checked: number; total_missing: number; missing: MissingFieldItem[] }> =>
+    api.get(`/projects/${projectId}/papers/${paperId}/missing-fields`).then((r) => r.data),
+
+  duplicateExperiments: (projectId: number, params?: { paper_id?: number; threshold?: number }): Promise<{ pairs: DuplicatePair[]; experiments_scanned: number; threshold: number }> =>
+    api.get(`/projects/${projectId}/experiments/duplicates`, { params }).then((r) => r.data),
 }
 
 // ── Snapshots & Exports ───────────────────────────────────────────────────

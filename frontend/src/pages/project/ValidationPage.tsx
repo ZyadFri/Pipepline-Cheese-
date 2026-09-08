@@ -21,8 +21,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { extractionEnginesApi, papersApi, workspaceApi } from '../../services/api'
+import { extractionEnginesApi, papersApi, workspaceApi, insightsApi } from '../../services/api'
+import type { QualityScore, MissingFieldItem } from '../../services/api'
 import AuthImage from '../../components/AuthImage'
+import QualityInsights from '../../components/QualityInsights'
 
 interface Paper {
   id: number
@@ -229,6 +231,9 @@ export default function ValidationPage() {
   const [sending, setSending] = useState(false)
   const [job, setJob] = useState<ExtractionJob | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [qualityScore, setQualityScore] = useState<QualityScore | null>(null)
+  const [missingFields, setMissingFields] = useState<MissingFieldItem[] | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -291,6 +296,23 @@ export default function ValidationPage() {
       if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [paperId, loadPackages])
+
+  useEffect(() => {
+    setQualityScore(null)
+    setMissingFields(null)
+    if (!paperId || job?.status !== 'completed' || !(job.result?.experiments_stored ?? 0)) return
+    setInsightsLoading(true)
+    Promise.all([
+      insightsApi.qualityScore(pid, paperId),
+      insightsApi.missingFields(pid, paperId),
+    ])
+      .then(([score, missing]) => {
+        setQualityScore(score)
+        setMissingFields(missing.missing)
+      })
+      .catch(() => { /* insights are a bonus, not required for the core flow */ })
+      .finally(() => setInsightsLoading(false))
+  }, [pid, paperId, job?.status, job?.result?.experiments_stored])
 
   const handleExtract = async () => {
     if (!paperId || !pkgData) return
@@ -480,6 +502,12 @@ export default function ValidationPage() {
                     </div>
                   </div>
                 ) : null}
+              </section>
+            )}
+
+            {job?.status === 'completed' && (job.result?.experiments_stored ?? 0) > 0 && (
+              <section className="mx-auto mt-4 max-w-4xl">
+                <QualityInsights score={qualityScore} missing={missingFields} loading={insightsLoading} />
               </section>
             )}
 

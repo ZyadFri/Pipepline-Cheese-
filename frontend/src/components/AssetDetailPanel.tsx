@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Download, ExternalLink,
-  FileText, Image as ImageIcon, Table2, X,
+  FileText, Image as ImageIcon, Table2, X, ArrowRightLeft,
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
@@ -9,6 +9,45 @@ import api, { workspaceApi } from '../services/api'
 import { downloadAuthenticated, fetchAuthenticatedBlob } from '../services/download'
 import type { ExtractionAsset, AssetDetail, ContextLink } from '../types/workspace'
 import AuthImage from './AuthImage'
+
+interface TablePreviewData {
+  table: Record<string, unknown>[]
+  rows: Record<string, unknown>[]
+}
+
+function MiniTable({ records, emptyLabel }: { records: Record<string, unknown>[]; emptyLabel: string }) {
+  if (records.length === 0) {
+    return <p className="p-4 text-center text-[11px] text-slate-400">{emptyLabel}</p>
+  }
+  const columns = Object.keys(records[0])
+  return (
+    <div className="max-h-56 overflow-auto">
+      <table className="w-full text-left text-[11px]">
+        <thead className="sticky top-0 bg-slate-50">
+          <tr>
+            {columns.map((c) => (
+              <th key={c} className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-500">{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {records.slice(0, 50).map((row, i) => (
+            <tr key={i}>
+              {columns.map((c) => (
+                <td key={c} className="whitespace-nowrap px-2 py-1.5 text-slate-700">
+                  {row[c] === null || row[c] === undefined ? '—' : String(row[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {records.length > 50 && (
+        <p className="px-2 py-1.5 text-[10px] text-slate-400">Showing first 50 of {records.length} rows.</p>
+      )}
+    </div>
+  )
+}
 
 function displayType(asset: ExtractionAsset) {
   if (asset.asset_type === 'native_table') return 'Table'
@@ -68,12 +107,24 @@ export default function AssetDetailPanel({
   const [detail, setDetail] = useState<AssetDetail | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [tablePreview, setTablePreview] = useState<TablePreviewData | null>(null)
+  const [tablePreviewLoading, setTablePreviewLoading] = useState(false)
 
   useEffect(() => {
     setDetail(null)
     setImgError(false)
     workspaceApi.getAsset(projectId, paperId, asset.id).then(setDetail).catch(() => null)
   }, [asset.id, paperId, projectId])
+
+  useEffect(() => {
+    setTablePreview(null)
+    if (asset.asset_type !== 'native_table' || !asset.has_csv) return
+    setTablePreviewLoading(true)
+    workspaceApi.exportAssetJson(projectId, paperId, asset.id)
+      .then((data) => setTablePreview({ table: data.table, rows: data.rows }))
+      .catch(() => setTablePreview(null))
+      .finally(() => setTablePreviewLoading(false))
+  }, [asset.id, asset.asset_type, asset.has_csv, paperId, projectId])
 
   const currentIndex = assets.findIndex((a) => a.id === asset.id)
   const canPrev = currentIndex > 0
@@ -273,6 +324,35 @@ export default function AssetDetailPanel({
                 )
               })}
             </div>
+          </section>
+        )}
+
+        {asset.asset_type === 'native_table' && asset.has_csv && (
+          <section className="mt-6 pt-5 border-t border-[#eee5e7]">
+            <div className="mb-3 flex items-center gap-2">
+              <ArrowRightLeft size={14} className="text-[#8B1538]" />
+              <h3 className="text-sm font-bold text-slate-900">Table → database preview</h3>
+            </div>
+            {tablePreviewLoading ? (
+              <p className="text-[11px] text-slate-400">Converting table…</p>
+            ) : !tablePreview ? (
+              <p className="text-[11px] text-slate-400">Could not preview this table.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Original table (as Docling read it)
+                  </p>
+                  <MiniTable records={tablePreview.table} emptyLabel="No table data." />
+                </div>
+                <div className="overflow-hidden rounded-xl border border-emerald-200">
+                  <p className="border-b border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Normalized database rows
+                  </p>
+                  <MiniTable records={tablePreview.rows} emptyLabel="No rows could be derived from this table yet." />
+                </div>
+              </div>
+            )}
           </section>
         )}
 

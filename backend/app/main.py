@@ -8,6 +8,7 @@ from app.api.routes import (
     auth, projects, papers, review_queue,
     analytics, schema,
     extraction_workspace, extraction_engines, asset_actions,
+    insights,
 )
 from app.api.routes import (
     studies, experiments, observations, microorganisms,
@@ -74,6 +75,9 @@ app.include_router(extraction_engines.router, prefix="/api")
 
 # ── Instant single-asset actions (table -> rows, per-asset export) ─────────────
 app.include_router(asset_actions.router, prefix="/api")
+
+# ── Insights (quality score, missing-fields, duplicate detection) ──────────────
+app.include_router(insights.router, prefix="/api")
 
 
 @app.get("/api/health")

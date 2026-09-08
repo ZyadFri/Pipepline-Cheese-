@@ -9,6 +9,7 @@ import clsx from 'clsx'
 import { reviewQueueApi, observationsApi, projectsApi } from '../services/api'
 import type { Project, ReviewObservation } from '../types'
 import AuthImage from '../components/AuthImage'
+import { confidenceStyle } from '../utils/confidence'
 
 type StatusFilter = 'all' | 'needs_review' | 'approved' | 'rejected'
 
@@ -33,15 +34,16 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function ConfidenceBadge({ value }: { value?: number }) {
-  if (value === undefined || value === null) {
+  const style = confidenceStyle(value)
+  if (!style) {
     return <span className="text-[11px] text-slate-300">—</span>
   }
-  const pct = Math.round(value * 100)
-  const cls =
-    value >= HIGH_CONFIDENCE ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-    : 'text-amber-700 bg-amber-50 border-amber-200'
+  const pct = Math.round((value ?? 0) * 100)
   return (
-    <span className={clsx('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border', cls)}>
+    <span
+      title={style.label}
+      className={clsx('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border', style.bg, style.text, style.border)}
+    >
       {pct}%
     </span>
   )
