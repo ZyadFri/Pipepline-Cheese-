@@ -1,38 +1,159 @@
-import { useState, useEffect, FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, FileText, CheckSquare, Trash2, FlaskConical, X, BarChart2, Eye, Calendar, LayoutGrid, Activity, ShieldCheck } from 'lucide-react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  Activity,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  CheckSquare,
+  ChevronDown,
+  Database,
+  Eye,
+  FileText,
+  FlaskConical,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
-import { projectsApi } from '../services/api'
-import { Project } from '../types'
+import clsx from 'clsx'
+import api, { papersApi, projectsApi } from '../services/api'
+import type { Paper, Project } from '../types'
 import { useAuthStore } from '../store/auth'
+import AuthImage from '../components/AuthImage'
 
-// Decorative header photos only — cycled deterministically by project id, not
-// tied to any real per-project field, since the API doesn't expose one.
-const CARD_PHOTOS = [
-  'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=600&q=75',
-  'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=600&q=75',
-  'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=75',
-  'https://images.unsplash.com/photo-1758685848544-625ddba413e4?auto=format&fit=crop&w=600&q=75',
-  'https://images.unsplash.com/photo-1761472651462-c2a019e76f4b?auto=format&fit=crop&w=600&q=75',
-]
+const HERO_IMAGE = 'https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=1800&q=86'
+
+type ProjectFilter = 'all' | 'recent'
+type SortMode = 'updated' | 'name' | 'papers'
+type ViewMode = 'grid' | 'list'
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const date = new Date(iso)
+  if (!Number.isFinite(date.getTime())) return '—'
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function isRecent(iso: string) {
+  const time = new Date(iso).getTime()
+  if (!Number.isFinite(time)) return false
+  return Date.now() - time <= 14 * 24 * 60 * 60 * 1000
+}
+
+function PaperPreview({ projectId, paper, paperCount }: { projectId: number; paper?: Paper; paperCount: number }) {
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setLoaded(false)
+    setFailed(false)
+  }, [paper?.id])
+
+  if (!paper) {
+    return (
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(145deg,#fffaf8,#f5e9ec)]">
+        <div className="absolute inset-0 opacity-50 [background-image:radial-gradient(circle_at_20%_20%,rgba(122,27,46,.08),transparent_30%),radial-gradient(circle_at_80%_70%,rgba(122,27,46,.06),transparent_28%)]" />
+        <div className="relative flex flex-col items-center text-center text-[#8d7780]">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#eadde1] bg-white shadow-sm">
+            <FileText size={25} strokeWidth={1.45} />
+          </div>
+          <p className="text-xs font-semibold text-[#5c4650]">No paper uploaded yet</p>
+          <p className="mt-1 text-[10px] text-[#a18e96]">Open the project to add a research paper</p>
+        </div>
+      </div>
+    )
+  }
+
+  const src = `${api.defaults.baseURL}/projects/${projectId}/papers/${paper.id}/pages/1/image`
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#f5eef0]">
+      {!loaded && !failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#b9a8af]">
+          <div className="h-8 w-8 animate-pulse rounded-lg bg-[#eadde1]" />
+          <span className="text-[10px] font-medium">Preparing first page…</span>
+        </div>
+      )}
+
+      {!failed && (
+        <AuthImage
+          src={src}
+          alt={`First page of ${paper.original_name}`}
+          className={clsx(
+            'absolute inset-0 h-full w-full bg-white object-cover object-top transition duration-500',
+            loaded ? 'opacity-100 group-hover:scale-[1.015]' : 'opacity-0',
+          )}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      )}
+
+      {failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[linear-gradient(145deg,#fff,#f8f1f3)] text-[#9f8b93]">
+          <BookOpen size={28} strokeWidth={1.35} />
+          <span className="max-w-[220px] truncate px-4 text-[10px] font-medium">{paper.original_name}</span>
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white via-white/65 to-transparent" />
+      <div className="absolute bottom-3 left-3 flex items-center gap-2">
+        <span className="rounded-full border border-white bg-white/95 px-2.5 py-1 text-[9px] font-semibold text-slate-600 shadow-sm backdrop-blur">
+          Page 1{paper.page_count ? ` of ${paper.page_count}` : ''}
+        </span>
+        {paperCount > 1 && (
+          <span className="rounded-full border border-[#eadde1] bg-[#fff7f9]/95 px-2.5 py-1 text-[9px] font-semibold text-[#7A1B2E] shadow-sm backdrop-blur">
+            +{paperCount - 1} more paper{paperCount - 1 === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
+  const [projectPapers, setProjectPapers] = useState<Record<number, Paper[]>>({})
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [creating, setCreating] = useState(false)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<ProjectFilter>('all')
+  const [sortMode, setSortMode] = useState<SortMode>('updated')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+
   const user = useAuthStore((s) => s.user)
+  const navigate = useNavigate()
+
+  const loadPaperPreviews = async (items: Project[]) => {
+    const entries = await Promise.allSettled(
+      items.map(async (project) => {
+        const papers: Paper[] = await papersApi.list(project.id)
+        return [project.id, papers] as const
+      }),
+    )
+
+    const next: Record<number, Paper[]> = {}
+    entries.forEach((entry) => {
+      if (entry.status === 'fulfilled') {
+        next[entry.value[0]] = entry.value[1]
+      }
+    })
+    setProjectPapers(next)
+  }
 
   const load = async () => {
     try {
-      const data = await projectsApi.list()
+      const data: Project[] = await projectsApi.list()
       setProjects(data)
+      void loadPaperPreviews(data)
     } catch {
       toast.error('Failed to load projects')
     } finally {
@@ -40,7 +161,7 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { void load() }, [])
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -49,6 +170,7 @@ export default function Dashboard() {
     try {
       const project = await projectsApi.create({ name: name.trim(), description: desc.trim() })
       setProjects((prev) => [project, ...prev])
+      setProjectPapers((prev) => ({ ...prev, [project.id]: [] }))
       setShowCreate(false)
       setName('')
       setDesc('')
@@ -65,38 +187,102 @@ export default function Dashboard() {
     try {
       await projectsApi.delete(id)
       setProjects((prev) => prev.filter((p) => p.id !== id))
+      setProjectPapers((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
       toast.success('Project deleted')
     } catch {
       toast.error('Failed to delete project')
     }
   }
 
+  const recentProject = useMemo(
+    () => [...projects].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0],
+    [projects],
+  )
+
+  const visibleProjects = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    let items = projects.filter((project) => {
+      if (filter === 'recent' && !isRecent(project.updated_at)) return false
+      if (!normalized) return true
+      return `${project.name} ${project.description ?? ''}`.toLowerCase().includes(normalized)
+    })
+
+    items = [...items].sort((a, b) => {
+      if (sortMode === 'name') return a.name.localeCompare(b.name)
+      if (sortMode === 'papers') return (b.paper_count ?? 0) - (a.paper_count ?? 0)
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    })
+
+    return items
+  }, [projects, query, filter, sortMode])
+
+  const totalPapers = projects.reduce((sum, project) => sum + (project.paper_count ?? 0), 0)
+  const totalRows = projects.reduce((sum, project) => sum + (project.row_count ?? 0), 0)
+
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">My Projects</h1>
-          <p className="muted mt-1.5">Welcome back, <span className="font-medium" style={{ color: 'var(--foreground)' }}>{user?.full_name}</span></p>
-          <p className="mt-1 text-[13px] text-slate-400">Organize and manage your cheese research paper extraction projects.</p>
+    <div className="space-y-6 pb-2">
+      {/* Hero */}
+      <section
+        className="relative overflow-hidden rounded-[28px] border border-[#eee1e4] bg-[#fbf6f3] shadow-[0_24px_80px_-55px_rgba(76,22,38,.75)]"
+        style={{
+          backgroundImage: `linear-gradient(90deg, rgba(255,252,250,.99) 0%, rgba(255,252,250,.95) 43%, rgba(255,252,250,.22) 71%, rgba(255,252,250,.05) 100%), url(${HERO_IMAGE})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="relative min-h-[300px] px-7 py-10 sm:px-10 lg:px-12">
+          <div className="max-w-[650px]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.23em] text-[#9c1838]">Your research, organized</p>
+            <h1 className="mt-3 font-display text-[42px] leading-[1.04] tracking-[-0.035em] text-[#21191d] sm:text-[50px]">
+              My Research Projects
+            </h1>
+            <p className="mt-4 max-w-[560px] text-[15px] leading-7 text-slate-600">
+              Extract, analyze, and organize data from cheese and food-science research papers — all in one place.
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button
+                onClick={() => setShowCreate(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#9b1737] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-18px_rgba(122,27,46,.95)] transition hover:-translate-y-0.5 hover:bg-[#7A1B2E]"
+              >
+                <Plus size={16} /> New Project
+              </button>
+              <button
+                onClick={() => recentProject ? navigate(`/projects/${recentProject.id}/upload`) : setShowCreate(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#d9c9ce] bg-white/90 px-5 py-3 text-sm font-semibold text-[#2d2327] shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-[#c9aab3] hover:bg-white"
+              >
+                <Upload size={15} /> Import Papers
+              </button>
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-slate-500">
+              <span><strong className="text-[#2f2529]">{projects.length}</strong> projects</span>
+              <span><strong className="text-[#2f2529]">{totalPapers}</strong> papers</span>
+              <span><strong className="text-[#2f2529]">{totalRows}</strong> structured rows</span>
+            </div>
+          </div>
+
+          <div className="absolute right-8 top-8 hidden rounded-2xl border border-white/70 bg-white/70 px-5 py-4 text-right shadow-[0_20px_50px_-30px_rgba(88,33,49,.65)] backdrop-blur-md lg:block">
+            <p className="font-display text-[20px] italic leading-7 text-[#765c65]">Knowledge for better</p>
+            <p className="font-display text-[20px] italic leading-7 text-[#765c65]">food systems.</p>
+            <div className="ml-auto mt-3 h-[2px] w-10 bg-[#9b1737]" />
+          </div>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
-          <Plus size={16} />
-          New Project
-        </button>
-      </div>
+      </section>
 
       {/* Create Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17131A]/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17131A]/40 px-4 backdrop-blur-sm">
           <div className="surface w-full max-w-md !bg-white">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h2 className="type-h3" style={{ color: 'var(--foreground)' }}>New Research Project</h2>
-              <button onClick={() => setShowCreate(false)} className="btn-ghost p-1.5">
-                <X size={16} />
-              </button>
+              <button onClick={() => setShowCreate(false)} className="btn-ghost p-1.5"><X size={16} /></button>
             </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+            <form onSubmit={handleCreate} className="space-y-4 p-6">
               <div>
                 <label className="label">Project Name *</label>
                 <input
@@ -111,16 +297,14 @@ export default function Dashboard() {
               <div>
                 <label className="label">Description (optional)</label>
                 <textarea
-                  className="input resize-none h-20"
+                  className="input h-20 resize-none"
                   placeholder="Brief description of this research project…"
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                 />
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1 justify-center">
-                  Cancel
-                </button>
+                <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1 justify-center">Cancel</button>
                 <button type="submit" className="btn-primary flex-1 justify-center" disabled={creating}>
                   {creating ? 'Creating…' : 'Create Project'}
                 </button>
@@ -133,108 +317,205 @@ export default function Dashboard() {
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
             <p className="text-sm text-slate-500">Loading projects…</p>
           </div>
         </div>
       ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'rgba(122,27,46,0.08)' }}>
-            <FlaskConical size={28} style={{ color: 'var(--primary)' }} />
+        <div className="flex flex-col items-center justify-center rounded-[24px] border border-[#eee3e6] bg-white py-20 text-center shadow-sm">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f9ecef]">
+            <FlaskConical size={28} className="text-[#8d1732]" />
           </div>
-          <h3 className="type-h3 mb-1" style={{ color: 'var(--foreground)' }}>No projects yet</h3>
-          <p className="text-sm text-slate-500 mb-6 max-w-xs">Create your first project to start extracting structured data from scientific papers using AI.</p>
-          <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> Create First Project
-          </button>
+          <h3 className="type-h3 mb-1" style={{ color: 'var(--foreground)' }}>Start your research workspace</h3>
+          <p className="mb-6 max-w-sm text-sm text-slate-500">Create a project, upload your first scientific paper, and its real first page will appear here automatically.</p>
+          <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={16} /> Create First Project</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {projects.map((p, idx) => (
-            <div key={p.id} className="surface-interactive group flex flex-col overflow-hidden !p-0">
-              <div className="relative h-[110px] w-full shrink-0 overflow-hidden bg-slate-100">
-                <img src={CARD_PHOTOS[idx % CARD_PHOTOS.length]} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                <button
-                  onClick={() => handleDelete(p.id, p.name)}
-                  className="absolute right-2.5 top-2.5 rounded-lg bg-white/90 p-1.5 text-slate-500 opacity-0 backdrop-blur-sm transition-all hover:bg-white hover:text-red-500 group-hover:opacity-100"
-                  title="Delete project"
+        <>
+          {/* Project controls */}
+          <div className="flex flex-col gap-4 border-b border-[#eee4e7] pb-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex items-center gap-7">
+              <button
+                onClick={() => setFilter('all')}
+                className={clsx(
+                  'relative pb-3 text-[13px] font-semibold transition-colors',
+                  filter === 'all' ? 'text-[#8d1732]' : 'text-slate-500 hover:text-slate-800',
+                )}
+              >
+                All Projects
+                <span className="ml-2 rounded-full bg-[#f5e8eb] px-2 py-0.5 text-[10px] text-[#8d1732]">{projects.length}</span>
+                {filter === 'all' && <span className="absolute inset-x-0 -bottom-[13px] h-[2px] bg-[#9b1737]" />}
+              </button>
+              <button
+                onClick={() => setFilter('recent')}
+                className={clsx(
+                  'relative pb-3 text-[13px] font-semibold transition-colors',
+                  filter === 'recent' ? 'text-[#8d1732]' : 'text-slate-500 hover:text-slate-800',
+                )}
+              >
+                Recent
+                {filter === 'recent' && <span className="absolute inset-x-0 -bottom-[13px] h-[2px] bg-[#9b1737]" />}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex h-10 min-w-[230px] flex-1 items-center gap-2 rounded-xl border border-[#e5dadd] bg-white px-3 text-slate-400 shadow-sm lg:flex-none">
+                <Search size={14} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search projects…"
+                  className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+                />
+              </label>
+
+              <div className="relative">
+                <select
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  className="h-10 appearance-none rounded-xl border border-[#e5dadd] bg-white py-0 pl-3 pr-9 text-xs font-medium text-slate-600 shadow-sm outline-none focus:border-[#c79ba7]"
                 >
-                  <Trash2 size={13} />
+                  <option value="updated">Last updated</option>
+                  <option value="name">Project name</option>
+                  <option value="papers">Most papers</option>
+                </select>
+                <ChevronDown size={13} className="pointer-events-none absolute right-3 top-3.5 text-slate-400" />
+              </div>
+
+              <div className="flex rounded-xl border border-[#e5dadd] bg-white p-1 shadow-sm">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={clsx('flex h-8 w-8 items-center justify-center rounded-lg transition', viewMode === 'grid' ? 'bg-[#9b1737] text-white' : 'text-slate-400 hover:bg-slate-50')}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={14} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={clsx('flex h-8 w-8 items-center justify-center rounded-lg transition', viewMode === 'list' ? 'bg-[#9b1737] text-white' : 'text-slate-400 hover:bg-slate-50')}
+                  title="List view"
+                >
+                  <List size={14} />
                 </button>
               </div>
-              <div className="p-5 flex-1">
-                <Link
-                  to={`/projects/${p.id}`}
-                  className="block type-title hover:text-[#7A1B2E] transition-colors mb-1 line-clamp-1"
-                  style={{ color: 'var(--foreground)' }}
-                >
-                  {p.name}
-                </Link>
-                {p.description && (
-                  <p className="text-slate-500 text-xs line-clamp-2 mb-3">{p.description}</p>
-                )}
-                <div className="flex items-center gap-4 text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">
-                  <span className="flex items-center gap-1.5">
-                    <FileText size={12} />
-                    <span>{p.paper_count ?? 0} papers</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <CheckSquare size={12} />
-                    <span>{p.row_count ?? 0} rows</span>
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <Calendar size={11} />
-                  Last updated {formatDate(p.updated_at)}
-                </div>
-              </div>
-              <div className="px-5 pb-5 flex gap-2">
-                <Link to={`/projects/${p.id}`} className="btn-primary text-xs py-1.5 px-3 flex-1 justify-center">
-                  Open Project
-                </Link>
-                <Link to={`/projects/${p.id}/review`} className="btn-secondary text-xs py-1.5 px-3" title="Review">
-                  <Eye size={12} />
-                </Link>
-                <Link to={`/projects/${p.id}/analytics`} className="btn-secondary text-xs py-1.5 px-3" title="Analytics">
-                  <BarChart2 size={12} />
-                </Link>
-              </div>
             </div>
-          ))}
-        </div>
+          </div>
+
+          {visibleProjects.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#dbcbd0] bg-[#fffafb] px-6 py-14 text-center">
+              <Search size={24} className="mx-auto mb-3 text-[#b89aa3]" />
+              <p className="text-sm font-semibold text-[#4d3941]">No projects match this view</p>
+              <p className="mt-1 text-xs text-slate-500">Try another search or switch back to all projects.</p>
+            </div>
+          ) : (
+            <div className={clsx(
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4'
+                : 'grid grid-cols-1 gap-4',
+            )}>
+              {visibleProjects.map((project) => {
+                const papers = projectPapers[project.id] ?? []
+                const firstPaper = papers[0]
+
+                return (
+                  <article
+                    key={project.id}
+                    className={clsx(
+                      'group overflow-hidden rounded-[20px] border border-[#eadfe2] bg-white shadow-[0_18px_45px_-36px_rgba(77,27,44,.7)] transition-all duration-300 hover:-translate-y-1 hover:border-[#d8bcc4] hover:shadow-[0_25px_55px_-34px_rgba(88,28,46,.55)]',
+                      viewMode === 'list' && 'flex min-h-[205px] flex-col sm:flex-row',
+                    )}
+                  >
+                    <div className={clsx(
+                      'relative shrink-0 overflow-hidden border-b border-[#eee4e7] bg-[#f8f2f4]',
+                      viewMode === 'grid' ? 'h-[245px] w-full' : 'h-[220px] w-full sm:h-auto sm:w-[245px] sm:border-b-0 sm:border-r',
+                    )}>
+                      <PaperPreview projectId={project.id} paper={firstPaper} paperCount={project.paper_count ?? papers.length} />
+                      <button
+                        onClick={() => void handleDelete(project.id, project.name)}
+                        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/90 text-slate-400 opacity-0 shadow-sm backdrop-blur transition-all hover:text-red-500 group-hover:opacity-100"
+                        title="Delete project"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    <div className="flex min-w-0 flex-1 flex-col p-4">
+                      <div className="min-h-[84px]">
+                        <Link
+                          to={`/projects/${project.id}`}
+                          className="block truncate text-[17px] font-bold tracking-[-0.01em] text-[#261d21] transition hover:text-[#8d1732]"
+                        >
+                          {project.name}
+                        </Link>
+                        {project.description ? (
+                          <p className="mt-1.5 line-clamp-2 text-[12px] leading-5 text-slate-500">{project.description}</p>
+                        ) : (
+                          <p className="mt-1.5 text-[12px] italic text-slate-400">Research paper extraction workspace</p>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-3 text-[11px] text-slate-400">
+                        <span className="flex items-center gap-1.5"><FileText size={11} /> {project.paper_count ?? 0} papers</span>
+                        <span className="flex items-center gap-1.5"><CheckSquare size={11} /> {project.row_count ?? 0} rows</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1.5 text-[10.5px] text-slate-400">
+                        <CalendarDays size={11} /> Last updated {formatDate(project.updated_at)}
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-2">
+                        <Link
+                          to={`/projects/${project.id}`}
+                          className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#941735] px-4 text-xs font-semibold text-white shadow-[0_12px_25px_-18px_rgba(122,27,46,.9)] transition hover:bg-[#7A1B2E]"
+                        >
+                          Open Project <ArrowRight size={13} />
+                        </Link>
+                        <Link
+                          to={`/projects/${project.id}/review`}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e2d7da] bg-white text-slate-500 transition hover:border-[#caa8b1] hover:bg-[#fff8fa] hover:text-[#8d1732]"
+                          title="Review"
+                        >
+                          <Eye size={14} />
+                        </Link>
+                        <Link
+                          to={`/projects/${project.id}/analytics`}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e2d7da] bg-white text-slate-500 transition hover:border-[#caa8b1] hover:bg-[#fff8fa] hover:text-[#8d1732]"
+                          title="Analytics"
+                        >
+                          <BarChart3 size={14} />
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {projects.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-100 bg-white p-6 sm:grid-cols-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(122,27,46,0.08)' }}>
-              <LayoutGrid size={16} style={{ color: 'var(--primary)' }} />
+        <section className="relative overflow-hidden rounded-[24px] border border-[#eadfe2] bg-[linear-gradient(115deg,#fff,#fff9fa_55%,#fdf0f3)] p-6 shadow-[0_18px_50px_-42px_rgba(92,34,50,.65)]">
+          <div className="pointer-events-none absolute -bottom-16 -right-8 h-52 w-52 rounded-full border border-[#e7cfd6] opacity-40" />
+          <div className="pointer-events-none absolute -bottom-10 right-14 h-36 w-36 rounded-full border border-[#efdce1] opacity-50" />
+          <div className="relative grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f9e9ed] text-[#971937]"><Upload size={16} /></div>
+              <div><p className="text-[13px] font-semibold text-[#2b2226]">Upload & organize</p><p className="mt-1 text-[11px] leading-5 text-slate-500">Keep papers and projects together in one research workspace.</p></div>
             </div>
-            <div>
-              <p className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>All in one place</p>
-              <p className="mt-0.5 text-xs text-slate-500">Organize your projects, papers, and extractions in one secure workspace.</p>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f9e9ed] text-[#971937]"><Database size={16} /></div>
+              <div><p className="text-[13px] font-semibold text-[#2b2226]">Extract & analyze</p><p className="mt-1 text-[11px] leading-5 text-slate-500">Turn research papers into structured, reviewable scientific data.</p></div>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(122,27,46,0.08)' }}>
-              <Activity size={16} style={{ color: 'var(--primary)' }} />
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f9e9ed] text-[#971937]"><Activity size={16} /></div>
+              <div><p className="text-[13px] font-semibold text-[#2b2226]">Track progress</p><p className="mt-1 text-[11px] leading-5 text-slate-500">Follow extraction, review, and data quality at a glance.</p></div>
             </div>
-            <div>
-              <p className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Track your progress</p>
-              <p className="mt-0.5 text-xs text-slate-500">Monitor extraction status, validation, and data quality at a glance.</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(122,27,46,0.08)' }}>
-              <ShieldCheck size={16} style={{ color: 'var(--primary)' }} />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Work with confidence</p>
-              <p className="mt-0.5 text-xs text-slate-500">Your data is private, secure, and always under your control.</p>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f9e9ed] text-[#971937]"><ShieldCheck size={16} /></div>
+              <div><p className="text-[13px] font-semibold text-[#2b2226]">Your data, your control</p><p className="mt-1 text-[11px] leading-5 text-slate-500">Private, traceable, and always connected to source evidence.</p></div>
             </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   )
