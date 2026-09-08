@@ -1,19 +1,44 @@
-import { useEffect, useState, useCallback } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  Upload, Settings, Eye, BarChart2, Download, FileText,
-  CheckCircle2, XCircle, Clock, ChevronRight, AlertCircle,
-  Loader2, RefreshCw, BarChart3, Table2, ShieldCheck,
-  FlaskConical, ArrowUpRight, Layers, MoreHorizontal, Trash2,
+  AlertCircle,
+  ArrowUpRight,
+  BarChart3,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Database,
+  Download,
+  Eye,
+  FileText,
+  Grid2X2,
+  List,
+  Loader2,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldCheck,
+  Table2,
+  Trash2,
+  Upload,
 } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { projectsApi, papersApi } from '../services/api'
+import api, { papersApi, projectsApi } from '../services/api'
+import AuthImage from '../components/AuthImage'
 import type { Project } from '../types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type StageStatus = 'not_started' | 'running' | 'completed' | 'failed' | 'unavailable' | 'no_charts' | 'ready' | 'pending' | 'partial'
+type StageStatus =
+  | 'not_started'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'unavailable'
+  | 'no_charts'
+  | 'ready'
+  | 'pending'
+  | 'partial'
 
 interface PaperStages {
   docling: StageStatus
@@ -25,6 +50,14 @@ interface PaperStages {
   promotion: StageStatus
 }
 
+interface PaperMetadata {
+  title?: string | null
+  authors?: string[]
+  publication_year?: number | null
+  journal?: string | null
+  abstract?: string | null
+}
+
 interface PaperPipeline {
   id: number
   original_name: string
@@ -34,293 +67,279 @@ interface PaperPipeline {
   badge: string
   progress_pct: number
   stages: PaperStages
-  counts: { assets: number; charts: number; rows: number; approved_rows: number }
+  counts: {
+    assets: number
+    tables: number
+    charts: number
+    rows: number
+    approved_rows: number
+  }
+  metadata?: PaperMetadata
   ws_result: Record<string, unknown>
   ws_job_id: number | null
   llm_job_id: number | null
 }
 
-// ─── Badge config ─────────────────────────────────────────────────────────────
+type DashboardFilter = 'all' | 'completed' | 'processing' | 'review' | 'failed' | 'not_started'
+type SortKey = 'newest' | 'oldest' | 'name'
+type ViewMode = 'list' | 'compact'
 
-const BADGE_META: Record<string, { label: string; cls: string }> = {
-  uploaded:         { label: 'Uploaded',          cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  processing:       { label: 'Processing',        cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-  validation_ready: { label: 'Validation Ready',  cls: 'bg-violet-50 text-violet-700 border-violet-200' },
-  extracting:       { label: 'AI Extracting',     cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  awaiting_review:  { label: 'Awaiting Review',   cls: 'bg-orange-50 text-orange-700 border-orange-200' },
-  ready_to_promote: { label: 'Ready for DB',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  completed:        { label: 'Completed',          cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  failed:           { label: 'Failed',             cls: 'bg-red-50 text-red-600 border-red-200' },
+const BADGE_META: Record<string, { label: string; cls: string; dot: string }> = {
+  uploaded: {
+    label: 'Not started',
+    cls: 'bg-slate-100 text-slate-600 border-slate-200',
+    dot: 'bg-slate-400',
+  },
+  processing: {
+    label: 'Processing',
+    cls: 'bg-blue-50 text-blue-700 border-blue-200',
+    dot: 'bg-blue-500',
+  },
+  validation_ready: {
+    label: 'Evidence ready',
+    cls: 'bg-violet-50 text-violet-700 border-violet-200',
+    dot: 'bg-violet-500',
+  },
+  extracting: {
+    label: 'Extracting data',
+    cls: 'bg-amber-50 text-amber-700 border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  awaiting_review: {
+    label: 'Needs review',
+    cls: 'bg-orange-50 text-orange-700 border-orange-200',
+    dot: 'bg-orange-500',
+  },
+  ready_to_promote: {
+    label: 'Ready for database',
+    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dot: 'bg-emerald-500',
+  },
+  completed: {
+    label: 'Completed',
+    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dot: 'bg-emerald-500',
+  },
+  failed: {
+    label: 'Failed',
+    cls: 'bg-red-50 text-red-600 border-red-200',
+    dot: 'bg-red-500',
+  },
 }
 
-// ─── Stage icon ───────────────────────────────────────────────────────────────
-
-function StageIcon({ status, size = 14 }: { status: StageStatus; size?: number }) {
-  if (status === 'completed' || status === 'no_charts' || status === 'unavailable') {
-    return <CheckCircle2 size={size} className="text-emerald-500" />
-  }
-  if (status === 'running') return <Loader2 size={size} className="text-blue-500 animate-spin" />
-  if (status === 'failed')  return <XCircle size={size} className="text-red-400" />
-  if (status === 'ready' || status === 'pending') return <Clock size={size} className="text-violet-400" />
-  if (status === 'partial') return <CheckCircle2 size={size} className="text-amber-400" />
-  return <span className="inline-block w-3 h-3 rounded-full border border-slate-300 bg-white" style={{ width: size, height: size }} />
+function stripPdf(name: string) {
+  return name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim()
 }
 
-// ─── Pipeline stage bar ───────────────────────────────────────────────────────
-
-const STAGES = [
-  { key: 'docling',    label: 'Docling',     Icon: Layers },
-  { key: 'assets',     label: 'Assets',      Icon: Table2 },
-  { key: 'charts',     label: 'Charts',      Icon: BarChart3 },
-  { key: 'validation', label: 'Validation',  Icon: ShieldCheck },
-  { key: 'llm',        label: 'LLM Extract', Icon: FlaskConical },
-  { key: 'review',     label: 'Review',      Icon: Eye },
-  { key: 'promotion',  label: 'Promote',     Icon: ArrowUpRight },
-] as const
-
-function StagePill({ stageKey, label, Icon, status }: {
-  stageKey: string; label: string; Icon: React.ElementType; status: StageStatus
-}) {
-  const isDone = ['completed', 'no_charts', 'unavailable'].includes(status)
-  const isActive = ['running', 'ready', 'pending', 'partial'].includes(status)
-
-  return (
-    <div className="flex flex-col items-center gap-1 min-w-0">
-      <div className={clsx(
-        'w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all',
-        isDone   ? 'bg-emerald-50 border-emerald-300' :
-        isActive ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-100' :
-        status === 'failed' ? 'bg-red-50 border-red-300' :
-                   'bg-white border-slate-200',
-      )}>
-        <StageIcon status={status} size={14} />
-      </div>
-      <span className={clsx(
-        'text-[9px] font-medium leading-tight text-center whitespace-nowrap',
-        isDone   ? 'text-emerald-600' :
-        isActive ? 'text-blue-600' :
-        status === 'failed' ? 'text-red-500' :
-                   'text-slate-300',
-      )}>
-        {label}
-      </span>
-      <span className={clsx(
-        'text-[8px] leading-none',
-        isDone   ? 'text-emerald-400' :
-        isActive ? 'text-blue-400' :
-                   'text-slate-200',
-      )}>
-        {isDone ? 'Done' : isActive ? (status === 'ready' ? 'Ready' : status === 'pending' ? 'Pending' : status === 'partial' ? 'Partial' : 'Running') : '—'}
-      </span>
-    </div>
-  )
+function formatDate(value: string | null | undefined) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
-function PipelineBar({ stages }: { stages: PaperStages }) {
-  return (
-    <div className="flex items-start gap-1.5">
-      {STAGES.map(({ key, label, Icon }, i) => {
-        const status = stages[key as keyof PaperStages]
-        const isDone = ['completed', 'no_charts', 'unavailable'].includes(status)
-        return (
-          <div key={key} className="flex items-center gap-1">
-            <StagePill stageKey={key} label={label} Icon={Icon} status={status} />
-            {i < STAGES.length - 1 && (
-              <div className={clsx('w-3 h-px mt-[-10px]', isDone ? 'bg-emerald-300' : 'bg-slate-200')} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
+function relativeTime(value: string | null | undefined) {
+  if (!value) return '—'
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return '—'
+  const diff = Math.max(0, Date.now() - timestamp)
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 2) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 14) return `${days} d ago`
+  return formatDate(value)
 }
 
-// ─── Current stage label ──────────────────────────────────────────────────────
+function authorsLine(metadata?: PaperMetadata) {
+  const authors = metadata?.authors ?? []
+  if (!authors.length) return null
+  const visible = authors.slice(0, 3).join(', ')
+  return authors.length > 3 ? `${visible} +${authors.length - 3}` : visible
+}
 
-function CurrentStageLabel({ paper }: { paper: PaperPipeline }) {
+function userFilterForBadge(badge: string): DashboardFilter {
+  if (badge === 'completed') return 'completed'
+  if (['processing', 'extracting'].includes(badge)) return 'processing'
+  if (['validation_ready', 'awaiting_review', 'ready_to_promote'].includes(badge)) return 'review'
+  if (badge === 'failed') return 'failed'
+  return 'not_started'
+}
+
+function stageCopy(paper: PaperPipeline) {
   const s = paper.stages
+  if (s.docling === 'running') return { title: 'Reading paper', detail: 'Evidence is appearing progressively' }
+  if (s.docling === 'failed') return { title: 'Paper analysis failed', detail: 'Open the paper to retry' }
+  if (s.docling === 'not_started') return { title: 'Ready to analyze', detail: 'Open the paper to begin' }
+  if (s.llm === 'running') return { title: 'Extracting structured data', detail: `${paper.counts.tables} tables already available` }
+  if (s.review === 'pending' || s.review === 'partial') {
+    const left = Math.max(0, paper.counts.rows - paper.counts.approved_rows)
+    return { title: 'Review required', detail: `${left} row${left === 1 ? '' : 's'} still need review` }
+  }
+  if (s.review === 'completed' && s.promotion === 'not_started') return { title: 'Ready for database', detail: 'Reviewed results can be added' }
+  if (s.promotion === 'completed') return { title: 'Completed', detail: 'Structured results are in the database' }
+  if (s.validation === 'ready') return { title: 'Evidence ready', detail: 'Tables, figures and text are ready' }
+  return { title: 'Paper analyzed', detail: `${paper.counts.assets} evidence items found` }
+}
 
-  if (s.docling === 'running') return (
-    <div>
-      <p className="text-xs font-semibold text-blue-700">Docling</p>
-      <p className="text-[10px] text-blue-500">In progress</p>
-    </div>
-  )
-  if (s.docling === 'failed') return (
-    <div>
-      <p className="text-xs font-semibold text-red-600">Docling Failed</p>
-      <p className="text-[10px] text-red-400">Check jobs log</p>
-    </div>
-  )
-  if (s.docling === 'not_started') return (
-    <div>
-      <p className="text-xs font-semibold text-slate-500">Not started</p>
-      <p className="text-[10px] text-slate-400">Next: Open pipeline</p>
-    </div>
-  )
-  if (s.validation === 'ready') return (
-    <div>
-      <p className="text-xs font-semibold text-violet-700">Validation</p>
-      <p className="text-[10px] text-violet-500">Ready</p>
-      <p className="text-[10px] text-slate-400 mt-0.5">Next: LLM Extraction</p>
-    </div>
-  )
-  if (s.llm === 'running') return (
-    <div>
-      <p className="text-xs font-semibold text-amber-700">AI Extracting</p>
-      <p className="text-[10px] text-amber-500">In progress</p>
-    </div>
-  )
-  if (s.llm === 'failed') return (
-    <div>
-      <p className="text-xs font-semibold text-red-600">LLM Failed</p>
-      <p className="text-[10px] text-red-400">Retry from validation</p>
-    </div>
-  )
-  if (s.review === 'pending' || s.review === 'partial') return (
-    <div>
-      <p className="text-xs font-semibold text-orange-700">Awaiting Review</p>
-      <p className="text-[10px] text-orange-500">
-        {paper.counts.approved_rows}/{paper.counts.rows} approved
-      </p>
-    </div>
-  )
-  if (s.review === 'completed' && s.promotion === 'not_started') return (
-    <div>
-      <p className="text-xs font-semibold text-emerald-700">Ready for DB</p>
-      <p className="text-[10px] text-emerald-500">Next: Promote rows</p>
-    </div>
-  )
-  if (s.promotion === 'completed') return (
-    <div>
-      <p className="text-xs font-semibold text-emerald-700">Completed</p>
-      <p className="text-[10px] text-emerald-500">In scientific DB</p>
-    </div>
-  )
-  // docling done but no assets yet
+function StageStatusIcon({ paper }: { paper: PaperPipeline }) {
+  if (paper.badge === 'completed') return <CheckCircle2 size={13} className="text-emerald-500" />
+  if (paper.badge === 'failed') return <AlertCircle size={13} className="text-red-500" />
+  if (['processing', 'extracting'].includes(paper.badge)) return <Loader2 size={13} className="animate-spin text-blue-500" />
+  return <Clock3 size={13} className="text-amber-500" />
+}
+
+function PaperCover({ pid, paper }: { pid: number; paper: PaperPipeline }) {
+  const [loaded, setLoaded] = useState(false)
+  const src = `${api.defaults.baseURL}/projects/${pid}/papers/${paper.id}/pages/1/image`
+
   return (
-    <div>
-      <p className="text-xs font-semibold text-slate-600">Docling</p>
-      <p className="text-[10px] text-slate-400">Done · {paper.counts.assets} assets</p>
-      <p className="text-[10px] text-slate-400 mt-0.5">Next: Assets</p>
+    <div className="relative h-full w-full overflow-hidden rounded-[18px] border border-[#eadde1] bg-[linear-gradient(145deg,#fff,#f7edef)] shadow-[0_18px_36px_-32px_rgba(73,22,39,.6)]">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#bba9af]">
+        <FileText size={28} strokeWidth={1.25} />
+        <span className="text-[10px] font-medium">First page</span>
+      </div>
+      <AuthImage
+        src={src}
+        alt={`First page of ${paper.original_name}`}
+        className={clsx(
+          'absolute inset-0 h-full w-full bg-white object-cover object-top transition-opacity duration-300',
+          loaded ? 'opacity-100' : 'opacity-0',
+        )}
+        onLoad={() => setLoaded(true)}
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white/70 to-transparent" />
+      <div className="absolute bottom-2 left-2 rounded-full border border-white/80 bg-white/90 px-2 py-1 text-[9px] font-semibold text-slate-500 shadow-sm backdrop-blur">
+        Page 1
+      </div>
     </div>
   )
 }
-
-// ─── Primary action button ────────────────────────────────────────────────────
 
 function PrimaryAction({ paper, pid }: { paper: PaperPipeline; pid: number }) {
   const navigate = useNavigate()
   const s = paper.stages
 
-  let label = 'Open Pipeline'
+  let label = 'Open paper'
   let to: string | null = `/projects/${pid}/papers/${paper.id}/overview`
-  let variant: 'primary' | 'secondary' | 'ghost' = 'primary'
+  let primary = true
 
-  if (s.docling === 'not_started') {
-    label = 'Start Processing'; to = `/projects/${pid}/papers/${paper.id}/overview`; variant = 'primary'
-  } else if (s.docling === 'running') {
-    label = 'View Progress'; to = `/projects/${pid}/papers/${paper.id}/overview`; variant = 'secondary'
-  } else if (s.docling === 'failed') {
-    label = 'Retry Docling'; to = `/projects/${pid}/papers/${paper.id}/overview`; variant = 'primary'
-  } else if (s.validation === 'ready' || s.llm === 'not_started') {
-    label = 'Review Assets'; to = `/projects/${pid}/papers/${paper.id}/docling`; variant = 'primary'
-  } else if (s.llm === 'running') {
-    label = 'View Extraction'; to = `/projects/${pid}/papers/${paper.id}/overview`; variant = 'secondary'
+  if (s.docling === 'not_started') label = 'Start analysis'
+  else if (s.docling === 'running') {
+    label = 'View live progress'
+    primary = false
+  } else if (s.docling === 'failed') label = 'Retry analysis'
+  else if (s.llm === 'running') {
+    label = 'View extraction'
+    primary = false
   } else if (s.review === 'pending' || s.review === 'partial') {
-    label = 'Review Rows'; to = `/projects/${pid}/review`; variant = 'primary'
+    label = 'Review results'
+    to = `/projects/${pid}/validation?paperId=${paper.id}`
   } else if (s.review === 'completed' && s.promotion === 'not_started') {
-    label = 'Promote to DB'; to = null; variant = 'primary'
+    label = 'Add to database'
+    to = null
   } else if (s.promotion === 'completed') {
-    label = 'Open Results'; to = `/projects/${pid}/dataset`; variant = 'secondary'
-  } else {
-    label = 'Open Workspace'; variant = 'secondary'
+    label = 'Open results'
+    to = `/projects/${pid}/dataset`
+    primary = false
+  } else if (s.validation === 'ready' || s.llm === 'not_started') {
+    label = 'Review evidence'
+    to = `/projects/${pid}/papers/${paper.id}/docling`
   }
 
-  const cls = clsx(
-    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap',
-    variant === 'primary'   ? 'bg-[#7A1B2E] text-white hover:bg-[#661523]' :
-    variant === 'secondary' ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' :
-                              'text-slate-500 hover:bg-slate-100',
+  const className = clsx(
+    'inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-[11px] font-semibold transition-all',
+    primary
+      ? 'bg-[#7A1B2E] text-white shadow-[0_10px_24px_-16px_rgba(122,27,46,.8)] hover:bg-[#681625] hover:-translate-y-px'
+      : 'border border-[#e6d9dd] bg-white text-[#6f2335] hover:bg-[#fff8fa]',
   )
 
   if (to) {
-    return <Link to={to} className={cls}>{label} <ChevronRight size={10} /></Link>
+    return (
+      <Link to={to} className={className}>
+        {label} <ChevronRight size={11} />
+      </Link>
+    )
   }
 
   return (
     <button
-      className={cls}
+      className={className}
       onClick={async () => {
         try {
           const result = await projectsApi.promoteCanonical(pid)
-          const created = (result.ext_pipeline?.observations_created ?? 0)
-            + (result.ext_pipeline?.observations_updated ?? 0)
-          toast.success(
-            created > 0
-              ? `Promoted ${created} observation(s) to the database`
-              : 'Nothing new to promote — already up to date',
-          )
+          const created =
+            (result.ext_pipeline?.observations_created ?? 0) +
+            (result.ext_pipeline?.observations_updated ?? 0)
+          toast.success(created ? `Added ${created} observation(s) to the database` : 'Database is already up to date')
           navigate(`/projects/${pid}/dataset`)
         } catch {
-          toast.error('Promotion failed')
+          toast.error('Could not add results to the database')
         }
       }}
     >
-      {label} <ChevronRight size={10} />
+      {label} <ArrowUpRight size={11} />
     </button>
   )
 }
 
-// ─── Donut chart ──────────────────────────────────────────────────────────────
-
-function DonutChart({ total, segments }: {
+function DonutChart({
+  total,
+  segments,
+}: {
   total: number
   segments: { label: string; count: number; color: string }[]
 }) {
-  const r = 40; const cx = 50; const cy = 50; const stroke = 10
+  const r = 39
   const circumference = 2 * Math.PI * r
   let offset = 0
-  const nonZero = segments.filter((s) => s.count > 0)
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-28 h-28">
-        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
-          {total === 0 ? (
-            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
-          ) : nonZero.map((seg) => {
-            const dash = (seg.count / total) * circumference
-            const el = (
-              <circle
-                key={seg.label}
-                cx={cx} cy={cy} r={r}
-                fill="none"
-                stroke={seg.color}
-                strokeWidth={stroke}
-                strokeDasharray={`${dash} ${circumference}`}
-                strokeDashoffset={-offset}
-              />
-            )
-            offset += dash
-            return el
-          })}
+    <div>
+      <div className="relative mx-auto h-32 w-32">
+        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+          <circle cx="50" cy="50" r={r} fill="none" stroke="#f3edef" strokeWidth="10" />
+          {total > 0 &&
+            segments
+              .filter((segment) => segment.count > 0)
+              .map((segment) => {
+                const dash = (segment.count / total) * circumference
+                const node = (
+                  <circle
+                    key={segment.label}
+                    cx="50"
+                    cy="50"
+                    r={r}
+                    fill="none"
+                    stroke={segment.color}
+                    strokeWidth="10"
+                    strokeLinecap="butt"
+                    strokeDasharray={`${dash} ${circumference}`}
+                    strokeDashoffset={-offset}
+                  />
+                )
+                offset += dash
+                return node
+              })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-bold text-slate-800">{total}</span>
-          <span className="text-[9px] text-slate-400 font-medium">Total Papers</span>
+          <span className="font-display text-[30px] leading-none text-[#2c2024]">{total}</span>
+          <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.12em] text-slate-400">Papers</span>
         </div>
       </div>
-      <div className="mt-3 space-y-1.5 w-full">
-        {segments.map((s) => (
-          <div key={s.label} className="flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-              <span className="text-slate-600">{s.label}</span>
-            </div>
-            <span className="text-slate-400 font-medium">
-              {s.count} ({total ? Math.round((s.count / total) * 100) : 0}%)
+      <div className="mt-4 space-y-2">
+        {segments.map((segment) => (
+          <div key={segment.label} className="flex items-center justify-between gap-3 text-[10.5px]">
+            <span className="flex items-center gap-2 text-slate-600">
+              <span className="h-2 w-2 rounded-full" style={{ background: segment.color }} />
+              {segment.label}
+            </span>
+            <span className="font-semibold text-slate-400">
+              {segment.count} {total ? `(${Math.round((segment.count / total) * 100)}%)` : ''}
             </span>
           </div>
         ))}
@@ -329,36 +348,206 @@ function DonutChart({ total, segments }: {
   )
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+function MetricCard({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  accent = false,
+  progress,
+}: {
+  label: string
+  value: string | number
+  detail: string
+  icon: React.ElementType
+  accent?: boolean
+  progress?: number
+}) {
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-[#ece3e6] bg-white p-4 shadow-[0_14px_35px_-32px_rgba(71,21,39,.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_45px_-32px_rgba(71,21,39,.65)]">
+      <div className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full bg-[#7A1B2E]/[0.035] transition-transform group-hover:scale-125" />
+      <div className="relative flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-slate-400">{label}</p>
+          <p className="mt-2 font-display text-[30px] leading-none text-[#271d20]">{value}</p>
+        </div>
+        <div className={clsx('flex h-10 w-10 items-center justify-center rounded-xl', accent ? 'bg-[#7A1B2E] text-white' : 'bg-[#f8eef1] text-[#8c2038]')}>
+          <Icon size={17} strokeWidth={1.8} />
+        </div>
+      </div>
+      {progress !== undefined && (
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#f1eaec]">
+          <div className="h-full rounded-full bg-[#8c2038] transition-all" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+        </div>
+      )}
+      <p className="mt-2 text-[10.5px] leading-snug text-slate-400">{detail}</p>
+    </div>
+  )
+}
+
+function PaperCard({
+  paper,
+  pid,
+  compact,
+  menuOpen,
+  onToggleMenu,
+  onDelete,
+}: {
+  paper: PaperPipeline
+  pid: number
+  compact: boolean
+  menuOpen: boolean
+  onToggleMenu: () => void
+  onDelete: () => void
+}) {
+  const metadata = paper.metadata
+  const title = metadata?.title?.trim() || stripPdf(paper.original_name)
+  const authorText = authorsLine(metadata)
+  const stage = stageCopy(paper)
+  const badge = BADGE_META[paper.badge] ?? BADGE_META.uploaded
+  const reviewRemaining = Math.max(0, paper.counts.rows - paper.counts.approved_rows)
+
+  return (
+    <article className="group relative overflow-visible rounded-[22px] border border-[#ebe1e4] bg-white p-3 shadow-[0_18px_44px_-38px_rgba(64,19,36,.55)] transition-all hover:-translate-y-[1px] hover:border-[#dfcbd1] hover:shadow-[0_24px_50px_-36px_rgba(64,19,36,.7)]">
+      <div className={clsx('grid gap-4', compact ? 'grid-cols-[96px_minmax(0,1fr)_auto]' : 'grid-cols-[132px_minmax(0,1fr)_200px]')}>
+        <Link to={`/projects/${pid}/papers/${paper.id}/overview`} className={clsx('block', compact ? 'h-[126px]' : 'h-[176px]')}>
+          <PaperCover pid={pid} paper={paper} />
+        </Link>
+
+        <div className="min-w-0 py-1 pr-1">
+          <div className="flex items-center gap-2">
+            <span className={clsx('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9.5px] font-bold', badge.cls)}>
+              <span className={clsx('h-1.5 w-1.5 rounded-full', badge.dot)} />
+              {badge.label}
+            </span>
+            {paper.progress_pct > 0 && paper.progress_pct < 100 && (
+              <span className="text-[10px] font-semibold text-slate-400">{paper.progress_pct}%</span>
+            )}
+          </div>
+
+          <Link to={`/projects/${pid}/papers/${paper.id}/overview`} className="mt-2 block">
+            <h3 className={clsx('font-display font-semibold leading-[1.15] text-[#281e21] transition-colors group-hover:text-[#7A1B2E]', compact ? 'text-[17px]' : 'text-[20px]')}>
+              {title}
+            </h3>
+          </Link>
+
+          {(authorText || metadata?.publication_year || metadata?.journal) && (
+            <p className="mt-1.5 line-clamp-1 text-[10.5px] text-slate-400">
+              {[authorText, metadata?.publication_year, metadata?.journal].filter(Boolean).join(' · ')}
+            </p>
+          )}
+
+          {!compact && metadata?.abstract && (
+            <p className="mt-3 line-clamp-2 max-w-3xl text-[11px] leading-relaxed text-slate-500">
+              {metadata.abstract}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-slate-500">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5">
+              <FileText size={11} className="text-slate-400" /> {paper.page_count || '—'} pages
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5">
+              <Table2 size={11} className="text-[#9a2940]" /> {paper.counts.tables} tables
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5">
+              <BarChart3 size={11} className="text-[#9a2940]" /> {paper.counts.charts} charts
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5">
+              <Database size={11} className="text-[#9a2940]" /> {paper.counts.rows} rows
+            </span>
+            {reviewRemaining > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-amber-700">
+                <ShieldCheck size={11} /> {reviewRemaining} to review
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className={clsx('flex min-w-0', compact ? 'items-center justify-end' : 'flex-col justify-between border-l border-[#f0e8ea] py-1 pl-4')}>
+          {!compact && (
+            <div>
+              <div className="flex items-start gap-2">
+                <StageStatusIcon paper={paper} />
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-700">{stage.title}</p>
+                  <p className="mt-0.5 text-[9.5px] leading-snug text-slate-400">{stage.detail}</p>
+                </div>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#f2ebed]">
+                <div
+                  className={clsx(
+                    'h-full rounded-full transition-all',
+                    paper.badge === 'failed' ? 'bg-red-400' : paper.badge === 'completed' ? 'bg-emerald-500' : 'bg-[#8c2038]',
+                  )}
+                  style={{ width: `${paper.progress_pct}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[9.5px] text-slate-400">
+                Uploaded {formatDate(paper.uploaded_at)}
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-1.5">
+            <PrimaryAction paper={paper} pid={pid} />
+            <div className="relative">
+              <button
+                onClick={onToggleMenu}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-400 transition-colors hover:border-[#eadde1] hover:bg-[#fff8fa] hover:text-[#7A1B2E]"
+                aria-label="Paper actions"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-[#eadde1] bg-white py-1.5 shadow-xl">
+                  <Link to={`/projects/${pid}/papers/${paper.id}/overview`} className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">
+                    <Eye size={12} /> Open paper
+                  </Link>
+                  {paper.counts.tables > 0 && (
+                    <Link to={`/projects/${pid}/papers/${paper.id}/docling`} className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">
+                      <Table2 size={12} /> View evidence
+                    </Link>
+                  )}
+                  {paper.counts.charts > 0 && (
+                    <Link to={`/projects/${pid}/papers/${paper.id}/charts`} className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">
+                      <BarChart3 size={12} /> View charts
+                    </Link>
+                  )}
+                  <button onClick={onDelete} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-red-500 hover:bg-red-50">
+                    <Trash2 size={12} /> Delete paper
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  )
+}
 
 export default function ProjectView() {
   const { projectId } = useParams<{ projectId: string }>()
   const pid = Number(projectId)
 
-  const [project, setProject]   = useState<Project | null>(null)
-  const [papers, setPapers]     = useState<PaperPipeline[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [search, setSearch]     = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [sort, setSort]         = useState<'newest' | 'oldest' | 'name'>('newest')
-  // Pipeline-stage detail (Docling/Assets/.../Promote pills) is hidden by
-  // default — the badge + Current Stage column already say this in plain
-  // language; the stage-by-stage breakdown is technical detail for anyone who
-  // wants it, not the default view.
-  const [showPipelineDetails, setShowPipelineDetails] = useState(false)
-  const rowGridCols = showPipelineDetails
-    ? 'grid-cols-[2fr_56px_1fr_1fr_100px_140px]'
-    : 'grid-cols-[2fr_56px_1fr_100px_140px]'
+  const [project, setProject] = useState<Project | null>(null)
+  const [papers, setPapers] = useState<PaperPipeline[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<DashboardFilter>('all')
+  const [sort, setSort] = useState<SortKey>('newest')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [proj, ps] = await Promise.all([
+      const [projectResult, paperResult] = await Promise.all([
         projectsApi.get(pid),
         papersApi.pipelineStatus(pid),
       ])
-      setProject(proj)
-      setPapers(ps)
+      setProject(projectResult)
+      setPapers(paperResult)
     } catch {
       toast.error('Failed to load project')
     } finally {
@@ -368,479 +557,329 @@ export default function ProjectView() {
 
   useEffect(() => {
     load()
-    const interval = setInterval(() => {
-      // Only poll while any paper is actively running
-      setPapers((prev) => {
-        const hasActive = prev.some((p) =>
-          p.stages.docling === 'running' || p.stages.llm === 'running'
-        )
-        if (hasActive) load()
-        return prev
+    const interval = window.setInterval(() => {
+      setPapers((current) => {
+        if (current.some((paper) => ['processing', 'extracting'].includes(paper.badge))) load()
+        return current
       })
     }, 5000)
-    return () => clearInterval(interval)
+    return () => window.clearInterval(interval)
   }, [load])
 
-  const handleDelete = async (paperId: number, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return
+  const handleDelete = async (paper: PaperPipeline) => {
+    if (!window.confirm(`Delete “${paper.metadata?.title || stripPdf(paper.original_name)}”?`)) return
     try {
-      await papersApi.delete(pid, paperId)
-      setPapers((prev) => prev.filter((p) => p.id !== paperId))
+      await papersApi.delete(pid, paper.id)
+      setPapers((current) => current.filter((item) => item.id !== paper.id))
+      setOpenMenuId(null)
       toast.success('Paper deleted')
     } catch {
       toast.error('Failed to delete paper')
     }
   }
 
-  // ── Derived counters ──────────────────────────────────────────────────────
-  const total       = papers.length
-  const processing  = papers.filter((p) => ['processing', 'extracting'].includes(p.badge)).length
-  const docklingDone= papers.filter((p) => p.stages.docling === 'completed').length
-  const llmDone     = papers.filter((p) => p.stages.llm === 'completed').length
-  const approvedRows= papers.reduce((s, p) => s + p.counts.approved_rows, 0)
-  const awaitingReview = papers.filter((p) => ['awaiting_review'].includes(p.badge)).length
-  const failed      = papers.filter((p) => p.badge === 'failed').length
+  const stats = useMemo(() => {
+    const total = papers.length
+    const structuredRows = papers.reduce((sum, paper) => sum + paper.counts.rows, 0)
+    const tables = papers.reduce((sum, paper) => sum + paper.counts.tables, 0)
+    const reviewRows = papers.reduce((sum, paper) => sum + Math.max(0, paper.counts.rows - paper.counts.approved_rows), 0)
+    const averageProgress = total
+      ? Math.round(papers.reduce((sum, paper) => sum + paper.progress_pct, 0) / total)
+      : 0
+    return { total, structuredRows, tables, reviewRows, averageProgress }
+  }, [papers])
 
-  // ── Filter + sort ─────────────────────────────────────────────────────────
-  let displayed = papers.filter((p) => {
-    if (search && !p.original_name.toLowerCase().includes(search.toLowerCase())) return false
-    if (statusFilter === 'all') return true
-    return p.badge === statusFilter
-  })
-  if (sort === 'oldest')  displayed = [...displayed].sort((a, b) => (a.uploaded_at ?? '').localeCompare(b.uploaded_at ?? ''))
-  else if (sort === 'newest') displayed = [...displayed].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
-  else displayed = [...displayed].sort((a, b) => a.original_name.localeCompare(b.original_name))
+  const filterCounts = useMemo(() => {
+    const result: Record<DashboardFilter, number> = {
+      all: papers.length,
+      completed: 0,
+      processing: 0,
+      review: 0,
+      failed: 0,
+      not_started: 0,
+    }
+    papers.forEach((paper) => {
+      result[userFilterForBadge(paper.badge)] += 1
+    })
+    return result
+  }, [papers])
 
-  // Pipeline overview segments
-  const segments = [
-    { label: 'Docling Completed', count: docklingDone, color: '#7A1B2E' },
-    { label: 'Charts Completed',  count: papers.filter((p) => p.stages.charts === 'completed').length, color: '#c2536b' },
-    { label: 'Awaiting Review',   count: awaitingReview, color: '#e8a94a' },
-    { label: 'Failed',            count: failed, color: '#c0392b' },
-    { label: 'Not Started',       count: papers.filter((p) => p.badge === 'uploaded').length, color: '#e5dbde' },
-  ].filter((s, i, arr) => arr.findIndex((x) => x.label === s.label) === i)
+  const displayed = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    let result = papers.filter((paper) => {
+      const matchesFilter = filter === 'all' || userFilterForBadge(paper.badge) === filter
+      if (!matchesFilter) return false
+      if (!query) return true
+      const metadata = paper.metadata
+      const haystack = [
+        paper.original_name,
+        metadata?.title,
+        metadata?.journal,
+        metadata?.publication_year,
+        ...(metadata?.authors ?? []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
 
-  // Recent activity (last 5 papers sorted by uploaded_at)
-  const recent = [...papers].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? '')).slice(0, 5)
+    if (sort === 'name') {
+      result = [...result].sort((a, b) => (a.metadata?.title || a.original_name).localeCompare(b.metadata?.title || b.original_name))
+    } else if (sort === 'oldest') {
+      result = [...result].sort((a, b) => (a.uploaded_at ?? '').localeCompare(b.uploaded_at ?? ''))
+    } else {
+      result = [...result].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
+    }
+    return result
+  }, [filter, papers, search, sort])
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-full">
-      <Loader2 size={22} className="animate-spin text-slate-300" />
-    </div>
+  const pipelineSegments = useMemo(
+    () => [
+      { label: 'Completed', count: filterCounts.completed, color: '#16875d' },
+      { label: 'In review', count: filterCounts.review, color: '#d79b34' },
+      { label: 'Processing', count: filterCounts.processing, color: '#6b7fd7' },
+      { label: 'Failed', count: filterCounts.failed, color: '#c94a4a' },
+      { label: 'Not started', count: filterCounts.not_started, color: '#d9cdd1' },
+    ],
+    [filterCounts],
   )
 
-  if (!project) return (
-    <div className="text-center py-24">
-      <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
-      <p className="text-slate-600">Project not found</p>
-    </div>
+  const recent = useMemo(
+    () => [...papers].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? '')).slice(0, 5),
+    [papers],
   )
 
-  // A brand-new project has nothing to summarize yet — showing four zeroed
-  // stat cards and an empty chart before any data exists is exactly the
-  // "excessive/confusing" pattern this app is trying to move away from. Just
-  // the project name and one clear next step, until there's something to show.
-  if (papers.length === 0) return (
-    <div className="flex flex-col items-center justify-center min-h-full p-6 text-center" style={{ background: 'var(--background)' }}>
-      <p className="type-eyebrow text-slate-400 mb-2">{project.name}</p>
-      <FileText size={40} strokeWidth={1} className="text-slate-200 mb-4" />
-      <h1 className="type-h1 mb-1.5" style={{ color: 'var(--foreground)' }}>No papers yet</h1>
-      <p className="text-sm text-slate-400 mb-6 max-w-sm">
-        Upload a research paper to start extracting cheese preservation data from it.
-      </p>
-      <Link to={`/projects/${pid}/upload`} className="btn-primary">
-        <Upload size={15} /> Upload Paper
-      </Link>
-    </div>
-  )
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#fffdfd]">
+        <Loader2 size={24} className="animate-spin text-[#9f7380]" />
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[#fffdfd] text-center">
+        <AlertCircle size={30} className="mb-3 text-red-400" />
+        <p className="text-sm font-semibold text-slate-700">Project not found</p>
+      </div>
+    )
+  }
+
+  if (papers.length === 0) {
+    return (
+      <div className="min-h-full bg-[radial-gradient(circle_at_75%_5%,rgba(122,27,46,.08),transparent_28%),#fffdfd] p-6">
+        <div className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center text-center">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-[#f8ecef] text-[#7A1B2E] shadow-[0_18px_40px_-30px_rgba(122,27,46,.7)]">
+            <FileText size={28} strokeWidth={1.4} />
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9f7380]">{project.name}</p>
+          <h1 className="mt-2 font-display text-4xl text-[#281e21]">Build your research library</h1>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-500">
+            Upload your first scientific paper. Its first page, tables, figures and structured results will appear here as the analysis progresses.
+          </p>
+          <Link to={`/projects/${pid}/upload`} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#7A1B2E] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_-20px_rgba(122,27,46,.8)] hover:bg-[#681625]">
+            <Upload size={15} /> Upload your first paper
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const filterTabs: { id: DashboardFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'completed', label: 'Completed' },
+    { id: 'processing', label: 'Processing' },
+    { id: 'review', label: 'In review' },
+    { id: 'failed', label: 'Failed' },
+    { id: 'not_started', label: 'Not started' },
+  ]
 
   return (
-    <div className="flex gap-6 p-6 min-h-full" style={{ background: 'var(--background)' }}>
+    <div className="min-h-full bg-[radial-gradient(circle_at_72%_-10%,rgba(178,76,100,.08),transparent_30%),linear-gradient(180deg,#fffefe_0%,#fffdfd_46%,#fffafa_100%)] p-5 lg:p-6">
+      <div className="mx-auto grid max-w-[1540px] grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
+        <main className="min-w-0 space-y-5">
+          <section className="relative overflow-hidden rounded-[24px] border border-[#ebdfe3] bg-white px-5 py-5 shadow-[0_18px_50px_-44px_rgba(68,18,35,.6)] lg:px-6">
+            <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full border border-[#7A1B2E]/10" />
+            <div className="pointer-events-none absolute right-8 top-0 h-36 w-56 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(#7A1B2E 1px, transparent 1px)', backgroundSize: '12px 12px' }} />
 
-      {/* ── Main column ─────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 space-y-5">
-
-        {/* Breadcrumb + header */}
-        <div>
-          <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
-            <Link to="/" className="hover:text-slate-600">Projects</Link>
-            <ChevronRight size={12} />
-            <span className="text-slate-700 font-medium">{project.name}</span>
-          </nav>
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="type-h1" style={{ color: 'var(--foreground)' }}>{project.name}</h1>
-                <span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200">Project</span>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Created on {project.created_at ? new Date(project.created_at).toLocaleDateString() : '—'}
-                {' · '}Last updated {project.updated_at ? new Date(project.updated_at).toLocaleDateString() : '—'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link to={`/projects/${pid}/upload`} className="btn-primary text-xs py-1.5">
-                <Upload size={13} /> Upload PDFs
-              </Link>
-              <Link to={`/projects/${pid}/schema`} className="btn-secondary text-xs py-1.5">
-                <Settings size={13} /> Schema
-              </Link>
-              <Link to={`/projects/${pid}/review`} className="btn-secondary text-xs py-1.5">
-                <Eye size={13} /> Review
-              </Link>
-              <Link to={`/projects/${pid}/export`} className="btn-secondary text-xs py-1.5">
-                <Download size={13} /> Export
-              </Link>
-              <button onClick={load} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Refresh">
-                <RefreshCw size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              label: 'Uploaded Papers', value: total,
-              sub: total === 0 ? 'No papers yet' : 'All uploaded',
-              icon: FileText, bar: null,
-            },
-            {
-              label: 'Extraction Progress', value: `${total ? Math.round((docklingDone / total) * 100) : 0}%`,
-              sub: `${docklingDone} / ${total} papers`,
-              icon: CheckCircle2,
-              bar: total ? docklingDone / total : 0,
-              detail: `${docklingDone} / ${total} papers`,
-            },
-            {
-              label: 'LLM Extractions', value: llmDone,
-              sub: total ? `${Math.round((llmDone / total) * 100)}%` : '0%',
-              icon: FlaskConical,
-              bar: total ? llmDone / total : 0,
-              detail: llmDone === 0 ? 'Not started' : `${Math.round((llmDone / Math.max(total, 1)) * 100)}% of papers`,
-            },
-            {
-              label: 'Approved Rows', value: approvedRows,
-              sub: approvedRows === 0 ? '0%' : 'Reviewed',
-              icon: ShieldCheck,
-              bar: null,
-              detail: approvedRows === 0 ? 'Ready to promote' : `${approvedRows} rows approved`,
-              warn: approvedRows === 0,
-            },
-          ].map((card) => (
-            <div key={card.label} className="surface p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'rgba(122,27,46,0.08)' }}>
-                  <card.icon size={16} style={{ color: 'var(--primary)' }} />
+            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <nav className="mb-2 flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                  <Link to="/" className="hover:text-[#7A1B2E]">Projects</Link>
+                  <ChevronRight size={10} />
+                  <span className="text-slate-600">{project.name}</span>
+                </nav>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="font-display text-[38px] leading-none tracking-tight text-[#261d20]">{project.name}</h1>
+                  <span className="rounded-full border border-[#e7d6db] bg-[#fff8fa] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#8b3449]">Project</span>
                 </div>
-                {card.warn && <AlertCircle size={13} className="text-amber-400 mt-0.5" />}
+                <p className="mt-2 max-w-2xl text-[12px] text-slate-500">
+                  {project.description?.trim() || 'Cheese research papers, structured evidence and reviewable scientific data in one workspace.'}
+                </p>
+                <p className="mt-2 text-[10px] text-slate-400">
+                  Created {project.created_at ? formatDate(project.created_at) : '—'} · Updated {project.updated_at ? formatDate(project.updated_at) : '—'}
+                </p>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-0.5">{card.value}</div>
-              <div className="text-xs text-slate-500">{card.label}</div>
-              {card.bar != null && (
-                <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.round(card.bar * 100)}%`, background: 'var(--primary)' }}
-                  />
-                </div>
-              )}
-              <p className="text-[10px] text-slate-400 mt-1.5">{card.detail ?? card.sub}</p>
-            </div>
-          ))}
-        </div>
 
-        {/* Papers table */}
-        <div className="surface overflow-hidden">
-          {/* Table header */}
-          <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-800">Papers ({total})</h2>
-            <div className="flex-1" />
-            {/* Search */}
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search papers…"
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 w-44 focus:outline-none focus:border-[#7A1B2E]/40 focus:ring-1 focus:ring-[#7A1B2E]/20"
-            />
-            {/* Status filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#7A1B2E]/40 bg-white"
-            >
-              <option value="all">All Status</option>
-              <option value="uploaded">Uploaded</option>
-              <option value="processing">Processing</option>
-              <option value="validation_ready">Validation Ready</option>
-              <option value="extracting">AI Extracting</option>
-              <option value="awaiting_review">Awaiting Review</option>
-              <option value="ready_to_promote">Ready for DB</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-            </select>
-            {/* Sort */}
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as typeof sort)}
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#7A1B2E]/40 bg-white"
-            >
-              <option value="newest">Sort: Newest</option>
-              <option value="oldest">Sort: Oldest</option>
-              <option value="name">Sort: Name</option>
-            </select>
-          </div>
-
-          {/* Column headers */}
-          <div className={clsx('grid gap-3 px-5 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest items-center', rowGridCols)}>
-            <span>Paper</span>
-            <span>Pages</span>
-            {showPipelineDetails && <span>Pipeline Progress</span>}
-            <span>Current Stage</span>
-            <span>Last Updated</span>
-            <div className="flex items-center justify-between">
-              <span>Action</span>
-              <button
-                onClick={() => setShowPipelineDetails((v) => !v)}
-                className="normal-case font-medium text-slate-400 hover:text-slate-600 tracking-normal text-[10px]"
-              >
-                {showPipelineDetails ? 'Hide stages' : 'Show stages'}
-              </button>
-            </div>
-          </div>
-
-          {/* Rows */}
-          {displayed.length === 0 ? (
-            <div className="text-center py-16">
-              <FileText size={28} className="text-slate-200 mx-auto mb-3" strokeWidth={1} />
-              <p className="text-sm text-slate-400 mb-4">
-                {papers.length === 0 ? 'No papers yet' : 'No papers match the filter'}
-              </p>
-              {papers.length === 0 && (
-                <Link to={`/projects/${pid}/upload`} className="btn-primary text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link to={`/projects/${pid}/upload`} className="inline-flex items-center gap-2 rounded-xl bg-[#7A1B2E] px-4 py-2.5 text-[11px] font-semibold text-white shadow-[0_12px_26px_-18px_rgba(122,27,46,.8)] hover:bg-[#681625]">
                   <Upload size={13} /> Upload PDFs
                 </Link>
+                <Link to={`/projects/${pid}/schema`} className="inline-flex items-center gap-2 rounded-xl border border-[#e7dce0] bg-white px-3.5 py-2.5 text-[11px] font-semibold text-slate-700 hover:bg-[#fff9fa]">
+                  <Settings size={13} /> Schema
+                </Link>
+                <Link to={`/projects/${pid}/validation`} className="inline-flex items-center gap-2 rounded-xl border border-[#e7dce0] bg-white px-3.5 py-2.5 text-[11px] font-semibold text-slate-700 hover:bg-[#fff9fa]">
+                  <Eye size={13} /> Review
+                </Link>
+                <Link to={`/projects/${pid}/export`} className="inline-flex items-center gap-2 rounded-xl border border-[#e7dce0] bg-white px-3.5 py-2.5 text-[11px] font-semibold text-slate-700 hover:bg-[#fff9fa]">
+                  <Download size={13} /> Export
+                </Link>
+                <button onClick={load} className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-[#fff8fa] hover:text-[#7A1B2E]" title="Refresh">
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <MetricCard label="Papers" value={stats.total} detail="Uploaded research papers" icon={FileText} />
+            <MetricCard label="Extraction" value={`${stats.averageProgress}%`} detail="Average pipeline progress" icon={CheckCircle2} progress={stats.averageProgress} />
+            <MetricCard label="Structured rows" value={stats.structuredRows.toLocaleString()} detail="Extracted observations across papers" icon={Database} accent />
+            <MetricCard label="Tables" value={stats.tables} detail="Native scientific tables detected" icon={Table2} />
+            <MetricCard label="Needs review" value={stats.reviewRows.toLocaleString()} detail={stats.reviewRows ? 'Rows waiting for researcher review' : 'No rows currently waiting'} icon={ShieldCheck} />
+          </section>
+
+          <section className="overflow-hidden rounded-[24px] border border-[#e9dfe2] bg-white shadow-[0_20px_48px_-42px_rgba(68,18,35,.6)]">
+            <div className="border-b border-[#f0e8ea] px-4 py-4 lg:px-5">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                <div>
+                  <h2 className="font-display text-[24px] leading-none text-[#2b2024]">Research papers</h2>
+                  <p className="mt-1 text-[10.5px] text-slate-400">Open a paper to inspect live evidence, tables, charts and extracted results.</p>
+                </div>
+                <div className="flex-1" />
+                <div className="relative min-w-[220px] flex-1 xl:max-w-[340px]">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search title, author, journal…"
+                    className="w-full rounded-xl border border-[#e7dce0] bg-[#fffefe] py-2.5 pl-9 pr-3 text-[11px] text-slate-700 outline-none transition focus:border-[#b98593] focus:ring-2 focus:ring-[#7A1B2E]/10"
+                  />
+                </div>
+                <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)} className="rounded-xl border border-[#e7dce0] bg-white px-3 py-2.5 text-[11px] text-slate-600 outline-none">
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name">Title A–Z</option>
+                </select>
+                <div className="flex rounded-xl border border-[#e7dce0] bg-[#fffafa] p-1">
+                  <button onClick={() => setViewMode('list')} className={clsx('flex h-7 w-7 items-center justify-center rounded-lg', viewMode === 'list' ? 'bg-white text-[#7A1B2E] shadow-sm' : 'text-slate-400')} title="Comfortable view">
+                    <List size={13} />
+                  </button>
+                  <button onClick={() => setViewMode('compact')} className={clsx('flex h-7 w-7 items-center justify-center rounded-lg', viewMode === 'compact' ? 'bg-white text-[#7A1B2E] shadow-sm' : 'text-slate-400')} title="Compact view">
+                    <Grid2X2 size={13} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-1 overflow-x-auto pb-0.5">
+                {filterTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFilter(tab.id)}
+                    className={clsx(
+                      'whitespace-nowrap rounded-full px-3 py-1.5 text-[10px] font-semibold transition-colors',
+                      filter === tab.id ? 'bg-[#7A1B2E] text-white' : 'bg-[#f8f4f5] text-slate-500 hover:bg-[#f2e8eb] hover:text-[#7A1B2E]',
+                    )}
+                  >
+                    {tab.label} <span className={clsx('ml-1', filter === tab.id ? 'text-white/70' : 'text-slate-400')}>{filterCounts[tab.id]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 bg-[#fffdfd] p-3 lg:p-4">
+              {displayed.length === 0 ? (
+                <div className="py-16 text-center">
+                  <Search size={24} className="mx-auto mb-3 text-slate-200" />
+                  <p className="text-sm font-medium text-slate-500">No papers match this view</p>
+                  <button onClick={() => { setSearch(''); setFilter('all') }} className="mt-3 text-[11px] font-semibold text-[#7A1B2E] hover:underline">Clear filters</button>
+                </div>
+              ) : (
+                displayed.map((paper) => (
+                  <PaperCard
+                    key={paper.id}
+                    paper={paper}
+                    pid={pid}
+                    compact={viewMode === 'compact'}
+                    menuOpen={openMenuId === paper.id}
+                    onToggleMenu={() => setOpenMenuId((current) => (current === paper.id ? null : paper.id))}
+                    onDelete={() => handleDelete(paper)}
+                  />
+                ))
               )}
             </div>
-          ) : (
-            <div className="divide-y divide-slate-50">
-              {displayed.map((paper) => {
+
+            <div className="flex items-center justify-between border-t border-[#f0e8ea] bg-white px-5 py-3 text-[10px] text-slate-400">
+              <span>Showing {displayed.length} of {stats.total} papers</span>
+              <Link to={`/projects/${pid}/papers`} className="font-semibold text-[#7A1B2E] hover:underline">Open full paper library</Link>
+            </div>
+          </section>
+        </main>
+
+        <aside className="space-y-4">
+          <section className="rounded-[22px] border border-[#e9dfe2] bg-white p-4 shadow-[0_18px_40px_-38px_rgba(68,18,35,.6)]">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600">Pipeline overview</h3>
+              {filterCounts.processing > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> Live</span>}
+            </div>
+            <DonutChart total={stats.total} segments={pipelineSegments} />
+          </section>
+
+          <section className="rounded-[22px] border border-[#e9dfe2] bg-white p-4 shadow-[0_18px_40px_-38px_rgba(68,18,35,.6)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600">Recent activity</h3>
+              <button onClick={load} className="text-[9.5px] font-semibold text-[#8c2038] hover:underline">Refresh</button>
+            </div>
+            <div className="mt-4 space-y-1">
+              {recent.map((paper, index) => {
                 const badge = BADGE_META[paper.badge] ?? BADGE_META.uploaded
                 return (
-                  <div
-                    key={paper.id}
-                    className={clsx('grid gap-3 items-center px-5 py-4 hover:bg-slate-50/60 transition-colors group', rowGridCols)}
-                  >
-                    {/* Paper name + badge */}
-                    <div className="min-w-0">
-                      <div className="flex items-start gap-2">
-                        <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                          <FileText size={13} className="text-blue-500" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-800 leading-snug line-clamp-2">
-                            {paper.original_name}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className={clsx(
-                              'inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border',
-                              badge.cls,
-                            )}>
-                              {paper.stages.docling === 'running' && <Loader2 size={8} className="animate-spin mr-0.5" />}
-                              {badge.label}
-                            </span>
-                            {paper.counts.assets > 0 && (
-                              <span className="text-[9px] text-slate-400">
-                                {paper.counts.assets} assets · {paper.counts.charts} charts
-                              </span>
-                            )}
-                          </div>
-                          {/* Progress bar */}
-                          <div className="mt-1.5 h-1 bg-slate-100 rounded-full overflow-hidden w-full max-w-[180px]">
-                            <div
-                              className={clsx(
-                                'h-full rounded-full transition-all',
-                                paper.badge === 'failed' ? 'bg-red-400' :
-                                paper.badge === 'completed' ? 'bg-emerald-500' :
-                                paper.badge === 'processing' ? 'bg-blue-400' : 'bg-violet-400',
-                              )}
-                              style={{ width: `${paper.progress_pct}%` }}
-                            />
-                          </div>
-                          <p className="text-[9px] text-slate-300 mt-0.5">
-                            Uploaded {paper.uploaded_at ? new Date(paper.uploaded_at).toLocaleDateString() : '—'} {paper.page_count > 0 ? `· ${paper.page_count} pages` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pages */}
-                    <div className="text-xs text-slate-500 font-medium">{paper.page_count || '—'}</div>
-
-                    {/* Pipeline stages — technical detail, hidden by default */}
-                    {showPipelineDetails && (
-                      <div className="overflow-hidden">
-                        <PipelineBar stages={paper.stages} />
-                      </div>
-                    )}
-
-                    {/* Current stage */}
-                    <CurrentStageLabel paper={paper} />
-
-                    {/* Last updated */}
-                    <div className="text-[10px] text-slate-400">
-                      {paper.uploaded_at
-                        ? new Date(paper.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        : '—'}
-                    </div>
-
-                    {/* Action */}
-                    <div className="flex items-center gap-1">
-                      <PrimaryAction paper={paper} pid={pid} />
-                      {/* Delete menu */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setOpenMenuId(openMenuId === paper.id ? null : paper.id)}
-                          className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <MoreHorizontal size={13} />
-                        </button>
-                        {openMenuId === paper.id && (
-                          <div className="absolute right-0 top-full mt-1 surface shadow-lg py-1 z-20 w-36">
-                            <Link
-                              to={`/projects/${pid}/papers/${paper.id}/overview`}
-                              className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
-                              onClick={() => setOpenMenuId(null)}
-                            >
-                              <Layers size={11} /> Open Pipeline
-                            </Link>
-                            {paper.counts.assets > 0 && (
-                              <Link
-                                to={`/projects/${pid}/papers/${paper.id}/docling`}
-                                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
-                                onClick={() => setOpenMenuId(null)}
-                              >
-                                <Layers size={11} /> Docling Results
-                              </Link>
-                            )}
-                            {paper.counts.charts > 0 && (
-                              <Link
-                                to={`/projects/${pid}/papers/${paper.id}/charts`}
-                                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
-                                onClick={() => setOpenMenuId(null)}
-                              >
-                                <BarChart3 size={11} /> View Charts
-                              </Link>
-                            )}
-                            <button
-                              onClick={() => { setOpenMenuId(null); handleDelete(paper.id, paper.original_name) }}
-                              className="flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 w-full text-left"
-                            >
-                              <Trash2 size={11} /> Delete Paper
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/50">
-            <p className="text-[10px] text-slate-400">
-              Showing {displayed.length} of {total} paper{total !== 1 ? 's' : ''}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Right sidebar ────────────────────────────────────────────────── */}
-      <div className="w-64 shrink-0 space-y-4">
-
-        {/* Pipeline overview donut */}
-        <div className="surface p-4">
-          <h3 className="text-xs font-bold text-slate-700 mb-4">Pipeline Overview</h3>
-          <DonutChart total={total} segments={segments} />
-        </div>
-
-        {/* Quick actions */}
-        <div className="surface p-4">
-          <h3 className="text-xs font-bold text-slate-700 mb-3">Quick Actions</h3>
-          <div className="space-y-1">
-            {[
-              { label: 'Upload PDFs',          to: `/projects/${pid}/upload`,     Icon: Upload },
-              { label: 'View Extraction Jobs', to: `/projects/${pid}/jobs`,       Icon: Clock },
-              { label: 'Open Validation Queue',to: `/projects/${pid}/validation`, Icon: ShieldCheck },
-              { label: 'Extraction Review',    to: `/projects/${pid}/review`,     Icon: Eye },
-              { label: 'Scientific Database',  to: `/projects/${pid}/dataset`,    Icon: BarChart2 },
-            ].map(({ label, to, Icon }) => (
-              <Link
-                key={label}
-                to={to}
-                className="flex items-center justify-between px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 rounded-lg transition-colors group"
-              >
-                <div className="flex items-center gap-2">
-                  <Icon size={12} className="text-slate-400" />
-                  {label}
-                </div>
-                <ChevronRight size={10} className="text-slate-300 group-hover:text-slate-500" />
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent activity */}
-        <div className="surface p-4">
-          <h3 className="text-xs font-bold text-slate-700 mb-3">Recent Activity</h3>
-          {recent.length === 0 ? (
-            <p className="text-[11px] text-slate-400 text-center py-4">No papers yet</p>
-          ) : (
-            <div className="space-y-3">
-              {recent.map((p) => {
-                const badge = BADGE_META[p.badge] ?? BADGE_META.uploaded
-                return (
-                  <div key={p.id} className="flex items-start gap-2">
-                    <div className={clsx(
-                      'w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5',
-                      p.badge === 'completed' ? 'bg-emerald-50' :
-                      p.badge === 'failed'    ? 'bg-red-50' :
-                      p.badge === 'processing'? 'bg-blue-50' : 'bg-slate-100',
-                    )}>
-                      <StageIcon status={p.badge === 'completed' ? 'completed' : p.badge === 'failed' ? 'failed' : p.badge === 'processing' ? 'running' : 'not_started'} size={11} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium text-slate-700 truncate leading-snug">
-                        {p.original_name}
-                      </p>
-                      <p className="text-[10px] text-slate-400">{badge.label}</p>
-                    </div>
-                    <span className="text-[9px] text-slate-300 shrink-0 mt-0.5">
-                      {p.uploaded_at
-                        ? (() => {
-                            const diff = Date.now() - new Date(p.uploaded_at).getTime()
-                            const min = Math.floor(diff / 60000)
-                            if (min < 60) return `${min} min ago`
-                            const hr = Math.floor(min / 60)
-                            if (hr < 24) return `${hr} hr ago`
-                            return `${Math.floor(hr / 24)} d ago`
-                          })()
-                        : '—'}
+                  <Link key={paper.id} to={`/projects/${pid}/papers/${paper.id}/overview`} className="group relative flex gap-3 rounded-xl px-1 py-2 hover:bg-[#fffafa]">
+                    {index < recent.length - 1 && <span className="absolute left-[10px] top-8 h-[calc(100%-14px)] w-px bg-[#eee4e7]" />}
+                    <span className={clsx('relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full', paper.badge === 'completed' ? 'bg-emerald-50' : paper.badge === 'failed' ? 'bg-red-50' : 'bg-[#f8eef1]')}>
+                      <StageStatusIcon paper={paper} />
                     </span>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-[10.5px] font-semibold text-slate-700 group-hover:text-[#7A1B2E]">{paper.metadata?.title || stripPdf(paper.original_name)}</p>
+                      <p className="mt-0.5 text-[9.5px] text-slate-400">{badge.label} · {relativeTime(paper.uploaded_at)}</p>
+                    </div>
+                  </Link>
                 )
               })}
             </div>
-          )}
-        </div>
+          </section>
+
+          <section className="rounded-[22px] border border-[#e9dfe2] bg-white p-4 shadow-[0_18px_40px_-38px_rgba(68,18,35,.6)]">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600">Quick actions</h3>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                { label: 'Upload', to: `/projects/${pid}/upload`, Icon: Upload },
+                { label: 'Jobs', to: `/projects/${pid}/jobs`, Icon: Clock3 },
+                { label: 'Review', to: `/projects/${pid}/validation`, Icon: ShieldCheck },
+                { label: 'Database', to: `/projects/${pid}/dataset`, Icon: Database },
+              ].map(({ label, to, Icon }) => (
+                <Link key={label} to={to} className="flex min-h-[72px] flex-col items-center justify-center gap-2 rounded-xl border border-[#eee4e7] bg-[#fffdfd] text-[10px] font-semibold text-slate-600 transition-all hover:-translate-y-0.5 hover:border-[#d9bcc5] hover:bg-[#fff8fa] hover:text-[#7A1B2E]">
+                  <Icon size={16} className="text-[#9a2940]" /> {label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        </aside>
       </div>
 
-      {/* Close open menus on outside click */}
-      {openMenuId !== null && (
-        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-      )}
+      {openMenuId !== null && <div className="fixed inset-0 z-20" onClick={() => setOpenMenuId(null)} />}
     </div>
   )
 }
