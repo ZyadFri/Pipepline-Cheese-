@@ -24,42 +24,23 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.routes.extraction_workspace import _get_paper, _require_project
-from app.core.errors import classify_extraction_error
 from app.db.database import SessionLocal, get_db
 from app.db.models import ExtExperiment, ExtMeasurement, ExtUnmappedFact, Job, Paper, User
 from app.extraction.rules.engine import RuleExtractionEngine
-from app.extraction.gliner.engine import GlinerExtractionEngine
 from app.extraction.common.persist import persist_paper_extraction
 from app.services.canonical_promoter import promote_ext_paper_to_canonical
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["extraction-engines"])
 
-SUPPORTED_ENGINES = {"llm", "rules", "gliner"}
+SUPPORTED_ENGINES = {"llm", "rules"}
 NOT_YET_AVAILABLE = {"ml": "The ML extraction engine is not implemented yet.",
-                      "compare": "Compare mode is not implemented yet — run engines separately."}
-_JOB_TYPE_BY_ENGINE = {
-    "llm": "llm_validation", "rules": "rule_extraction", "gliner": "gliner_extraction",
-}
+                      "compare": "Compare mode is not implemented yet — run 'llm' and 'rules' separately."}
 
 
-_ENGINE_FACTORIES = {
-    "rules": RuleExtractionEngine,
-    "gliner": GlinerExtractionEngine,
-}
-_ENGINE_STEP_LABEL = {
-    "rules": "Running rule-based extraction",
-    "gliner": "Running local GLiNER extraction",
-}
-
-
-def _run_deterministic_extraction(engine_name: str, paper_id: int, project_id: int, job_id: int) -> None:
-    """Background task shared by every non-LLM engine (Rules, GLiNER, and any
-    future local engine): own session, Job status updates, never leaves the
-    job stuck on an unhandled exception. LLM keeps its own existing flow
-    (_run_llm_validation in extraction_workspace.py) unchanged — it has
-    different steps (evidence packaging, citation validation) that don't fit
-    this shape."""
+def _run_rule_extraction(paper_id: int, project_id: int, job_id: int) -> None:
+    """Background task mirroring _run_llm_validation's shape: own session,
+    Job status updates, never leaves the job stuck on an unhandled exception."""
     db = SessionLocal()
     try:
         paper = db.query(Paper).filter(Paper.id == paper_id).first()
@@ -69,11 +50,11 @@ def _run_deterministic_extraction(engine_name: str, paper_id: int, project_id: i
 
         job.status = "running"
         job.started_at = datetime.utcnow()
-        job.current_step = _ENGINE_STEP_LABEL[engine_name]
+        job.current_step = "Running rule-based extraction"
         job.progress = 20
         db.commit()
 
-        engine = _ENGINE_FACTORIES[engine_name]()
+        engine = RuleExtractionEngine()
         result = engine.extract_document(paper_id, project_id, db)
 
         job.progress = 70
@@ -81,13 +62,13 @@ def _run_deterministic_extraction(engine_name: str, paper_id: int, project_id: i
         db.commit()
 
         persist_counts = persist_paper_extraction(
-            result, paper=paper, project_id=project_id, job_id=job_id, engine=engine_name, db=db,
+            result, paper=paper, project_id=project_id, job_id=job_id, engine="rules", db=db,
         )
 
         try:
-            promotion = promote_ext_paper_to_canonical(paper_id, project_id, db, engine=engine_name)
+            promotion = promote_ext_paper_to_canonical(paper_id, project_id, db, engine="rules")
         except Exception as promo_exc:
-            logger.error("Canonical promotion failed for paper %d (%s): %s", paper_id, engine_name, promo_exc, exc_info=True)
+            logger.error("Canonical promotion failed for paper %d (rules): %s", paper_id, promo_exc, exc_info=True)
             promotion = {}
             result.warnings.append(f"Extraction succeeded but promotion to the database failed: {promo_exc}")
 
@@ -106,12 +87,12 @@ def _run_deterministic_extraction(engine_name: str, paper_id: int, project_id: i
         db.commit()
 
     except Exception as exc:
-        logger.error("%s extraction failed for paper %d: %s", engine_name, paper_id, exc, exc_info=True)
+        logger.error("Rule extraction failed for paper %d: %s", paper_id, exc, exc_info=True)
         try:
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
                 job.status = "failed"
-                job.error_message = classify_extraction_error(exc)
+                job.error_message = str(exc)[:500]
                 job.completed_at = datetime.utcnow()
             db.commit()
         except Exception:
@@ -125,7 +106,7 @@ def start_extraction(
     project_id: int,
     paper_id: int,
     background_tasks: BackgroundTasks,
-    engine: str = Query(..., description="llm|rules|gliner"),
+    engine: str = Query(..., description="llm|rules"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -143,7 +124,7 @@ def start_extraction(
         from app.api.routes.extraction_workspace import send_to_llm
         return send_to_llm(project_id, paper_id, background_tasks, db, user)
 
-    job_type = _JOB_TYPE_BY_ENGINE[engine]
+    job_type = "rule_extraction"
     running = db.query(Job).filter(
         Job.paper_id == paper_id, Job.job_type == job_type,
         Job.status.in_(["queued", "running"]),
@@ -159,8 +140,8 @@ def start_extraction(
     db.commit()
     db.refresh(job)
 
-    background_tasks.add_task(_run_deterministic_extraction, engine, paper_id, project_id, job.id)
-    return {"job_id": job.id, "status": "queued", "engine": engine}
+    background_tasks.add_task(_run_rule_extraction, paper_id, project_id, job.id)
+    return {"job_id": job.id, "status": "queued", "engine": "rules"}
 
 
 @router.get("/projects/{project_id}/papers/{paper_id}/extractions")
@@ -176,7 +157,7 @@ def list_extractions(
     _get_paper(project_id, paper_id, db)
 
     summaries = []
-    for engine in ("llm", "rules", "gliner"):
+    for engine in ("llm", "rules"):
         exp_ids = [r.id for r in db.query(ExtExperiment.id).filter(
             ExtExperiment.paper_id == paper_id, ExtExperiment.engine == engine,
         ).all()]
@@ -188,7 +169,7 @@ def list_extractions(
         ).count()
         last_job = db.query(Job).filter(
             Job.paper_id == paper_id,
-            Job.job_type == _JOB_TYPE_BY_ENGINE[engine],
+            Job.job_type == ("llm_validation" if engine == "llm" else "rule_extraction"),
         ).order_by(Job.id.desc()).first()
 
         summaries.append({

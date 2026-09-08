@@ -350,7 +350,7 @@ export const workspaceApi = {
 
 // ── Multi-engine extraction (LLM / Rules — ML not implemented yet) ────────
 
-export type ExtractionEngineName = 'llm' | 'rules' | 'gliner'
+export type ExtractionEngineName = 'llm' | 'rules'
 
 export interface EngineSummary {
   engine: ExtractionEngineName
