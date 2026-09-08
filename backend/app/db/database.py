@@ -59,6 +59,8 @@ def apply_column_migrations() -> None:
         "ALTER TABLE jobs ADD COLUMN figures_found INTEGER DEFAULT 0",
         "ALTER TABLE jobs ADD COLUMN warnings_json TEXT DEFAULT '[]'",
         "ALTER TABLE jobs ADD COLUMN cancel_requested BOOLEAN DEFAULT 0",
+        "ALTER TABLE papers ADD COLUMN summary_json TEXT",
+        "ALTER TABLE papers ADD COLUMN summary_generated_at DATETIME",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

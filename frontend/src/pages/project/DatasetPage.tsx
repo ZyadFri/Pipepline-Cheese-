@@ -260,7 +260,7 @@ export default function DatasetPage() {
                   <td className="px-3 py-2"><span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-500">{o.value_origin === 'graph_estimated' ? 'Estimated from chart' : 'Reported directly'}</span></td>
                   <td className="px-3 py-2">{(() => { const style = confidenceStyle(o.quality_score); return style ? <span className={clsx('inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border', style.bg, style.text, style.border)} title={style.label}>{Math.round((o.quality_score ?? 0) * 100)}%</span> : null })()}</td>
                   <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_CLS[o.review_status] ?? 'bg-slate-100 text-slate-600'}`}>{STATUS_LABEL[o.review_status] ?? o.review_status}</span></td>
-                  <td className="px-3 py-2">{o.evidence.length > 0 && <button onClick={() => setEvidenceFor(o)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-100 hover:text-[#8B1538]" title="View source evidence"><Info size={12} /> Evidence</button>}</td>
+                  <td className="px-3 py-2">{o.evidence.length > 0 && <button onClick={() => setEvidenceFor(o)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-100 hover:text-[#8B1538]" title="Why was this extracted?"><Info size={12} /> Evidence</button>}</td>
                 </tr>
               ))}
             </tbody>

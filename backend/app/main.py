@@ -8,7 +8,7 @@ from app.api.routes import (
     auth, projects, papers, review_queue,
     analytics, schema,
     extraction_workspace, extraction_engines, asset_actions,
-    insights,
+    insights, paper_assistant,
 )
 from app.api.routes import (
     studies, experiments, observations, microorganisms,
@@ -78,6 +78,9 @@ app.include_router(asset_actions.router, prefix="/api")
 
 # ── Insights (quality score, missing-fields, duplicate detection) ──────────────
 app.include_router(insights.router, prefix="/api")
+
+# ── LLM-backed paper assistant (summary card, ask-this-paper chat) ─────────────
+app.include_router(paper_assistant.router, prefix="/api")
 
 
 @app.get("/api/health")

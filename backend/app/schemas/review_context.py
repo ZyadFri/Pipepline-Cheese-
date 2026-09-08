@@ -3,7 +3,14 @@ from __future__ import annotations
 from typing import Any, Optional
 from pydantic import Field
 
-from app.schemas.canonical import ObservationReviewOut
+from app.schemas.canonical import ObservationReviewOut, ProvenanceRecordOut  # noqa: F401 -- ProvenanceRecordOut
+# must be importable in this module's namespace: RichObservationReviewOut inherits
+# ObservationReviewOut's `evidence: list[ProvenanceRecordOut]` field, and with
+# `from __future__ import annotations` that annotation is a lazily-evaluated
+# string resolved against THIS module's globals when Pydantic rebuilds the
+# subclass — without this import it raises "RichObservationReviewOut is not
+# fully defined" on first real use (a real bug found running the full test
+# suite, not caught by a syntax-only check).
 
 
 class RichObservationReviewOut(ObservationReviewOut):

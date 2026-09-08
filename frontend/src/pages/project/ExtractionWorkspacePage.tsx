@@ -25,6 +25,8 @@ import AuthImage from '../../components/AuthImage'
 import AssetCard from '../../components/AssetCard'
 import AssetDetailPanel from '../../components/AssetDetailPanel'
 import ExtractionTimeline from '../../components/ExtractionTimeline'
+import PaperSummaryCard from '../../components/PaperSummaryCard'
+import AskPaperChat from '../../components/AskPaperChat'
 import { useExtractionStream } from '../../hooks/useExtractionStream'
 import type { ExtractionAsset, WorkspaceStatus } from '../../types/workspace'
 
@@ -588,6 +590,11 @@ export default function ExtractionWorkspacePage() {
           </div>
         )}
       </section>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <PaperSummaryCard projectId={pid} paperId={paperIdNum} />
+        <AskPaperChat projectId={pid} paperId={paperIdNum} />
+      </div>
 
       <section className="mt-4 overflow-hidden rounded-[22px] border border-[#e8dde0] bg-white shadow-[0_22px_50px_-44px_rgba(74,18,38,.65)]">
         <div className="flex flex-col gap-3 border-b border-[#eee6e8] px-4 py-3 lg:flex-row lg:items-center">

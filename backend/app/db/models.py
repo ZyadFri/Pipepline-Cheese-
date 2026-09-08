@@ -91,6 +91,8 @@ class Paper(Base):
     status        = Column(String, default="uploaded")
     error_message = Column(Text, default="")
     uploaded_at   = Column(DateTime, default=datetime.utcnow)
+    summary_json         = Column(Text, nullable=True)   # cached LLM paper-summary card
+    summary_generated_at = Column(DateTime, nullable=True)
 
     project         = relationship("Project", back_populates="papers")
     rows            = relationship("ExtractedRow", back_populates="paper", cascade="all, delete-orphan")

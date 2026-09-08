@@ -451,6 +451,38 @@ export const insightsApi = {
     api.get(`/projects/${projectId}/experiments/duplicates`, { params }).then((r) => r.data),
 }
 
+// ── Paper assistant (LLM-backed summary card + ask-this-paper chat) ───────
+
+export interface PaperSummary {
+  objective: string
+  product: string
+  treatments: string[]
+  variables: string[]
+  main_findings: string[]
+  counts: { experiment_count: number; observation_count: number }
+  generated_at: string | null
+  cached: boolean
+}
+
+export interface AskPaperSource {
+  page_number: number | null
+  snippet: string
+}
+
+export interface AskPaperResponse {
+  answer: string
+  sources: AskPaperSource[]
+}
+
+export const paperAssistantApi = {
+  summary: (projectId: number, paperId: number, regenerate = false): Promise<PaperSummary> =>
+    api.get(`/projects/${projectId}/papers/${paperId}/summary`, { params: regenerate ? { regenerate: true } : undefined })
+      .then((r) => r.data),
+
+  ask: (projectId: number, paperId: number, question: string): Promise<AskPaperResponse> =>
+    api.post(`/projects/${projectId}/papers/${paperId}/ask`, { question }).then((r) => r.data),
+}
+
 // ── Snapshots & Exports ───────────────────────────────────────────────────
 
 export const snapshotsApi = {

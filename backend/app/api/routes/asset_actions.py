@@ -142,9 +142,18 @@ def export_asset(
         rows, unmapped_out = _flatten_rows(experiments, unmapped)
 
     if format == "json":
+        # NaN (blank CSV cells, very common in real tables) is not valid
+        # JSON — FastAPI's encoder raises ValueError: Out of range float
+        # values are not JSON compliant, 500ing the whole request. Blank
+        # cells become null instead of being invented as 0 or dropped.
+        # astype(object) first is required: .where() alone on a still-numeric
+        # column silently re-coerces None back to NaN (pandas has no "empty"
+        # representation in a float64 column), so the substitution is a no-op
+        # without it — confirmed live against a real table with a blank cell.
+        table = df.astype(object).where(pd.notnull(df), None).to_dict("records")
         return {
             "asset_id": asset_id,
-            "table": df.to_dict("records"),
+            "table": table,
             "rows": rows,
             "unmapped": unmapped_out,
         }

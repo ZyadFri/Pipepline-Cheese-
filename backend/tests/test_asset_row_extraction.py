@@ -149,6 +149,46 @@ def test_export_xlsx_returns_a_two_sheet_workbook(client, auth_headers, db, test
     assert wb["Rows"].max_row == 7    # header + 6 rows
 
 
+def test_export_json_handles_blank_cells_without_500(client, auth_headers, db, test_user, tmp_path):
+    """Regression test for a real bug found live in the UI: a table with a
+    blank cell (very common — e.g. a day-42 reading missing for one sample)
+    reads as NaN via pandas, and NaN is not valid JSON — FastAPI's encoder
+    raised 'ValueError: Out of range float values are not JSON compliant:
+    nan', 500ing the whole export and breaking the table preview in
+    AssetDetailPanel. Blank cells must become null in the response, not
+    crash the endpoint."""
+    project = Project(name="Cheese Shelf-Life", owner_id=test_user.id)
+    db.add(project)
+    db.flush()
+    paper = Paper(project_id=project.id, filename="p.pdf", original_name="paper.pdf",
+                  file_path="/nonexistent/p.pdf", status="extracted")
+    db.add(paper)
+    db.flush()
+
+    csv_path = tmp_path / "table_blank_cell.csv"
+    csv_path.write_text("Treatment,Day 1,Day 42\nControl,3.9,3.7\nEXg,4.2,\n", encoding="utf-8")
+
+    asset = ExtractionAsset(
+        paper_id=paper.id, project_id=project.id, docling_item_ref="#/tables/1",
+        asset_type="native_table", page_number=7, classification="native_table",
+        caption="Table with a missing day-42 reading", csv_path=str(csv_path),
+        csv_rows=2, csv_cols=3, relevance_score=5.0,
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+
+    resp = client.get(
+        f"/api/projects/{project.id}/papers/{paper.id}/assets/{asset.id}/export?format=json",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert len(body["table"]) == 2
+    blank_row = next(r for r in body["table"] if r["Treatment"] == "EXg")
+    assert blank_row["Day 42"] is None
+
+
 def test_export_requires_project_access(client, db, test_user, tmp_path):
     project, paper, asset = _seed_table_asset(db, test_user, tmp_path)
 
