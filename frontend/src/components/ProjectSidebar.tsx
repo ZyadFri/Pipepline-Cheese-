@@ -2,7 +2,7 @@ import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShieldCheck, Download, Settings,
   LogOut, ChevronRight, FlaskConical, Beaker, TestTube2, Wand2,
-  Briefcase, ClipboardList, Users, Database,
+  Briefcase, ClipboardList, Users, Database, Home,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect } from 'react'
@@ -105,7 +105,7 @@ export default function ProjectSidebar() {
   return (
     <aside className="w-60 shrink-0 h-full flex flex-col overflow-hidden border-r border-[#efe7e9] bg-[linear-gradient(180deg,#fff_0%,#fffdfd_56%,#fffafa_100%)]">
       <div className="shrink-0 border-b border-[#f1eaec] px-4 pb-4 pt-5">
-        <div className="mb-3.5 flex items-center gap-2.5">
+        <NavLink to="/" className="mb-3.5 flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80" title="Back to all projects">
           <div className="rounded-[9px] border border-[#ece6e8] bg-white p-1.5 shadow-sm">
             <img src="/mcgill.png" alt="McGill" className="h-7 w-auto" />
           </div>
@@ -113,18 +113,34 @@ export default function ProjectSidebar() {
             <p className="text-[11px] font-bold leading-tight text-[#182235]">McGill University</p>
             <p className="text-[9.5px] leading-tight text-[#7d8ba0]">Agricultural Sciences</p>
           </div>
-        </div>
+        </NavLink>
 
-        <div className="relative flex items-center gap-2.5 overflow-hidden rounded-[11px] border border-[rgba(122,27,46,.14)] bg-[linear-gradient(135deg,rgba(122,27,46,.07),rgba(122,27,46,.035))] px-2.5 py-2">
+        <NavLink
+          to="/"
+          className="relative flex items-center gap-2.5 overflow-hidden rounded-[11px] border border-[rgba(122,27,46,.14)] bg-[linear-gradient(135deg,rgba(122,27,46,.07),rgba(122,27,46,.035))] px-2.5 py-2 transition-all hover:border-[rgba(122,27,46,.24)] hover:bg-[#fff7f9]"
+          title="Back to all projects"
+        >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[18px] shadow-sm">🧀</div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-display truncate text-[12px] font-semibold leading-tight text-[#7A1B2E]">Cheese Database</p>
             <p className="mt-0.5 text-[9.5px] leading-tight text-[rgba(122,27,46,.58)]">Research Platform</p>
           </div>
-        </div>
+          <ChevronRight size={11} className="shrink-0 text-[#9f7e87]" />
+        </NavLink>
       </div>
 
       <nav className="scrollbar-none flex-1 overflow-y-auto px-3 py-2">
+        <div className="pt-2">
+          <NavLink
+            to="/"
+            className="group flex items-center gap-2.5 rounded-[10px] border border-[#eadde1] bg-white px-3 py-2.5 text-[#7A1B2E] shadow-[0_8px_20px_-18px_rgba(122,27,46,.65)] transition-all hover:-translate-y-px hover:bg-[#fff8fa]"
+          >
+            <Home size={14} className="shrink-0" />
+            <span className="flex-1 text-[13px] font-semibold">All Projects</span>
+            <ChevronRight size={10} className="opacity-60 transition-transform group-hover:translate-x-0.5" />
+          </NavLink>
+        </div>
+
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
             <SectionLabel label={group.label} />
