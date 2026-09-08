@@ -1,20 +1,18 @@
 """
 The ONE function that writes any engine's PaperExtractionResult into the Ext*
-staging schema. Used by both RuleExtractionEngine and (via
-app/extraction/llm/wrapper.py's adapter) the existing LLM flow, so persistence
-logic exists exactly once regardless of how many engines exist.
+staging schema.
 
-Engine-scoped: only this paper's rows for THIS engine are wiped before writing
-fresh ones, so running Rules never erases the LLM's staging data for the same
-paper (or vice versa) — both coexist and can be compared. ExtIngredient/
-ExtIndicator are project-level reusable catalogs shared across engines
-deliberately (the same real ingredient found by two engines should resolve to
-the same catalog row) and are never wiped here.
+The legacy Ext* tables are intentionally narrow, so rich canonical fields are
+carried through staging as hidden canonical-bridge facts. The canonical promoter
+consumes them immediately. This keeps old databases compatible while allowing the
+extractor to capture the full scientific context supported by Experiment,
+TreatmentArm and Observation.
 """
 from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -24,11 +22,15 @@ from app.db.models import (
     ExtEvidence, ExtExperiment, ExtExperimentIngredient, ExtIndicator,
     ExtIngredient, ExtMeasurement, ExtUnmappedFact, Paper,
 )
+from app.extraction.common.canonical_bridge import (
+    EXPERIMENT_FIELDS, OBSERVATION_FIELDS, TREATMENT_FIELDS,
+    experiment_subject, observation_subject, write_bridge_fields,
+)
+from app.extraction.common.context_enricher import enrich_extraction_result
 from app.extraction.common.models import PaperExtractionResult
 from app.services.evidence_capture import save_evidence_crop
 
 logger = logging.getLogger(__name__)
-
 EVIDENCE_BASE = UPLOAD_PATH / "evidence"
 
 
@@ -45,9 +47,6 @@ def _get_or_create_ingredient(project_id: int, name: str, func_class: str, sourc
         db.add(ing)
         db.flush()
         return ing
-    # Backfill-if-empty: first engine to see this ingredient shouldn't permanently
-    # block a later, better classification from a different engine (mirrors the
-    # existing indicator_threshold backfill below).
     if (not ing.functional_class or ing.functional_class == "unknown") and func_class and func_class != "unknown":
         ing.functional_class = func_class
     if not ing.source and source:
@@ -74,6 +73,29 @@ def _get_or_create_indicator(project_id: int, ind_type: str, ind_unit: str,
     return ind
 
 
+def _first_provenance(obj):
+    provs = getattr(obj, "provenance", None) or []
+    return provs[0] if provs else None
+
+
+def _backfill_treatment_context(exp) -> None:
+    """Use ingredient-level details only when the experiment-level field is empty."""
+    if exp.application_method is None:
+        values = {i.application_method for i in exp.ingredients if i.application_method}
+        if len(values) == 1:
+            exp.application_method = next(iter(values))
+    if exp.treatment_timing is None:
+        values = {i.treatment_timing for i in exp.ingredients if i.treatment_timing}
+        if len(values) == 1:
+            exp.treatment_timing = next(iter(values))
+    if exp.treatment_type is None:
+        classes = {i.functional_class for i in exp.ingredients if i.functional_class and i.functional_class != "unknown"}
+        if len(classes) == 1:
+            exp.treatment_type = next(iter(classes))
+    if exp.is_control is None:
+        exp.is_control = bool(re.search(r"\b(control|untreated|vehicle)\b", exp.treatment or "", re.IGNORECASE))
+
+
 def persist_paper_extraction(
     result: PaperExtractionResult,
     paper: Paper,
@@ -84,6 +106,10 @@ def persist_paper_extraction(
 ) -> dict:
     """Wipe this paper's stale rows for `engine`, write `result` fresh, return counts."""
     paper_id = paper.id
+
+    # One deterministic enrichment pass benefits EVERY engine and uses only the
+    # Docling-linked text already present locally. Existing engine values always win.
+    result = enrich_extraction_result(result, paper_id, db)
 
     # ── Wipe stale rows for THIS engine only ────────────────────────────────────
     stale_exp_ids = [
@@ -138,11 +164,13 @@ def persist_paper_extraction(
             except Exception as exc:
                 logger.warning("persist_paper_extraction: evidence crop failed for paper %d: %s", paper_id, exc)
 
-    exp_count = meas_count = ing_link_count = unmapped_count = 0
+    exp_count = meas_count = ing_link_count = unmapped_count = context_field_count = 0
 
     for exp in result.experiments:
         if not exp.cheese_product or not exp.treatment:
             continue
+        _backfill_treatment_context(exp)
+
         exp_row = ExtExperiment(
             project_id=project_id, paper_id=paper_id, job_id=job_id, engine=engine,
             cheese_product=exp.cheese_product, treatment=exp.treatment,
@@ -153,6 +181,19 @@ def persist_paper_extraction(
 
         for prov in exp.provenance:
             _save_evidence("experiment", {"experiment_id": exp_row.id}, None, prov)
+
+        bridge_prov = _first_provenance(exp)
+        subject = experiment_subject(exp_row.id)
+        context_field_count += write_bridge_fields(
+            db, project_id=project_id, paper_id=paper_id, engine=engine,
+            subject=subject, source_obj=exp, field_names=EXPERIMENT_FIELDS,
+            provenance=bridge_prov,
+        )
+        context_field_count += write_bridge_fields(
+            db, project_id=project_id, paper_id=paper_id, engine=engine,
+            subject=subject, source_obj=exp, field_names=TREATMENT_FIELDS,
+            provenance=bridge_prov,
+        )
 
         for ing in exp.ingredients:
             if not ing.ingredient_name or ing.concentration is None:
@@ -185,14 +226,15 @@ def persist_paper_extraction(
             ind_row = _get_or_create_indicator(
                 project_id, obs.indicator_type, obs.indicator_unit, obs.indicator_threshold, db,
             )
+            day_int = int(obs.day)
             exists = db.query(ExtMeasurement).filter(
                 ExtMeasurement.experiment_id == exp_row.id,
-                ExtMeasurement.day == int(obs.day),
+                ExtMeasurement.day == day_int,
                 ExtMeasurement.indicator_id == ind_row.id,
             ).first()
             if not exists:
                 db.add(ExtMeasurement(
-                    experiment_id=exp_row.id, day=int(obs.day), indicator_id=ind_row.id,
+                    experiment_id=exp_row.id, day=day_int, indicator_id=ind_row.id,
                     indicator_value=float(obs.indicator_value),
                     value_is_approximate=bool(obs.value_is_approximate),
                 ))
@@ -201,10 +243,18 @@ def persist_paper_extraction(
                 for prov in obs.provenance:
                     _save_evidence(
                         "measurement",
-                        {"experiment_id": exp_row.id, "day": int(obs.day), "indicator_id": ind_row.id},
+                        {"experiment_id": exp_row.id, "day": day_int, "indicator_id": ind_row.id},
                         "indicator_value", prov,
                     )
+                context_field_count += write_bridge_fields(
+                    db, project_id=project_id, paper_id=paper_id, engine=engine,
+                    subject=observation_subject(exp_row.id, day_int, ind_row.id),
+                    source_obj=obs, field_names=OBSERVATION_FIELDS,
+                    provenance=_first_provenance(obs),
+                )
 
+    # Genuine unmapped facts remain visible/reviewable. Canonical bridge facts
+    # written above are a separate hidden category and are NOT counted here.
     for fact in result.unmapped_facts:
         prov = fact.provenance
         db.add(ExtUnmappedFact(
@@ -227,4 +277,5 @@ def persist_paper_extraction(
         "measurements_stored": meas_count,
         "ingredient_links_stored": ing_link_count,
         "unmapped_facts_stored": unmapped_count,
+        "structured_context_fields_stored": context_field_count,
     }
