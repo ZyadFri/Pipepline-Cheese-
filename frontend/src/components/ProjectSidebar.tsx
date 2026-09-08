@@ -1,6 +1,6 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, FileText, ShieldCheck, Download, Settings,
+  LayoutDashboard, ShieldCheck, Download, Settings,
   LogOut, ChevronRight, FlaskConical, Beaker, TestTube2, Wand2,
   Briefcase, ClipboardList, Users, Database,
 } from 'lucide-react'
@@ -15,7 +15,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Project',
     items: [
       { to: '',          end: true, label: 'Dashboard', Icon: LayoutDashboard },
-      { to: 'papers',               label: 'Papers',    Icon: FileText },
       { to: 'validation',           label: 'Review',    Icon: ShieldCheck },
       { to: 'dataset',              label: 'Database',  Icon: Database },
     ],
