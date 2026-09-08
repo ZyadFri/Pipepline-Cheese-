@@ -26,13 +26,13 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 const CONV_BADGE: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  pending:        { label: 'Pending',     color: 'text-slate-400', icon: <Clock size={11} /> },
-  processing:     { label: 'Processing',  color: 'text-blue-500',  icon: <Clock size={11} className="animate-spin" /> },
-  complete:       { label: 'CSV ready',   color: 'text-emerald-600', icon: <CheckCircle size={11} /> },
-  failed:         { label: 'Failed',      color: 'text-red-500',   icon: <AlertCircle size={11} /> },
-  skipped:        { label: 'Skipped',     color: 'text-slate-400', icon: null },
-  not_a_chart:    { label: 'Not a chart', color: 'text-slate-400', icon: null },
-  not_applicable: { label: '',            color: '',               icon: null },
+  pending:        { label: 'Pending',                color: 'text-slate-400',   icon: <Clock size={11} /> },
+  processing:     { label: 'Processing',             color: 'text-blue-500',    icon: <Clock size={11} className="animate-spin" /> },
+  complete:       { label: 'CSV ready',              color: 'text-emerald-600', icon: <CheckCircle size={11} /> },
+  failed:         { label: 'Chart data unavailable', color: 'text-amber-600',   icon: <AlertCircle size={11} /> },
+  skipped:        { label: 'Skipped',                color: 'text-slate-400',   icon: null },
+  not_a_chart:    { label: 'Not a chart',            color: 'text-slate-400',   icon: null },
+  not_applicable: { label: '',                       color: '',                 icon: null },
 }
 
 interface Props {
@@ -76,7 +76,6 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
           : 'border-slate-200 hover:border-slate-300',
       )}
     >
-      {/* Thumbnail area */}
       <div className="relative h-44 bg-slate-50 flex items-center justify-center overflow-hidden">
         {asset.has_image && !imgError ? (
           <AuthImage
@@ -100,7 +99,6 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
           </div>
         )}
 
-        {/* Select for LLM button */}
         <button
           onClick={handleSelect}
           disabled={selecting}
@@ -116,13 +114,11 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
           {asset.selected_for_llm ? <CheckCircle size={14} /> : <Star size={14} />}
         </button>
 
-        {/* Type badge */}
         <div className={clsx('absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold', typeColor)}>
           {typeIcon}
           {asset.classification !== 'unknown' ? asset.classification.replace('_', ' ') : typeLabel.toLowerCase()}
         </div>
 
-        {/* Relevance score */}
         {score > 0 && (
           <div className="absolute bottom-2 right-2 bg-white/90 border border-slate-200 text-slate-600 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">
             {score.toFixed(1)}
@@ -130,7 +126,6 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
         )}
       </div>
 
-      {/* Info */}
       <div className="p-3 space-y-1.5">
         <div className="flex items-start justify-between gap-1">
           <p className="text-xs font-semibold text-slate-800 leading-snug">
@@ -147,7 +142,6 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
           <p className="text-[11px] text-slate-300 italic">No caption</p>
         )}
 
-        {/* Chart conversion status */}
         {asset.asset_type === 'figure' && conv.label && (
           <div className={clsx('flex items-center gap-1 text-[10px] font-medium', conv.color)}>
             {conv.icon}
@@ -160,7 +154,6 @@ export default function AssetCard({ asset, projectId, paperId, onClick, onToggle
           </div>
         )}
 
-        {/* Native table dimensions */}
         {asset.asset_type === 'native_table' && asset.csv_rows !== null && (
           <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
             <FileSpreadsheet size={10} />
