@@ -1,8 +1,7 @@
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, ShieldCheck, Download, Settings,
-  LogOut, ChevronRight, Wand2, GitBranch,
-  Briefcase, ClipboardList, Users, Database, Home,
+  LayoutDashboard, ShieldCheck, LogOut, ChevronRight, Wand2,
+  GitBranch, Database, Home,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect } from 'react'
@@ -25,16 +24,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: 'research-structure', label: 'Research Structure', Icon: GitBranch },
       { to: 'normalization',      label: 'Normalization',      Icon: Wand2 },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { to: 'export',   label: 'Export',   Icon: Download },
-      { to: 'jobs',     label: 'Jobs',     Icon: Briefcase },
-      { to: 'audit',    label: 'Audit',    Icon: ClipboardList },
-      { to: 'team',     label: 'Team',     Icon: Users },
-      { to: 'settings', label: 'Settings', Icon: Settings },
     ],
   },
 ]
