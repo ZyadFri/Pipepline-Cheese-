@@ -38,7 +38,6 @@ import TeamPage from './pages/project/TeamPage'
 import ProjectSettingsPage from './pages/project/ProjectSettingsPage'
 
 // Paper-centric workflow pages
-import PapersPage from './pages/project/PapersPage'
 import PaperShell from './pages/project/PaperShell'
 import DoclingResultsPage from './pages/project/DoclingResultsPage'
 
@@ -92,8 +91,9 @@ export default function App() {
         <Route path="treatments" element={<TreatmentsPage />} />
         <Route path="thresholds" element={<ThresholdShelfLifePage />} />
 
-        {/* Paper list */}
-        <Route path="papers" element={<PapersPage />} />
+        {/* The project dashboard is now the paper library. Keep the old URL
+            as a compatibility redirect so bookmarks do not break. */}
+        <Route path="papers" element={<Navigate to=".." replace />} />
 
         {/* Paper-centric workflow — each paper has its own sub-nav shell */}
         <Route path="papers/:paperId" element={<PaperShell />}>
