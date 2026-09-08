@@ -62,6 +62,7 @@ type ResearchPaper = {
   summary: string
   doi: string
   accent: string
+  coverImage: string
 }
 
 // Real publications only. Keep metadata literal and externally verifiable.
@@ -76,6 +77,7 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     summary: 'Profiles enzymatic activity and carbohydrate composition across Canadian honeys and evaluates predictive models for botanical origin.',
     doi: 'https://doi.org/10.1016/j.fochx.2026.104189',
     accent: '#f7e7eb',
+    coverImage: '/papers/honey-food-chemistry-x.jpg',
   },
   {
     tag: 'Functional foods',
@@ -87,6 +89,7 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     summary: 'Examines a probiotic beverage enriched with cricket proteins and its relationship with gut microbiota composition and nutritional parameters.',
     doi: 'https://doi.org/10.3390/foods13020204',
     accent: '#fff1e8',
+    coverImage: '/papers/probiotic-foods.jpg',
   },
   {
     tag: 'AI & decision systems',
@@ -98,6 +101,7 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     summary: 'Presents a tailored framework for evaluating photovoltaic-system performance according to system type and application context.',
     doi: 'https://doi.org/10.1016/j.renene.2025.124047',
     accent: '#f1eaf7',
+    coverImage: '/papers/pv-renewable-energy.jpg',
   },
 ]
 
@@ -183,23 +187,9 @@ function LandingHeader() {
 
 function PaperPreview({ paper }: { paper: ResearchPaper }) {
   return (
-    <div className="relative mx-auto h-[228px] w-[164px] shrink-0 overflow-hidden rounded-[8px] border border-[#ded8d9] bg-white p-3 shadow-[0_20px_36px_-24px_rgba(50,25,33,.52)]">
-      <div className="flex items-center justify-between border-b border-[#eee8e9] pb-2 text-[5.8px] font-bold uppercase tracking-[.08em] text-[#7A1B2E]">
-        <span>{paper.journal}</span><span>{paper.year}</span>
-      </div>
-      <p className="mt-3 font-display text-[9.7px] font-semibold leading-[1.14] text-[#252024]">{paper.title}</p>
-      <p className="mt-2 line-clamp-3 text-[5.8px] leading-[1.35] text-[#766c70]">{paper.authors}</p>
-      <div className="mt-3 space-y-1.5">
-        {[100, 92, 96, 82].map((width) => <div key={width} className="h-1 rounded-full bg-[#e8e3e4]" style={{ width: `${width}%` }} />)}
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-1">
-        {[55, 76, 42, 68, 86, 60].map((height, index) => (
-          <div key={index} className="flex h-9 items-end justify-center rounded-sm bg-[#faf7f8] px-1">
-            <span className="w-full rounded-t-sm bg-[#d7a3b0]" style={{ height: `${height}%` }} />
-          </div>
-        ))}
-      </div>
-      <span className="absolute bottom-2 right-2 text-[5.5px] font-medium text-[#a19498]">DOI verified</span>
+    <div className="relative mx-auto h-[228px] w-[164px] shrink-0 overflow-hidden rounded-[8px] border border-[#ded8d9] bg-white shadow-[0_20px_36px_-24px_rgba(50,25,33,.52)]">
+      <img src={paper.coverImage} alt={`Page 1 of ${paper.title}`} className="h-full w-full object-cover object-top" />
+      <span className="absolute bottom-1.5 right-1.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[5.5px] font-semibold text-[#a19498] shadow-sm">Page 1</span>
     </div>
   )
 }
