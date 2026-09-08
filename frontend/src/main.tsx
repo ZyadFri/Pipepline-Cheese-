@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './index.css'
+import './landing-research.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
