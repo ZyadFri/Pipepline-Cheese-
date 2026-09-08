@@ -474,28 +474,23 @@ function Workflow() {
 }
 
 function ResearchSection() {
-  return (
-    <section id="research" className="relative overflow-hidden border-b border-[#eadde0] bg-[#fff9fa] py-0">
-      <div className="relative overflow-hidden border-b border-[#eadde0]">
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff9fa_0%,#fff9fa_46%,rgba(255,249,250,.92)_58%,rgba(255,249,250,.30)_100%)]" />
-        <img src={MEDIA.aging} alt="Food science research" className="absolute right-0 top-0 h-full w-[48%] object-cover opacity-60" />
-        <div className="absolute right-[6%] top-[14%] hidden rotate-[-2deg] lg:block">
-          <p className="font-display text-[23px] italic leading-tight text-[#734956]">Science<br />for better<br />food systems.</p>
-          <span className="mt-2 block h-px w-14 bg-[#a73550]" />
-        </div>
-        <div className="absolute bottom-[7%] right-[8%] hidden w-[245px] space-y-2 xl:block">
-          {['FOOD CHEMISTRY', 'DAIRY SCIENCE', 'MICROBIOLOGY', 'FOOD QUALITY'].map((label, i) => (
-            <div key={label} className="rounded-[7px] border border-white/45 bg-[#2c2930]/90 px-4 py-2.5 font-display text-[12px] tracking-[.06em] text-white shadow-[0_16px_24px_-18px_rgba(20,15,17,.8)]" style={{ transform: `translateX(${i * 7}px)` }}>
-              {label}
-            </div>
-          ))}
-        </div>
+  const topics = ['Food chemistry', 'Dairy science', 'Microbiology', 'Food quality']
 
-        <div className="relative mx-auto max-w-[1500px] px-6 py-16 sm:px-8 lg:px-10 lg:py-20">
-          <div className="max-w-[760px]">
+  return (
+    <section id="research" className="relative overflow-hidden border-b border-[#eadde0] bg-[#fffdfd] py-16 lg:py-20">
+      <div className="pointer-events-none absolute -left-40 top-0 h-96 w-96 rounded-full bg-[#f8e9ed] opacity-70 blur-3xl" />
+      <div className="relative mx-auto max-w-[1500px] px-6 sm:px-8 lg:px-10">
+        <div className="grid gap-10 lg:grid-cols-[1fr_.72fr] lg:items-center">
+          <div>
             <p className="text-[9.5px] font-bold uppercase tracking-[.18em] text-[#a12241]">Recent research</p>
             <h2 className="mt-3 font-display text-[43px] font-medium leading-[.98] tracking-[-.02em] text-[#281f22] sm:text-[48px]">Real publications from the researchers behind the project.</h2>
-            <p className="mt-5 max-w-[690px] text-[12.5px] leading-[1.75] text-[#74676d]">Explore peer-reviewed research from our team. Every publication below is real, linked to its DOI, and presented with verified journal, year and author information.</p>
+            <p className="mt-5 max-w-[560px] text-[12.5px] leading-[1.75] text-[#74676d]">Explore peer-reviewed research from our team. Every publication below is real, linked to its DOI, and presented with verified journal, year and author information.</p>
+
+            <div className="mt-7 flex flex-wrap gap-2">
+              {topics.map((label) => (
+                <span key={label} className="rounded-full border border-[#eadbe0] bg-[#fdf5f7] px-3.5 py-1.5 font-display text-[11.5px] text-[#8f2942]">{label}</span>
+              ))}
+            </div>
 
             <div className="mt-8 flex flex-wrap gap-x-8 gap-y-4">
               {[
@@ -513,25 +508,32 @@ function ResearchSection() {
               })}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="relative mx-auto max-w-[1500px] px-6 py-10 sm:px-8 lg:px-10 lg:py-12">
-        <div className="space-y-4">
+          <div className="relative hidden lg:block">
+            <div className="overflow-hidden rounded-[26px] border border-[#f0e2e6] shadow-[0_40px_80px_-45px_rgba(87,24,46,.5)]">
+              <img src={MEDIA.aging} alt="Food science research" className="h-[360px] w-full object-cover" />
+            </div>
+            <div className="absolute -bottom-6 -left-6 rounded-2xl border border-[#f0e2e6] bg-white px-4 py-3 shadow-[0_20px_45px_-25px_rgba(87,24,46,.4)]">
+              <p className="font-display text-[15px] italic leading-tight text-[#7A1B2E]">Science for<br />better food systems.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-14 space-y-4">
           {RESEARCH_PAPERS.map((paper, index) => <ResearchCard key={paper.doi} paper={paper} index={index} />)}
         </div>
 
-        <div className="relative mt-7 overflow-hidden rounded-[24px] bg-[linear-gradient(108deg,#650f24,#8c1a37_62%,#a83c57)] px-6 py-7 text-white shadow-[0_28px_58px_-40px_rgba(94,17,39,.78)] md:px-8">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border border-white/10" />
+        <div className="relative mt-7 overflow-hidden rounded-[24px] border border-[#eadbe0] bg-[#fdf6f8] px-6 py-7 md:px-8">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-[#f8e9ed] opacity-70 blur-2xl" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10"><BookOpen size={19} /></span>
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#8B1730] shadow-[0_10px_24px_-14px_rgba(139,23,48,.5)]"><BookOpen size={19} /></span>
               <div>
-                <p className="text-[8.5px] font-bold uppercase tracking-[.18em] text-white/60">Explore more</p>
-                <h3 className="mt-1 font-display text-[28px] font-medium leading-tight">Discover the researchers behind these publications</h3>
+                <p className="text-[8.5px] font-bold uppercase tracking-[.18em] text-[#a1465c]">Explore more</p>
+                <h3 className="mt-1 font-display text-[26px] font-medium leading-tight text-[#2d2528]">Discover the researchers behind these publications</h3>
               </div>
             </div>
-            <a href="#team" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[13px] bg-white px-5 py-3 text-[10.5px] font-semibold text-[#7A1B2E] transition hover:-translate-y-0.5">Meet the research team <ArrowRight size={12} /></a>
+            <a href="#team" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[13px] bg-[#7A1B2E] px-5 py-3 text-[10.5px] font-semibold text-white shadow-[0_14px_28px_-16px_rgba(122,27,46,.6)] transition hover:-translate-y-0.5 hover:bg-[#651426]">Meet the research team <ArrowRight size={12} /></a>
           </div>
         </div>
       </div>
