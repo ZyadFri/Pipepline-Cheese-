@@ -1,18 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
-  Briefcase,
-  ClipboardList,
   Database,
-  Download,
-  FlaskConical,
-  FolderKanban,
+  GitBranch,
   LayoutDashboard,
-  Settings,
   ShieldCheck,
-  TestTube2,
-  Users,
-  Wand2,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -20,15 +12,7 @@ type ProjectDestination =
   | ''
   | 'validation'
   | 'dataset'
-  | 'studies'
-  | 'experiments'
-  | 'treatments'
-  | 'normalization'
-  | 'export'
-  | 'jobs'
-  | 'audit'
-  | 'team'
-  | 'settings'
+  | 'research-structure'
 
 interface SidebarItemProps {
   label: string
@@ -123,21 +107,9 @@ export default function HomeSidebar() {
           <SidebarItem label="Database" Icon={Database} destination="dataset" projectRequired />
         </div>
 
-        <SectionLabel>Analysis</SectionLabel>
+        <SectionLabel>Research</SectionLabel>
         <div className="space-y-0.5">
-          <SidebarItem label="Studies" Icon={FlaskConical} destination="studies" projectRequired />
-          <SidebarItem label="Experiments" Icon={FolderKanban} destination="experiments" projectRequired />
-          <SidebarItem label="Treatments" Icon={TestTube2} destination="treatments" projectRequired />
-          <SidebarItem label="Normalization" Icon={Wand2} destination="normalization" projectRequired />
-        </div>
-
-        <SectionLabel>Admin</SectionLabel>
-        <div className="space-y-0.5">
-          <SidebarItem label="Export" Icon={Download} destination="export" projectRequired />
-          <SidebarItem label="Jobs" Icon={Briefcase} destination="jobs" projectRequired />
-          <SidebarItem label="Audit" Icon={ClipboardList} destination="audit" projectRequired />
-          <SidebarItem label="Team" Icon={Users} destination="team" projectRequired />
-          <SidebarItem label="Settings" Icon={Settings} destination="settings" projectRequired />
+          <SidebarItem label="Research Structure" Icon={GitBranch} destination="research-structure" projectRequired />
         </div>
       </nav>
 
