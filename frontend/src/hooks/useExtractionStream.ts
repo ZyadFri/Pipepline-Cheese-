@@ -161,8 +161,13 @@ export function useExtractionStream(
       if (eventType === 'asset_added') {
         onAssetEventRef.current?.()
       }
-      if (eventType === 'chunk_failed' || eventType === 'asset_failed') {
-        const msg = evt.message ?? 'A step failed and was skipped'
+      if (eventType === 'chunk_failed') {
+        const msg = evt.message ?? 'Some pages could not be processed and were skipped'
+        setWarnings((prev) => (prev.includes(msg) ? prev : [...prev, msg]))
+      }
+      if (eventType === 'asset_failed') {
+        const page = payload.page_number ? ` on page ${payload.page_number}` : ''
+        const msg = `Chart data${page} could not be digitized automatically. The original figure is still available for review.`
         setWarnings((prev) => (prev.includes(msg) ? prev : [...prev, msg]))
       }
       if (TERMINAL_EVENT_TYPES.has(eventType)) {
