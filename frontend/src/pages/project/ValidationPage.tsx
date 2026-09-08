@@ -1,15 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  AlertCircle, AlignLeft, BarChart3, BookOpen, Brain,
-  CheckCircle2, ChevronDown, ChevronUp, FileText,
-  Loader2, RefreshCw, Send, Table2, XCircle,
+  Activity,
+  AlertCircle,
+  BarChart3,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  FileText,
+  FlaskConical,
+  Image as ImageIcon,
+  Loader2,
+  Package,
+  Play,
+  RefreshCw,
+  Sparkles,
+  Table2,
+  Thermometer,
+  type LucideIcon,
 } from 'lucide-react'
-import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { papersApi, workspaceApi, extractionEnginesApi, type ExtractionEngineName, type UnmappedFact } from '../../services/api'
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
+import { extractionEnginesApi, papersApi, workspaceApi } from '../../services/api'
+import AuthImage from '../../components/AuthImage'
 
 interface Paper {
   id: number
@@ -57,11 +70,16 @@ interface EvidencePackages {
   native_tables: AssetItem[]
   chart_csvs: AssetItem[]
   excluded: AssetItem[]
-  totals: { paragraphs: number; native_tables: number; chart_csvs: number; excluded: number }
-  last_job: LlmJob | null
+  totals: {
+    paragraphs: number
+    native_tables: number
+    chart_csvs: number
+    excluded: number
+  }
+  last_job: ExtractionJob | null
 }
 
-interface LlmJob {
+interface ExtractionJob {
   job_id: number
   status: string
   progress: number
@@ -80,288 +98,123 @@ interface LlmJob {
   completed_at?: string | null
 }
 
-// ─── Validation check helpers ──────────────────────────────────────────────────
-
-// These confirm the paper is ready for extraction (evidence was found and
-// prepared) — they are NOT a scientific validation of the paper's content, and
-// must never be described as such.
-function computeChecks(pkg: EvidencePackages | null) {
-  if (!pkg) return []
-  const t = pkg.totals
-  return [
-    {
-      label: 'Evidence gathered from the paper',
-      ok: (t.paragraphs + t.native_tables + t.chart_csvs + t.excluded) > 0,
-      detail: `${t.paragraphs + t.native_tables + t.chart_csvs + t.excluded} item(s) found`,
-    },
-    {
-      label: 'Evidence ready for extraction',
-      ok: (t.paragraphs + t.native_tables + t.chart_csvs) > 0,
-      detail: `${t.paragraphs + t.native_tables + t.chart_csvs} item(s) included`,
-    },
-    {
-      label: 'Relevant text found',
-      ok: t.paragraphs > 0,
-      detail: `${t.paragraphs} text segment(s)`,
-    },
-    {
-      label: 'Tables found',
-      ok: t.native_tables > 0,
-      detail: `${t.native_tables} table(s)`,
-    },
-    {
-      label: 'Charts available',
-      ok: t.chart_csvs > 0,
-      detail: `${t.chart_csvs} chart(s) read`,
-    },
-    {
-      label: 'Enough evidence to extract',
-      ok: (t.paragraphs + t.native_tables + t.chart_csvs) >= 2,
-      detail: (t.paragraphs + t.native_tables + t.chart_csvs) >= 2
-        ? 'Ready to extract'
-        : 'Need at least 2 evidence items',
-    },
-  ]
+interface WhatCardProps {
+  Icon: LucideIcon
+  title: string
+  body: string
+  iconClass: string
 }
 
-// Papers often surface the same sentence multiple times (once as its own
-// paragraph, again as a caption neighbor, again as a keyword match) — collapse
-// those to one card each so the list reads as distinct evidence, not noise.
-// Each dropped duplicate's own link stays counted (paragraphs.length keeps its
-// real total), it just isn't rendered as a second identical card.
-function dedupeParagraphs(items: ParagraphItem[]): ParagraphItem[] {
-  const seen = new Set<string>()
-  const out: ParagraphItem[] = []
-  for (const item of items) {
-    const key = item.text.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 200)
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(item)
-  }
-  return out
-}
-
-// ─── Donut chart (pure SVG, no library) ────────────────────────────────────────
-
-function DonutChart({ paragraphs, tables, charts, excluded }: {
-  paragraphs: number; tables: number; charts: number; excluded: number
-}) {
-  const total = paragraphs + tables + charts + excluded
-  if (total === 0) {
-    return (
-      <div className="flex items-center justify-center h-28 text-slate-400 text-xs">
-        No assets yet
-      </div>
-    )
-  }
-  const r = 40
-  const cx = 60
-  const cy = 60
-  const circumference = 2 * Math.PI * r
-
-  const segments = [
-    { value: paragraphs, color: '#6366f1', label: 'Text' },
-    { value: tables,     color: '#10b981', label: 'Tables' },
-    { value: charts,     color: '#f59e0b', label: 'Charts' },
-    { value: excluded,   color: '#94a3b8', label: 'Excluded' },
-  ]
-
-  let offset = 0
-  const paths = segments.map((seg, i) => {
-    const frac = seg.value / total
-    const dash = frac * circumference
-    const path = (
-      <circle
-        key={i}
-        r={r}
-        cx={cx}
-        cy={cy}
-        fill="none"
-        stroke={seg.color}
-        strokeWidth={18}
-        strokeDasharray={`${dash} ${circumference - dash}`}
-        strokeDashoffset={-offset}
-        transform={`rotate(-90 ${cx} ${cy})`}
-        style={{ transition: 'stroke-dasharray 0.4s' }}
-      />
-    )
-    offset += dash
-    return path
-  })
-
+function WhatCard({ Icon, title, body, iconClass }: WhatCardProps) {
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative">
-        <svg width={120} height={120}>
-          {paths}
-          <text x={cx} y={cy - 4} textAnchor="middle" className="text-slate-900" fontSize={18} fontWeight="bold" fill="#0f172a">
-            {total - excluded}
-          </text>
-          <text x={cx} y={cy + 14} textAnchor="middle" fontSize={9} fill="#64748b">
-            selected
-          </text>
-        </svg>
+    <div className="group flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-4 shadow-[0_8px_28px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-[#dcb6c0] hover:shadow-[0_12px_32px_rgba(122,27,46,0.08)]">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${iconClass}`}>
+        <Icon size={22} strokeWidth={1.8} />
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 w-full">
-        {segments.map((s) => (
-          <div key={s.label} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-            <span className="text-[11px] text-slate-600">{s.label}: <b>{s.value}</b></span>
-          </div>
-        ))}
+      <div className="min-w-0">
+        <p className="text-[14px] font-semibold text-slate-900">{title}</p>
+        <p className="mt-0.5 text-[12px] leading-5 text-slate-500">{body}</p>
       </div>
     </div>
   )
 }
 
-// ─── Collapsible evidence section ──────────────────────────────────────────────
-
-function EvidenceSection({
-  icon: Icon,
+function StatItem({
+  Icon,
+  value,
   label,
-  count,
-  colorClass,
-  children,
-  defaultOpen = true,
+  tone,
 }: {
-  icon: React.ElementType
+  Icon: LucideIcon
+  value: number
   label: string
-  count: number
-  colorClass: string
-  children: React.ReactNode
-  defaultOpen?: boolean
+  tone: string
 }) {
-  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-2.5">
-          <div className={clsx('w-7 h-7 rounded-lg flex items-center justify-center', colorClass)}>
-            <Icon size={14} />
-          </div>
-          <span className="font-semibold text-sm text-slate-800">{label}</span>
-          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full font-medium">
-            {count}
-          </span>
-        </div>
-        {open ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-      </button>
-      {open && <div className="border-t border-slate-100 divide-y divide-slate-100">{children}</div>}
-    </div>
-  )
-}
-
-// ─── Paragraph row ──────────────────────────────────────────────────────────────
-
-function ParagraphRow({ item }: { item: ParagraphItem }) {
-  const [expanded, setExpanded] = useState(false)
-  const badge = {
-    neighbor_before: 'Before',
-    neighbor_after: 'After',
-    keyword_match: 'Keyword',
-    same_section: 'Section',
-  }[item.link_type] || item.link_type
-
-  return (
-    <div className="px-4 py-3 bg-white hover:bg-slate-50 transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="shrink-0 mt-0.5">
-          <AlignLeft size={13} className="text-indigo-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded font-medium">
-              {badge}
-            </span>
-            {item.section_name && (
-              <span className="text-[10px] text-slate-400 truncate max-w-[180px]">{item.section_name}</span>
-            )}
-            <span className="text-[10px] text-slate-400 ml-auto">p.{item.page_number}</span>
-          </div>
-          <p className={clsx('text-xs text-slate-700 leading-relaxed', !expanded && 'line-clamp-2')}>
-            {item.text}
-          </p>
-          {item.text.length > 160 && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-[10px] text-[#7A1B2E] hover:text-[#661523] mt-1"
-            >
-              {expanded ? 'Show less' : 'Show more'}
-            </button>
-          )}
-        </div>
+    <div className="flex min-w-0 flex-1 items-center gap-3 px-5 py-4">
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}>
+        <Icon size={21} strokeWidth={1.8} />
+      </div>
+      <div className="min-w-0">
+        <div className="font-serif text-[27px] leading-none text-slate-950">{value}</div>
+        <div className="mt-1 text-[12px] leading-4 text-slate-500">{label}</div>
       </div>
     </div>
   )
 }
 
-// ─── Asset row ─────────────────────────────────────────────────────────────────
-
-function AssetRow({ item, type }: { item: AssetItem; type: 'table' | 'chart' | 'excluded' }) {
-  const [expanded, setExpanded] = useState(false)
-  const colorMap = {
-    table: 'text-emerald-500',
-    chart: 'text-amber-500',
-    excluded: 'text-slate-400',
-  }
-  const Icon = type === 'table' ? Table2 : type === 'chart' ? BarChart3 : FileText
+function VisualAssetCard({
+  item,
+  kind,
+  projectId,
+  paperId,
+}: {
+  item: AssetItem
+  kind: 'table' | 'chart'
+  projectId: number
+  paperId: number
+}) {
+  const [imgError, setImgError] = useState(false)
+  const Icon = kind === 'table' ? Table2 : BarChart3
+  const label = kind === 'table' ? 'Table' : 'Chart'
+  const chip = kind === 'table'
+    ? 'bg-blue-50 text-blue-700 border-blue-100'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
 
   return (
-    <div className="px-4 py-3 bg-white hover:bg-slate-50 transition-colors">
-      <div className="flex items-start gap-3">
-        <Icon size={14} className={clsx('mt-0.5 shrink-0', colorMap[type])} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <span className="text-xs font-medium text-slate-800 truncate">
-              {item.caption || `${type === 'table' ? 'Table' : 'Chart'} (page ${item.page_number})`}
-            </span>
-            <span className="ml-auto text-[10px] text-slate-400">p.{item.page_number}</span>
-          </div>
-          <div className="flex items-center gap-3">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[#f8fafc]">
+        {item.has_image && !imgError ? (
+          <AuthImage
+            src={workspaceApi.imageUrl(projectId, paperId, item.id)}
+            alt={item.caption || `${label} on page ${item.page_number}`}
+            className="h-full w-full object-contain"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-slate-300">
+            <Icon size={34} strokeWidth={1.4} />
             {item.csv_rows != null && (
-              <span className="text-[10px] text-slate-500">{item.csv_rows} rows × {item.csv_cols} cols</span>
+              <span className="text-[11px] text-slate-400">
+                {item.csv_rows} rows × {item.csv_cols ?? 0} columns
+              </span>
             )}
-            {item.link_count > 0 && (
-              <span className="text-[10px] text-slate-500">{item.link_count} context link(s)</span>
-            )}
-            <span className={clsx(
-              'text-[10px] px-1.5 py-0.5 rounded font-medium ml-auto',
-              item.relevance_score >= 7 ? 'bg-green-50 text-green-700' :
-              item.relevance_score >= 4 ? 'bg-amber-50 text-amber-700' :
-              'bg-slate-100 text-slate-500'
-            )}>
-              Score {item.relevance_score?.toFixed(1)}
-            </span>
           </div>
-          {item.context_links.length > 0 && (
-            <>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="text-[10px] text-[#7A1B2E] hover:text-[#661523] mt-1"
-              >
-                {expanded ? 'Hide context' : `Show ${item.context_links.length} context link(s)`}
-              </button>
-              {expanded && (
-                <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-[#f3dde2]">
-                  {item.context_links.slice(0, 4).map((lnk) => (
-                    <p key={lnk.id} className="text-[11px] text-slate-600 leading-relaxed line-clamp-2">
-                      {lnk.text}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        )}
+        <span className="absolute right-2.5 top-2.5 rounded-full border border-white/70 bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-600 shadow-sm">
+          p.{item.page_number}
+        </span>
+      </div>
+      <div className="p-3.5">
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold ${chip}`}>
+          <Icon size={11} /> {label}
+        </span>
+        {item.caption && (
+          <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-700">{item.caption}</p>
+        )}
+        {!item.caption && item.csv_rows != null && (
+          <p className="mt-2 text-[12px] text-slate-500">
+            {item.csv_rows} rows × {item.csv_cols ?? 0} columns
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
+function TextEvidenceCard({ item }: { item: ParagraphItem }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">
+          <FileText size={11} /> Text
+        </span>
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500">p.{item.page_number}</span>
+      </div>
+      <p className="mt-3 line-clamp-4 text-[12px] leading-5 text-slate-600">{item.text}</p>
+    </div>
+  )
+}
 
 export default function ValidationPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -374,41 +227,38 @@ export default function ValidationPage() {
   const [pkgData, setPkgData] = useState<EvidencePackages | null>(null)
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
-  const [job, setJob] = useState<LlmJob | null>(null)
-  const [unmappedFacts, setUnmappedFacts] = useState<UnmappedFact[]>([])
-  const [showUnmapped, setShowUnmapped] = useState(false)
+  const [job, setJob] = useState<ExtractionJob | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Whenever a job finishes with additional facts captured, fetch them so the
-  // "N additional facts preserved" line has something real to expand into —
-  // this is the only place those facts are visible right now, since nothing
-  // was ever discarded, just not always structured into an experiment.
-  useEffect(() => {
-    if (job?.status === 'completed' && (job.result?.unmapped_facts_stored ?? 0) > 0 && paperId) {
-      extractionEnginesApi.unmappedFacts(pid, paperId).then(setUnmappedFacts).catch(() => setUnmappedFacts([]))
-    } else if (job?.status !== 'completed') {
-      setUnmappedFacts([])
-      setShowUnmapped(false)
-    }
-  }, [job?.status, job?.job_id, pid, paperId])
-
-  // ── Load papers ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     papersApi.list(pid).then((list: Paper[]) => {
       const extracted = list.filter((p) => ['extracted', 'extracting'].includes(p.status))
       setPapers(extracted.length > 0 ? extracted : list)
-
-      const qp = searchParams.get('paperId')
-      if (qp) {
-        setPaperId(Number(qp))
-      } else if (list.length > 0) {
-        setPaperId(list[0].id)
-      }
-    }).catch(console.error)
+      const fromQuery = searchParams.get('paperId')
+      if (fromQuery) setPaperId(Number(fromQuery))
+      else if (list.length > 0) setPaperId(list[0].id)
+    }).catch(() => toast.error('Could not load papers'))
   }, [pid, searchParams])
 
-  // ── Load evidence packages when paper selected ───────────────────────────────
+  const startPolling = useCallback((pId: number, jobId: number) => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      try {
+        const next: ExtractionJob = await workspaceApi.getLlmJob(pid, pId, jobId)
+        setJob(next)
+        if (!['queued', 'running'].includes(next.status)) {
+          clearInterval(pollRef.current!)
+          pollRef.current = null
+          if (next.status === 'completed') toast.success('Structured extraction complete')
+          if (next.status === 'failed') toast.error(next.error_message || 'Extraction failed')
+        }
+      } catch {
+        clearInterval(pollRef.current!)
+        pollRef.current = null
+      }
+    }, 2000)
+  }, [pid])
 
   const loadPackages = useCallback(async (pId: number) => {
     setLoading(true)
@@ -428,483 +278,260 @@ export default function ValidationPage() {
         }
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      if (msg?.includes('No extracted assets')) {
-        setPkgData(null)
-      } else {
-        toast.error('Failed to load evidence packages')
-      }
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      if (!message?.includes('No extracted assets')) toast.error('Could not prepare this paper for extraction')
     } finally {
       setLoading(false)
     }
-  }, [pid])
+  }, [pid, startPolling])
 
   useEffect(() => {
     if (paperId) loadPackages(paperId)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [paperId, loadPackages])
 
-  // ── Polling ──────────────────────────────────────────────────────────────────
-
-  const startPolling = (pId: number, jId: number) => {
-    if (pollRef.current) clearInterval(pollRef.current)
-    pollRef.current = setInterval(async () => {
-      try {
-        const j: LlmJob = await workspaceApi.getLlmJob(pid, pId, jId)
-        setJob(j)
-        if (!['queued', 'running'].includes(j.status)) {
-          clearInterval(pollRef.current!)
-          pollRef.current = null
-          if (j.status === 'completed') {
-            toast.success('LLM extraction complete!')
-          } else if (j.status === 'failed') {
-            toast.error(`Extraction failed: ${j.error_message || 'Unknown error'}`)
-          }
-        }
-      } catch {
-        clearInterval(pollRef.current!)
-        pollRef.current = null
-      }
-    }, 2000)
-  }
-
-  // ── Extract (LLM or Rules) ───────────────────────────────────────────────────
-
-  const [engine, setEngine] = useState<ExtractionEngineName>('llm')
-
-  const handleSend = async () => {
-    if (!paperId) return
+  const handleExtract = async () => {
+    if (!paperId || !pkgData) return
     setSending(true)
     try {
-      const resp = await extractionEnginesApi.run(pid, paperId, engine)
-      setJob({ job_id: resp.job_id, status: 'queued', progress: 0, current_step: 'Queued' })
-      toast.success(`${engine === 'llm' ? 'LLM' : 'Rule-based'} extraction started…`)
-      startPolling(paperId, resp.job_id)
+      const response = await extractionEnginesApi.run(pid, paperId, 'llm')
+      setJob({
+        job_id: response.job_id,
+        status: 'queued',
+        progress: 0,
+        current_step: 'Preparing extraction',
+      })
+      startPolling(paperId, response.job_id)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      toast.error(msg || 'Failed to start extraction')
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      toast.error(message || 'Could not start extraction')
     } finally {
       setSending(false)
     }
   }
 
-  // ── Derived state ────────────────────────────────────────────────────────────
-
-  const checks = computeChecks(pkgData)
-  const allChecksPass = checks.length > 0 && checks.every((c) => c.ok)
-  const isRunning = job && ['queued', 'running'].includes(job.status)
-  const canSend = !isRunning && !sending && paperId !== null &&
-    pkgData !== null &&
-    (pkgData.totals.paragraphs + pkgData.totals.native_tables + pkgData.totals.chart_csvs) > 0
-
   const selectedPaper = papers.find((p) => p.id === paperId)
+  const selectedCount = pkgData
+    ? pkgData.totals.paragraphs + pkgData.totals.native_tables + pkgData.totals.chart_csvs
+    : 0
+  const isRunning = !!job && ['queued', 'running'].includes(job.status)
+  const canExtract = !!paperId && !!pkgData && selectedCount > 0 && !isRunning && !sending
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="type-h1 text-slate-900">Evidence Review</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Review the evidence gathered from this paper, then extract structured data from it
-          </p>
-        </div>
+  const previewParagraphs = pkgData?.paragraphs.slice(0, 6) ?? []
+  const previewTables = pkgData?.native_tables.slice(0, 4) ?? []
+  const previewCharts = pkgData?.chart_csvs.slice(0, 4) ?? []
 
-        {/* Paper selector */}
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-semibold text-slate-600">Paper:</label>
-          <select
-            value={paperId ?? ''}
-            onChange={(e) => setPaperId(Number(e.target.value))}
-            className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#7A1B2E]/30 max-w-[280px] truncate"
-          >
-            <option value="">Select a paper…</option>
-            {papers.map((p) => (
-              <option key={p.id} value={p.id}>{p.original_name}</option>
-            ))}
-          </select>
-          {paperId && (
-            <button
-              onClick={() => loadPackages(paperId)}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            </button>
-          )}
+  if (!paperId) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#fffdfd]">
+        <div className="text-center text-slate-400">
+          <BookOpen size={42} strokeWidth={1.2} className="mx-auto mb-3" />
+          <p className="text-sm font-medium text-slate-600">Choose a research paper to continue</p>
         </div>
       </div>
+    )
+  }
 
-      {/* Body */}
-      {!paperId ? (
-        <div className="flex-1 flex items-center justify-center text-slate-400">
-          <div className="text-center">
-            <BookOpen size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Select a paper to view its evidence packages</p>
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#fffdfd]">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+          <Loader2 size={20} className="animate-spin text-[#7A1B2E]" />
+          Preparing extraction workspace…
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-[linear-gradient(180deg,#fffdfd_0%,#ffffff_48%,#fffafa_100%)]">
+      <div className="mx-auto w-full max-w-[1500px] px-7 pb-12 pt-5">
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Paper</span>
+          <select
+            value={paperId ?? ''}
+            onChange={(event) => setPaperId(Number(event.target.value))}
+            className="max-w-[360px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-700 shadow-sm outline-none transition focus:border-[#c98c9c] focus:ring-2 focus:ring-[#7A1B2E]/10"
+          >
+            {papers.map((paper) => (
+              <option key={paper.id} value={paper.id}>{paper.original_name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => paperId && loadPackages(paperId)}
+            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:text-slate-700"
+            title="Refresh"
+          >
+            <RefreshCw size={14} />
+          </button>
+        </div>
+
+        <section className="relative overflow-hidden rounded-[28px] border border-[#eadde1] bg-white shadow-[0_22px_70px_rgba(81,28,42,0.07)]">
+          <div className="absolute inset-y-0 right-0 hidden w-[34%] overflow-hidden lg:block">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_35%,rgba(232,202,173,0.50),transparent_38%),radial-gradient(circle_at_45%_75%,rgba(210,228,204,0.55),transparent_34%),linear-gradient(135deg,#fff7f2_0%,#faf1ea_55%,#f7eee7_100%)]" />
+            <div className="absolute right-12 top-10 h-52 w-40 rotate-[7deg] rounded-[18px] border border-white/80 bg-white/75 shadow-[0_18px_40px_rgba(80,42,30,0.12)]" />
+            <div className="absolute right-28 top-16 h-52 w-40 rotate-[-4deg] rounded-[18px] border border-white/80 bg-white/90 shadow-[0_18px_40px_rgba(80,42,30,0.10)]" />
+            <div className="absolute bottom-12 right-16 rounded-2xl border border-white/80 bg-white/78 px-5 py-4 shadow-lg backdrop-blur-sm">
+              <p className="font-serif text-[18px] italic leading-6 text-[#6f4d51]">From scientific literature<br />to usable data, faster.</p>
+              <div className="mt-3 h-[2px] w-10 bg-[#8B1538]" />
+            </div>
           </div>
-        </div>
-      ) : loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 size={28} className="animate-spin text-[#7A1B2E]" />
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex gap-0 h-full">
-            {/* ── Left: Evidence packages (2/3) ─────────────────────────────── */}
-            <div className="flex-1 min-w-0 overflow-y-auto p-5 space-y-4 border-r border-slate-200">
 
-              {/* Extraction status banner — confidence-aware: only green when
-                  nothing needs a second look, amber when it finished but has
-                  low-confidence values or unstored items, red on failure. */}
-              {job && (() => {
-                const nothingStructured = job.status === 'completed' &&
-                  (job.result?.experiments_stored ?? 0) === 0 &&
-                  (job.result?.measurements_stored ?? 0) === 0
-                const needsReview = job.status === 'completed' && !nothingStructured && (
-                  (job.result?.low_confidence_count ?? 0) > 0 ||
-                  (job.result?.warnings?.length ?? 0) > 0
-                )
-                const isClean = job.status === 'completed' && !needsReview && !nothingStructured
-                return (
-                <div className={clsx(
-                  'rounded-xl p-4 border flex items-start gap-3',
-                  isClean     ? 'bg-green-50 border-green-200' :
-                  (needsReview || nothingStructured) ? 'bg-amber-50 border-amber-200' :
-                  job.status === 'failed' ? 'bg-red-50 border-red-200' :
-                  'bg-[#fdf3f5] border-[#e8c6d0]'
-                )}>
-                  {isClean ? (
-                    <CheckCircle2 size={18} className="text-green-600 mt-0.5 shrink-0" />
-                  ) : (needsReview || nothingStructured) ? (
-                    <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
-                  ) : job.status === 'failed' ? (
-                    <XCircle size={18} className="text-red-600 mt-0.5 shrink-0" />
-                  ) : (
-                    <Loader2 size={18} className="text-[#7A1B2E] mt-0.5 shrink-0 animate-spin" />
-                  )}
-                  <div className="flex-1">
-                    <p className={clsx(
-                      'text-sm font-semibold',
-                      isClean     ? 'text-green-800' :
-                      (needsReview || nothingStructured) ? 'text-amber-800' :
-                      job.status === 'failed' ? 'text-red-800' :
-                      'text-[#661523]'
-                    )}>
-                      {isClean     ? 'Extraction complete' :
-                       nothingStructured ? "No structured experiments recognized" :
-                       needsReview ? 'Extraction finished — review required' :
-                       job.status === 'failed' ? 'Extraction failed' :
-                       'Extracting structured data…'}
-                    </p>
-                    <p className="text-xs text-slate-600 mt-0.5">{job.current_step}</p>
-                    {isRunning && (
-                      <div className="mt-2 h-1.5 bg-[#f3dde2] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#7A1B2E] rounded-full transition-all duration-500"
-                          style={{ width: `${job.progress}%` }}
-                        />
-                      </div>
-                    )}
-                    {job.result && job.status === 'completed' && (
-                      <div className="mt-2 flex gap-4 flex-wrap items-center">
-                        <span className={clsx('text-xs font-medium', isClean ? 'text-green-700' : 'text-amber-700')}>
-                          {job.result.experiments_stored} experiment(s)
-                        </span>
-                        <span className={clsx('text-xs font-medium', isClean ? 'text-green-700' : 'text-amber-700')}>
-                          {job.result.measurements_stored} measurement(s)
-                        </span>
-                        {(job.result.low_confidence_count ?? 0) > 0 && (
-                          <span className="text-xs text-amber-600">
-                            {job.result.low_confidence_count} need review
-                          </span>
-                        )}
-                        {job.result.warnings.length > 0 && (
-                          <span className="text-xs text-amber-600" title={job.result.warnings.join(' ')}>
-                            {job.result.warnings.length} warning(s)
-                          </span>
-                        )}
-                        {job.result.experiments_stored > 0 && (
-                          <button
-                            onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
-                            className="text-xs text-[#7A1B2E] font-semibold hover:underline"
-                          >
-                            Review results →
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {(job.result?.unmapped_facts_stored ?? 0) > 0 && (
-                      <div className="mt-2">
-                        <button
-                          onClick={() => setShowUnmapped((v) => !v)}
-                          className="text-xs font-semibold text-[#7A1B2E] hover:underline"
-                        >
-                          {job.result!.unmapped_facts_stored} additional value{job.result!.unmapped_facts_stored === 1 ? '' : 's'} found but not matched to a known indicator {showUnmapped ? '▲' : '▼'}
-                        </button>
-                        {showUnmapped && (
-                          <div className="mt-2 rounded-lg border border-amber-200 bg-white divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                            {unmappedFacts.length === 0 ? (
-                              <p className="text-xs text-slate-400 p-3">Loading…</p>
-                            ) : unmappedFacts.map((f) => (
-                              <div key={f.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                                <div className="min-w-0">
-                                  <span className="font-medium text-slate-700">{f.predicate}</span>
-                                  {f.subject && <span className="text-slate-400"> · {f.subject}</span>}
-                                </div>
-                                <span className="text-slate-600 shrink-0">{f.value_raw}{f.unit_raw ? ` ${f.unit_raw}` : ''}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {job.status === 'failed' && job.error_message && (
-                      <p className="text-xs text-red-600 mt-1">{job.error_message}</p>
-                    )}
-                  </div>
-                </div>
-                )
-              })()}
+          <div className="relative z-10 px-8 py-8 lg:w-[69%] lg:px-10 lg:py-10">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#8B1538]">Extract structured data</p>
+            <h1 className="max-w-3xl font-serif text-[42px] leading-[1.02] tracking-[-0.02em] text-[#171827] md:text-[50px]">
+              Turn this research paper into structured data
+            </h1>
+            <p className="mt-4 max-w-2xl text-[14px] leading-6 text-slate-500">
+              We’ll organize the selected evidence into research-ready experiments, treatments, conditions and measurements.
+            </p>
+            {selectedPaper && (
+              <div className="mt-5 inline-flex max-w-full items-center gap-2 rounded-full border border-[#eadde1] bg-[#fff8fa] px-3 py-1.5 text-[11px] text-[#7A1B2E]">
+                <FileText size={12} />
+                <span className="truncate">{selectedPaper.original_name}</span>
+              </div>
+            )}
+          </div>
+        </section>
 
-              {pkgData === null ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                  <AlertCircle size={36} className="mb-3 opacity-30" />
-                  <p className="text-sm font-medium">No evidence found yet</p>
-                  <p className="text-xs mt-1">Reading the paper hasn't finished for this paper yet</p>
-                  <button
-                    onClick={() => navigate(`/projects/${pid}/papers/${paperId}/overview`)}
-                    className="mt-4 btn-secondary text-xs"
-                  >
-                    Go to paper overview
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs text-slate-500 px-1">
-                    Evidence below is ranked by relevance. Items marked{' '}
-                    <strong>Included</strong> in the workspace will be used for extraction.
-                  </p>
-
-                  {/* Relevant Paragraphs */}
-                  <EvidenceSection
-                    icon={AlignLeft}
-                    label="Relevant Paragraphs"
-                    count={pkgData.totals.paragraphs}
-                    colorClass="bg-indigo-100 text-indigo-600"
-                  >
-                    {pkgData.paragraphs.length === 0 ? (
-                      <div className="px-4 py-3 text-xs text-slate-400">
-                        No relevant text paragraphs found
-                      </div>
-                    ) : (() => {
-                      const deduped = dedupeParagraphs(pkgData.paragraphs)
-                      const shown = deduped.slice(0, 30)
-                      return (
-                        <>
-                          {shown.map((item, i) => (
-                            <ParagraphRow key={`${item.asset_id}-${item.link_id}-${i}`} item={item} />
-                          ))}
-                          {deduped.length > 30 && (
-                            <div className="px-4 py-2 text-xs text-slate-400 bg-slate-50">
-                              + {deduped.length - 30} more paragraphs
-                            </div>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </EvidenceSection>
-
-                  {/* Tables */}
-                  <EvidenceSection
-                    icon={Table2}
-                    label="Tables"
-                    count={pkgData.totals.native_tables}
-                    colorClass="bg-emerald-100 text-emerald-600"
-                  >
-                    {pkgData.native_tables.length === 0 ? (
-                      <div className="px-4 py-3 text-xs text-slate-400">No tables found</div>
-                    ) : (
-                      pkgData.native_tables.map((item) => (
-                        <AssetRow key={item.id} item={item} type="table" />
-                      ))
-                    )}
-                  </EvidenceSection>
-
-                  {/* Charts */}
-                  <EvidenceSection
-                    icon={BarChart3}
-                    label="Charts"
-                    count={pkgData.totals.chart_csvs}
-                    colorClass="bg-amber-100 text-amber-600"
-                  >
-                    {pkgData.chart_csvs.length === 0 ? (
-                      <div className="px-4 py-3 text-xs text-slate-400">
-                        No usable charts found
-                      </div>
-                    ) : (
-                      pkgData.chart_csvs.map((item) => (
-                        <AssetRow key={item.id} item={item} type="chart" />
-                      ))
-                    )}
-                  </EvidenceSection>
-
-                  {/* Excluded Items */}
-                  {pkgData.excluded.length > 0 && (
-                    <EvidenceSection
-                      icon={FileText}
-                      label="Excluded Items"
-                      count={pkgData.totals.excluded}
-                      colorClass="bg-slate-100 text-slate-500"
-                      defaultOpen={false}
-                    >
-                      {pkgData.excluded.map((item) => (
-                        <AssetRow key={item.id} item={item} type="excluded" />
-                      ))}
-                    </EvidenceSection>
-                  )}
-                </>
-              )}
+        {pkgData ? (
+          <>
+            <div className="relative z-20 mx-auto -mt-1 flex max-w-5xl divide-x divide-slate-100 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+              <StatItem Icon={BookOpen} value={selectedCount} label="evidence items" tone="bg-[#fff0f3] text-[#9B1741]" />
+              <StatItem Icon={FileText} value={pkgData.totals.paragraphs} label="text passages" tone="bg-blue-50 text-blue-600" />
+              <StatItem Icon={Table2} value={pkgData.totals.native_tables} label="tables" tone="bg-violet-50 text-violet-600" />
+              <StatItem Icon={BarChart3} value={pkgData.totals.chart_csvs} label="charts" tone="bg-emerald-50 text-emerald-600" />
             </div>
 
-            {/* ── Right: Checks + summary + action (1/3) ──────────────────────── */}
-            <div className="w-80 shrink-0 overflow-y-auto p-5 space-y-5 bg-slate-50">
-
-              {/* Paper preparation */}
-              <div className="card">
-                <h3 className="section-title mb-3">Paper preparation</h3>
-                <div className="space-y-2">
-                  {checks.map((c) => (
-                    <div key={c.label} className="flex items-start gap-2.5">
-                      {c.ok ? (
-                        <CheckCircle2 size={15} className="text-emerald-500 mt-0.5 shrink-0" />
-                      ) : (
-                        <XCircle size={15} className="text-red-400 mt-0.5 shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-800 leading-tight">{c.label}</p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">{c.detail}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {pkgData && (
-                  <div className={clsx(
-                    'mt-3 pt-3 border-t border-slate-100 flex items-center gap-2',
-                    allChecksPass ? 'text-emerald-600' : 'text-amber-600'
-                  )}>
-                    {allChecksPass ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                    <span className="text-[11px] font-semibold">
-                      {allChecksPass ? 'Ready to extract' : 'More evidence would help'}
-                    </span>
-                  </div>
-                )}
+            <section className="mt-8">
+              <div className="mb-4">
+                <h2 className="font-serif text-[27px] text-slate-950">What we’ll extract</h2>
+                <p className="mt-1 text-[12px] text-slate-500">The system will look for these scientific elements in the evidence you selected.</p>
               </div>
 
-              {/* Selection Summary */}
-              {pkgData && (
-                <div className="card">
-                  <h3 className="section-title mb-3">Selection Summary</h3>
-                  <DonutChart
-                    paragraphs={pkgData.totals.paragraphs}
-                    tables={pkgData.totals.native_tables}
-                    charts={pkgData.totals.chart_csvs}
-                    excluded={pkgData.totals.excluded}
-                  />
-                </div>
-              )}
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <WhatCard Icon={Package} title="Cheese / product information" body="Product type, matrix, formulation details and characteristics" iconClass="bg-amber-50 text-amber-600" />
+                <WhatCard Icon={FlaskConical} title="Treatments & ingredients" body="Preservatives, concentrations and application methods" iconClass="bg-rose-50 text-rose-600" />
+                <WhatCard Icon={Thermometer} title="Storage conditions" body="Temperature, storage time, packaging and atmosphere" iconClass="bg-blue-50 text-blue-600" />
+                <WhatCard Icon={Activity} title="Microbiological measurements" body="Counts, organisms and other microbiological outcomes" iconClass="bg-violet-50 text-violet-600" />
+                <WhatCard Icon={Sparkles} title="Physicochemical measurements" body="pH, acidity, texture, water activity and related values" iconClass="bg-emerald-50 text-emerald-600" />
+                <WhatCard Icon={Clock3} title="Sampling times" body="Time points, study days and associated measurements" iconClass="bg-orange-50 text-orange-600" />
+              </div>
+            </section>
 
-              {/* Extract Structured Data */}
-              <div className="card space-y-3">
-                <h3 className="section-title">Extract Structured Data</h3>
-                <p className="text-xs text-slate-500">
-                  Extract structured experiments and measurements from the included
-                  evidence. Results are saved automatically and appear in Review.
-                </p>
+            <section className="mt-7 flex flex-col items-center">
+              <button
+                onClick={handleExtract}
+                disabled={!canExtract}
+                className="group inline-flex min-w-[250px] items-center justify-center gap-2 rounded-xl bg-[#93052f] px-7 py-3.5 text-[14px] font-semibold text-white shadow-[0_12px_28px_rgba(147,5,47,0.24)] transition-all hover:-translate-y-0.5 hover:bg-[#7d0428] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                {isRunning || sending ? <Loader2 size={17} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+                {isRunning ? 'Extracting…' : job?.status === 'completed' ? 'Run extraction again' : 'Start extraction'}
+              </button>
+              <p className="mt-3 text-[11px] text-slate-400">Only the evidence prepared from this paper will be used.</p>
+            </section>
 
-                {!isRunning && (
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Extraction method</p>
-                    <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-slate-100 p-1">
-                      {([
-                        ['llm', 'LLM-based'],
-                        ['rules', 'Rule-based'],
-                      ] as [ExtractionEngineName, string][]).map(([value, label]) => (
-                        <button
-                          key={value}
-                          onClick={() => setEngine(value)}
-                          className={clsx(
-                            'py-1.5 rounded-md text-xs font-semibold transition-colors',
-                            engine === value ? 'bg-white text-[#7A1B2E] shadow-sm' : 'text-slate-500 hover:text-slate-700',
-                          )}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
+            {job && (
+              <section className="mx-auto mt-6 max-w-4xl">
                 {isRunning ? (
-                  <div className="space-y-2">
-                    <div className="h-2 bg-[#f3dde2] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#7A1B2E] rounded-full transition-all duration-500"
-                        style={{ width: `${job!.progress}%` }}
-                      />
+                  <div className="rounded-2xl border border-[#eadde1] bg-[#fff8fa] p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <Loader2 size={18} className="animate-spin text-[#8B1538]" />
+                        <div>
+                          <p className="text-[13px] font-semibold text-slate-900">Building structured data</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">{job.current_step}</p>
+                        </div>
+                      </div>
+                      <span className="text-[12px] font-semibold text-[#8B1538]">{job.progress}%</span>
                     </div>
-                    <p className="text-xs text-[#661523] font-medium">{job!.current_step}</p>
-                    <p className="text-[10px] text-slate-400">{job!.progress}% complete</p>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#efdde2]">
+                      <div className="h-full rounded-full bg-[#8B1538] transition-all duration-500" style={{ width: `${job.progress}%` }} />
+                    </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={handleSend}
-                    disabled={!canSend || sending}
-                    className={clsx(
-                      'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all',
-                      canSend && !sending
-                        ? 'bg-[#7A1B2E] text-white hover:bg-[#661523] shadow-sm'
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                ) : job.status === 'completed' ? (
+                  <div className="flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-emerald-600" />
+                      <div>
+                        <p className="text-[13px] font-semibold text-emerald-900">Structured data is ready</p>
+                        <p className="mt-1 text-[11px] text-emerald-700">
+                          {job.result?.experiments_stored ?? 0} experiments · {job.result?.measurements_stored ?? 0} measurements
+                        </p>
+                      </div>
+                    </div>
+                    {(job.result?.experiments_stored ?? 0) > 0 && (
+                      <button
+                        onClick={() => navigate(`/projects/${pid}/papers/${paperId}/review`)}
+                        className="rounded-xl bg-emerald-700 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-emerald-800"
+                      >
+                        Review extracted data →
+                      </button>
                     )}
-                  >
-                    {sending ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <Brain size={15} />
-                    )}
-                    {sending ? 'Starting…' : `Extract with ${engine === 'llm' ? 'LLM' : 'Rules'}`}
-                    {!sending && <Send size={13} />}
-                  </button>
-                )}
+                  </div>
+                ) : job.status === 'failed' ? (
+                  <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-5">
+                    <AlertCircle size={19} className="mt-0.5 shrink-0 text-red-500" />
+                    <div>
+                      <p className="text-[13px] font-semibold text-red-800">Extraction could not finish</p>
+                      {job.error_message && <p className="mt-1 text-[11px] leading-5 text-red-600">{job.error_message}</p>}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            )}
 
-                {!canSend && !isRunning && pkgData !== null && (
-                  <p className="text-[10px] text-amber-600 text-center">
-                    Select at least one item in the workspace first
-                  </p>
-                )}
+            <section className="mt-7 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.035)]">
+              <button
+                onClick={() => setReviewOpen((value) => !value)}
+                className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-slate-50/70"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff0f3] text-[#8B1538]">
+                  <BookOpen size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[13px] font-semibold text-slate-900">Review included evidence <span className="font-normal text-slate-400">(optional)</span></p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">See the tables, charts and text passages that will be used for extraction.</p>
+                </div>
+                <ChevronDown size={18} className={`text-slate-400 transition-transform ${reviewOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-                {selectedPaper && (
-                  <button
-                    onClick={() => navigate(`/projects/${pid}/jobs`)}
-                    className="w-full text-xs text-slate-500 hover:text-slate-700 text-center"
-                  >
-                    View all jobs →
-                  </button>
-                )}
-              </div>
-
-              {/* Reasoning summary */}
-              {job?.result?.reasoning && job.status === 'completed' && (
-                <div className="card">
-                  <h3 className="section-title mb-2">Extraction notes</h3>
-                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-8">
-                    {job.result.reasoning}
-                  </p>
+              {reviewOpen && (
+                <div className="border-t border-slate-100 bg-[#fcfcfd] p-5">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {previewCharts.map((item) => (
+                      <VisualAssetCard key={`chart-${item.id}`} item={item} kind="chart" projectId={pid} paperId={paperId} />
+                    ))}
+                    {previewTables.map((item) => (
+                      <VisualAssetCard key={`table-${item.id}`} item={item} kind="table" projectId={pid} paperId={paperId} />
+                    ))}
+                    {previewParagraphs.map((item, index) => (
+                      <TextEvidenceCard key={`text-${item.asset_id}-${item.link_id}-${index}`} item={item} />
+                    ))}
+                  </div>
+                  {(pkgData.totals.paragraphs > previewParagraphs.length || pkgData.totals.native_tables > previewTables.length || pkgData.totals.chart_csvs > previewCharts.length) && (
+                    <p className="mt-4 text-center text-[11px] text-slate-400">Showing a visual preview of the included evidence.</p>
+                  )}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            </section>
+          </>
+        ) : (
+          <section className="mt-6 flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-8 py-16 text-center">
+            <FileText size={40} strokeWidth={1.2} className="text-slate-300" />
+            <h2 className="mt-4 font-serif text-[25px] text-slate-900">Evidence is still being prepared</h2>
+            <p className="mt-2 max-w-md text-[12px] leading-5 text-slate-500">Return to the paper overview once the paper analysis has finished.</p>
+            <button
+              onClick={() => navigate(`/projects/${pid}/papers/${paperId}/overview`)}
+              className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Back to paper overview
+            </button>
+          </section>
+        )}
+      </div>
     </div>
   )
 }
