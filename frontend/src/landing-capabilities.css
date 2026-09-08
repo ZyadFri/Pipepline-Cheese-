@@ -245,73 +245,10 @@
   transform-origin: center;
 }
 
-/* ---------- Card 3: provenance + cheese/paper composition ---------- */
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 {
-  position: relative;
-  min-height: 145px;
-  margin-top: 18px !important;
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4::before {
-  content: 'Journal of\A Dairy Science';
-  white-space: pre;
-  position: absolute;
-  left: 2px;
-  bottom: 0;
-  width: 46%;
-  height: 142px;
-  box-sizing: border-box;
-  padding: 18px 14px;
-  border: 1px solid #eee1e4;
-  border-radius: 8px 8px 3px 3px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.30), rgba(255,255,255,.72)),
-    url('https://commons.wikimedia.org/wiki/Special:Redirect/file/Various_cheeses.jpg?width=700') center 76% / 76% auto no-repeat,
-    #fffdfa;
-  color: #65555b;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 10px;
-  line-height: 1.2;
-  box-shadow:
-    10px 9px 0 -4px #fbf5f6,
-    11px 10px 0 -3px #eadde1,
-    20px 17px 0 -8px #fff,
-    21px 18px 0 -7px #eadde1,
-    0 19px 32px -26px rgba(76,23,39,.5);
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 > div {
-  position: absolute;
-  right: 0;
-  top: 6px;
-  width: 42%;
-  padding: 0 0 0 16px !important;
-  border: 0 !important;
-  border-left: 1px dashed #d9a1af !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 > div > div {
-  position: relative;
-  min-height: 26px;
-  padding: 5px 9px !important;
-  border: 1px solid #eee2e5;
-  border-radius: 10px;
-  background: #fff;
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4 > div > div::before {
-  content: '';
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin-top: -2.5px;
-  border-radius: 50%;
-  background: #c85f79;
-}
+/* Card 3 (Full provenance) intentionally keeps the plain JSX mockup from
+   Landing.tsx here — the illustrated photo+dashed-timeline composition that
+   used to live in this spot rendered as a broken, hard-to-read overlap of a
+   background photo and generated caption text, so it was removed. */
 
 /* ---------- Card 4: review controls ---------- */
 #validation > div.mx-auto > div.mt-10.grid > div:nth-child(4) > div.mt-4 {
@@ -343,56 +280,10 @@
   color: #8e2942 !important;
 }
 
-/* ---------- Card 5: database cylinder ---------- */
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 {
-  position: relative;
-  min-height: 88px;
-  margin-top: 8px !important;
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4::before {
-  content: 'From papers\A to knowledge';
-  white-space: pre;
-  position: absolute;
-  right: 24px;
-  top: -8px;
-  width: 116px;
-  padding: 8px 10px;
-  border: 1px solid #eee0e4;
-  border-radius: 12px;
-  background: #fff;
-  text-align: center;
-  color: #7d666f;
-  font-size: 9px;
-  line-height: 1.15;
-  box-shadow: 0 10px 22px -18px rgba(81,24,41,.4);
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div {
-  position: absolute;
-  right: 45px;
-  bottom: -6px;
-  display: block !important;
-  width: 88px;
-  height: 58px;
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span {
-  position: absolute;
-  left: 7px;
-  width: 74px !important;
-  height: 30px !important;
-  border-color: #eccfd7 !important;
-  border-radius: 50% !important;
-  background: linear-gradient(180deg,#f7dbe3,#f2c8d3) !important;
-  color: transparent !important;
-  box-shadow: 0 7px 13px -10px rgba(123,28,53,.55) !important;
-}
-
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span:nth-child(1) { top: 0; z-index: 3 !important; }
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span:nth-child(2) { top: 14px; z-index: 2 !important; }
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div > span:nth-child(3) { top: 28px; z-index: 1 !important; }
-#validation > div.mx-auto > div.mt-10.grid > div:nth-child(5) > div.mt-4 > div svg { opacity: 0; }
+/* Card 5 (One scientific database) also keeps the plain JSX mockup — the
+   floating "From papers to knowledge" pill plus flattened-ellipse stack left
+   too much empty space and read as a set of disconnected shapes rather than
+   a database. */
 
 /* ---------- Card 6: research structure ---------- */
 #validation > div.mx-auto > div.mt-10.grid > div:nth-child(6) > div.mt-4 {
@@ -454,8 +345,7 @@
     min-height: 0;
   }
 
-  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4::before,
-  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(3) > div.mt-4::before {
+  #validation > div.mx-auto > div.mt-10.grid > div:nth-child(1) > div.mt-4::before {
     transform: scale(.88);
     transform-origin: left bottom;
   }
