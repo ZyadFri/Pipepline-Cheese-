@@ -1,0 +1,14 @@
+# Root .dockerignore — build context is the repo root for backend/Dockerfile.
+frontend/node_modules
+frontend/dist
+frontend/.vite
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+backend/venv
+backend/uploads
+backend/food_research.db
+backend/tests
+**/.env
+**/.env.*
