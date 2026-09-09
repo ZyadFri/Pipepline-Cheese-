@@ -16,6 +16,7 @@ from app.db.models import (
     Project, Study, TreatmentArm, User,
 )
 from app.schemas.papers import PaperOut
+from app.services.cascade_cleanup import prepare_paper_deletion
 from app.services.docling_extractor import cache_dir_for
 from app.services.pdf_extractor import extract_full_text
 
@@ -394,6 +395,9 @@ def delete_paper(
     paper = db.query(Paper).filter(Paper.id == paper_id, Paper.project_id == project_id).first()
     if not paper:
         raise HTTPException(404, "Paper not found")
+
+    prepare_paper_deletion(db, paper_id)
+
     if os.path.exists(paper.file_path):
         os.remove(paper.file_path)
     db.delete(paper)

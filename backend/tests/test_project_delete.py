@@ -1,19 +1,25 @@
 """
-Regression test for a real bug: deleting a project that had gone through
-extraction always failed with a 500 (sqlite3.IntegrityError: FOREIGN KEY
-constraint failed). The canonical Study -> Experiment -> TreatmentArm ->
-Observation tree cascades correctly via ORM relationships, but several side
-tables (ExtExperiment.promoted_experiment_id, ProvenanceRecord, ValidationIssue,
-ImputationProposal, TrajectoryDefinition, ReviewAssignment, ExtractedRow's
-optional canonical_study_id) hold plain foreign keys straight into that tree
-with no cascade at all, so SQLite's FK enforcement rejected the delete as soon
-as any of them held a live row.
+Regression test for a real bug that has now broken production delete twice in a
+row from two DIFFERENT tables: deleting a project/paper that had gone through
+extraction failed with a FOREIGN KEY / ForeignKeyViolation error. The canonical
+Study -> Experiment -> TreatmentArm -> Observation tree cascades correctly via
+ORM relationships, but a growing number of side tables (ExtExperiment,
+ProvenanceRecord, ValidationIssue, ImputationProposal, TrajectoryDefinition,
+ReviewAssignment, ExtractedRow, LLMUsageEvent, the Model Lab tables...) hold
+plain foreign keys straight into paper/project/study rows with no cascade at
+all. Hand-enumerating them (the first fix) missed LLMUsageEvent entirely and
+was only caught live in production against real Postgres - SQLite's weaker FK
+enforcement in the test suite didn't reproduce it. The fix is now a generic,
+schema-introspecting cleanup (app/services/cascade_cleanup.py) instead of a
+hand-written table list, specifically so a future table nobody remembers to
+list here still gets handled.
 """
 
 from app.db.models import (
-    Experiment, ExtExperiment, ExtractedRow, ImputationProposal, Job, Observation,
+    Experiment, ExtExperiment, ExtractedRow, ImputationProposal, Job,
+    LabModelResult, LabTrainingRun, LLMUsageEvent, Observation,
     Paper, Project, ProvenanceRecord, ReviewAssignment, Study, TreatmentArm,
-    TrajectoryDefinition, User, ValidationIssue,
+    TrajectoryDefinition, UploadedDataset, User, ValidationIssue,
 )
 
 
@@ -70,16 +76,42 @@ def _full_canonical_project(db, user: User) -> Project:
     row = ExtractedRow(project_id=proj.id, paper_id=paper.id, canonical_study_id=study.id, data_json="{}")
     db.add(row)
 
+    # The two gaps a hand-written table list actually missed in production:
+    db.add(LLMUsageEvent(user_id=user.id, project_id=proj.id, paper_id=paper.id,
+                          feature="llm_extraction", provider="groq", model="test-model"))
+    dataset = UploadedDataset(project_id=proj.id, original_name="d.csv", filename="d.csv", file_path="/tmp/d.csv")
+    db.add(dataset)
+    db.flush()
+    training_run = LabTrainingRun(project_id=proj.id, dataset_id=dataset.id, dataset_family="kinetic")
+    db.add(training_run)
+    db.flush()
+    db.add(LabModelResult(training_run_id=training_run.id, project_id=proj.id,
+                           model_name="baranyi", model_family="kinetic"))
+
     db.commit()
-    return proj
+    return proj, paper
 
 
 def test_delete_project_with_full_canonical_tree(client, db, test_user, auth_headers):
-    proj = _full_canonical_project(db, test_user)
+    proj, _paper = _full_canonical_project(db, test_user)
 
     resp = client.delete(f"/api/projects/{proj.id}", headers=auth_headers)
     assert resp.status_code == 204, resp.text
     assert db.query(Project).filter(Project.id == proj.id).first() is None
+
+
+def test_delete_paper_with_full_canonical_tree(client, db, test_user, auth_headers):
+    """Regression test: delete_paper used to do a bare db.delete(paper) with no
+    cascade cleanup, so any paper that had gone through extraction (and therefore
+    has a promoted ExtExperiment, provenance records, etc.) failed with the same
+    FOREIGN KEY constraint IntegrityError delete_project used to hit."""
+    proj, paper = _full_canonical_project(db, test_user)
+
+    resp = client.delete(f"/api/projects/{proj.id}/papers/{paper.id}", headers=auth_headers)
+    assert resp.status_code == 204, resp.text
+    assert db.query(Paper).filter(Paper.id == paper.id).first() is None
+    # The project itself must survive a single-paper delete.
+    assert db.query(Project).filter(Project.id == proj.id).first() is not None
 
 
 def test_delete_project_requires_ownership(client, db, test_user, auth_headers):
