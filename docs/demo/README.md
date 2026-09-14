@@ -21,3 +21,10 @@ approve action), Research Structure, and the Scientific Database with its Export
 
 No intermediate recordings, audio chunks or debug screenshots are committed — only the final
 video, script and captions.
+
+## Presentation-cut demo videos
+
+[`presentation/`](presentation/) holds two shorter, silent, presentation-oriented cuts (upload →
+extraction, and evidence → database) recorded the same way — real Playwright automation against
+the live app, no mockups — plus the scripts used to produce them and a full recording log in
+`presentation/DEMO_RECORDING_NOTES.md`.

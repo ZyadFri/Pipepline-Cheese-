@@ -53,3 +53,18 @@ Thumbs.db
 # ── Stray backup archives (not source, not meant to be tracked) ────
 backend/app.zip
 frontend/src.zip
+
+# ── Local-only source assets (originals for derived, already-tracked ───
+# images under frontend/public/ — kept on disk for provenance, not git) ─
+docs/assets/
+
+# ── Demo recording intermediates (regeneratable via the record_* scripts;
+# only the 1080p presentation MP4s + notes are tracked — 4K is a large
+# upscale produced locally by render_demos.sh, not committed) ──────────
+docs/demo/presentation/raw_video1/
+docs/demo/presentation/raw_video2/
+docs/demo/presentation/video1_timing.json
+docs/demo/presentation/video2_timing.json
+docs/demo/presentation/qc_*.png
+docs/demo/presentation/continuity_*.png
+docs/demo/presentation/*_4k.mp4
